@@ -10,8 +10,22 @@ const UsageStats = registerPlugin('UsageStats')
  * Saves to workout_logs if a higher step count is found.
  * Safe to call at any time — never throws, never shows UI.
  */
+// A step count the user typed in wins for the rest of that day; only an
+// explicit Sync on the Log screen clears it.
+const MANUAL_KEY = 'hq-steps-manual'
+export const isStepsManualToday = () => {
+  try { return localStorage.getItem(MANUAL_KEY) === format(new Date(), 'yyyy-MM-dd') } catch { return false }
+}
+export const setStepsManualToday = (on) => {
+  try {
+    if (on) localStorage.setItem(MANUAL_KEY, format(new Date(), 'yyyy-MM-dd'))
+    else localStorage.removeItem(MANUAL_KEY)
+  } catch {}
+}
+
 export async function syncStepsBackground() {
   if (!Capacitor.isNativePlatform()) return
+  if (isStepsManualToday()) return
 
   const today = format(new Date(), 'yyyy-MM-dd')
 

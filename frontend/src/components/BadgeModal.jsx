@@ -39,11 +39,11 @@ export default function BadgeModal({ badge, onClose }) {
 
           <div className="text-center space-y-1">
             <div className="flex items-center justify-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full"
+              <span className="text-[11px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full"
                 style={{ color: t.color, background: `${t.color}20` }}>
                 {t.label}
               </span>
-              <span className="text-[10px] text-text-muted">{cat.emoji} {cat.label}</span>
+              <span className="text-[11px] text-text-muted">{cat.emoji} {cat.label}</span>
             </div>
             <h2 className="text-2xl font-black text-text-primary">{badge.name}</h2>
             {badge.unlocked && badge.unlockedAt && (
@@ -62,7 +62,7 @@ export default function BadgeModal({ badge, onClose }) {
 
         {/* Criterion */}
         <div className="space-y-1.5 mb-4">
-          <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Unlock Condition</p>
+          <p className="text-[11px] font-bold text-text-muted uppercase tracking-widest">Unlock Condition</p>
           <p className="text-sm text-text-primary">{badge.criterion}</p>
         </div>
 
@@ -70,7 +70,7 @@ export default function BadgeModal({ badge, onClose }) {
         {!badge.unlocked && badge.progress > 0 && (
           <div className="space-y-1.5">
             <div className="flex justify-between">
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Progress</p>
+              <p className="text-[11px] font-bold text-text-muted uppercase tracking-widest">Progress</p>
               <p className="text-xs font-bold" style={{ color: t.color }}>
                 {Math.round(badge.progress * 100)}%
               </p>
@@ -100,7 +100,7 @@ export default function BadgeModal({ badge, onClose }) {
             <span className="text-xl">{evo.symbol}</span>
             <div>
               <p className="text-xs font-bold" style={{ color: evo.color }}>{evo.label} Tier — x{badge.earnCount} earned</p>
-              <p className="text-[10px] text-text-muted mt-0.5">This badge represents a repeatable habit you've mastered.</p>
+              <p className="text-[11px] text-text-muted mt-0.5">This badge represents a repeatable habit you've mastered.</p>
             </div>
           </div>
         )}

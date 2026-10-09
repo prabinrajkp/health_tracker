@@ -1,4 +1,5 @@
 import { format, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns'
+import { gradeFor } from './scoreMeta'
 
 const IDENTITIES = [
   { key: 'momentum_elite',     label: 'Momentum Elite',     emoji: '👑', color: '#f59e0b',
@@ -26,15 +27,6 @@ const IDENTITIES = [
     grad: 'linear-gradient(135deg,#1e293b,#334155,#0f172a)',
     check: () => true },
 ]
-
-function gradeFromScore(s) {
-  if (s >= 90) return { letter: 'S', label: 'Outstanding', color: '#a78bfa' }
-  if (s >= 80) return { letter: 'A', label: 'Excellent',   color: '#22c55e' }
-  if (s >= 70) return { letter: 'B', label: 'Great',       color: '#38bdf8' }
-  if (s >= 60) return { letter: 'C', label: 'Good',        color: '#f59e0b' }
-  if (s >= 40) return { letter: 'D', label: 'Keep pushing',color: '#f97316' }
-  return              { letter: 'F', label: 'Needs work',  color: '#ef4444' }
-}
 
 function buildNarrative({ avgScore, trend, daysLogged, monthName, avgSleep, workoutSessions, junkFoodDays, lateDinnerDays }) {
   const parts = []
@@ -140,7 +132,7 @@ export function computeMonthlyInsights({ scores, prevScores, dietLogs, workoutLo
   const junkFoodDays  = dates.filter(d => (dietMap[d]?.meal_items || []).some(i => i.category === 'bad')).length
   const breakfastDays = dates.filter(d => (dietMap[d]?.meal_items || []).some(i => i.mealType === 'breakfast')).length
 
-  const grade    = gradeFromScore(avgScore)
+  const grade    = gradeFor(avgScore)
   const identityData = { avgScore, trend, avgSleep, workoutSessions, daysLogged }
   const identity = IDENTITIES.find(id => id.check(identityData)) || IDENTITIES[IDENTITIES.length - 1]
   const narrative = buildNarrative({ avgScore, trend, daysLogged, monthName, avgSleep, workoutSessions, junkFoodDays, lateDinnerDays })
@@ -155,10 +147,10 @@ export function computeMonthlyInsights({ scores, prevScores, dietLogs, workoutLo
   if (trend !== null && trend >= 5) positives.push({ icon: '📈', text: `+${trend} pts vs last month`, sub: 'Clear upward momentum' })
 
   const risks = []
-  if (junkFoodDays >= 8) risks.push({ icon: '🚨', text: `Junk food ${junkFoodDays} days`, sub: 'Top diet score drag' })
-  if (lateDinnerDays >= 6) risks.push({ icon: '⚠️', text: `${lateDinnerDays} late dinners`, sub: 'Each costs −5 pts + fasting window' })
-  if (avgSleep < 6.5 && sleepHours.length >= 5) risks.push({ icon: '😴', text: `Avg sleep ${avgSleep}h`, sub: '7+ hrs = +10–12 pts/night' })
-  if (workoutSessions === 0 && daysLogged >= 10) risks.push({ icon: '🏃', text: 'No workout sessions', sub: '10+ pts left unclaimed' })
+  if (junkFoodDays >= 8) risks.push({ icon: '🚨', text: `Junk food ${junkFoodDays} days`, sub: 'The biggest cost to your diet score' })
+  if (lateDinnerDays >= 6) risks.push({ icon: '⚠️', text: `${lateDinnerDays} late dinners`, sub: 'Each one costs points and shortens the fasting window' })
+  if (avgSleep < 6.5 && sleepHours.length >= 5) risks.push({ icon: '😴', text: `Avg sleep ${avgSleep}h`, sub: '7+ hours earns the full sleep-duration points' })
+  if (workoutSessions === 0 && daysLogged >= 10) risks.push({ icon: '🏃', text: 'No workout sessions', sub: 'Exercise points left unclaimed' })
 
   const nearMiss = []
   if (grade.letter !== 'S' && grade.letter !== 'A') {

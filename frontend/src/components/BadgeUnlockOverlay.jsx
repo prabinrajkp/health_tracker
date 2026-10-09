@@ -35,7 +35,7 @@ export default function BadgeUnlockOverlay({ badge, remaining, onDismiss }) {
       <div className="text-center px-8 relative"
         style={{ animation: 'badgeUnlockScale 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
 
-        <p className="text-[10px] font-black uppercase tracking-[0.35em] text-white/40 mb-8">
+        <p className="text-[11px] font-black uppercase tracking-[0.35em] text-white/40 mb-8">
           Badge Unlocked
         </p>
 

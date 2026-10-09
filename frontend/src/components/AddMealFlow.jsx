@@ -343,7 +343,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
   }, [open])
 
   // Reset + load base data whenever the sheet opens. Category is guessed from
-  // the current time (or the preset from an Activity meal-section tap) but
+  // the current time (or the preset from a Log meal-section tap) but
   // stays changeable via the header chip — see CategoryPicker.
   useEffect(() => {
     if (!open) return
@@ -429,7 +429,18 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
 
   const appendToTodayDiet = async (newItems) => {
     const diet = (await getDiet(today())) || { meal_items: [], meal_times: {}, notes: '', date: today() }
-    await saveDiet({ ...diet, date: today(), meal_items: [...(diet.meal_items || []), ...newItems] })
+    // The first log of a main meal stamps that meal's time, so the time shown
+    // on the Log screen (and used for the late-dinner rule) is never blank.
+    // It stays editable there if the meal was eaten earlier than it was logged.
+    const meal_times = { ...(diet.meal_times || {}) }
+    if (['breakfast', 'lunch', 'dinner'].includes(category) && !meal_times[category]) {
+      meal_times[category] = format(new Date(), 'HH:mm')
+    }
+    await saveDiet({
+      ...diet, date: today(), meal_times,
+      dinner_time: meal_times.dinner || diet.dinner_time || '',
+      meal_items: [...(diet.meal_items || []), ...newItems],
+    })
   }
 
   const finish = async (finalItems = items) => {

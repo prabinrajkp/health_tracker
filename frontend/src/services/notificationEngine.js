@@ -1,7 +1,8 @@
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
-import { format, subDays } from 'date-fns'
+import { format, subDays, isLastDayOfMonth } from 'date-fns'
 import db from './db'
+import { getNotificationMode, pickDailyNudge } from './reminders'
 
 // Smart notification IDs 30–39 (one-time daily, rescheduled on app open and after saves)
 // Fixed repeating reminders use IDs 1–26 (managed in Settings.jsx)
@@ -55,6 +56,10 @@ export async function scheduleSmartNotifications() {
 
     // Cancel all existing smart notifications before rescheduling
     await LocalNotifications.cancel({ notifications: SMART_IDS.map(id => ({ id })) })
+
+    // Quiet mode sends no nudges at all
+    const mode = await getNotificationMode()
+    if (mode === 'quiet') return
 
     // Read today's logs and recent history in parallel
     const [dietLog, workoutLog, sleepLog, todayScore, recentDiet, recentScores] = await Promise.all([
@@ -141,7 +146,7 @@ export async function scheduleSmartNotifications() {
       if (weekLateDinners >= 3) {
         weekBody = `This week: ${weekLateDinners} late dinners cost ~${weekLateDinners * 5} pts. Fix this → instant upgrade.`
       } else if (weekAvgScore > 0) {
-        weekBody = `Weekly avg: ${weekAvgScore} pts. Open History → Weekly tab for your full breakdown.`
+        weekBody = `Weekly avg: ${weekAvgScore} pts. Open Progress → Week for your full breakdown.`
       } else {
         weekBody = 'Your weekly summary is ready. See what drove your score this week.'
       }
@@ -174,12 +179,23 @@ export async function scheduleSmartNotifications() {
       }
     }
 
-    // Frequency control: max 4 smart notifications per day, highest priority first
+    // Frequency control, highest priority first
     // Priority order: sleep risk > dinner risk > workout gap > re-engagement > weekly > breakfast
     const priorityOrder = [31, 30, 32, 33, 34, 35]
-    const sorted = notifications.sort(
+    const ranked = notifications.sort(
       (a, b) => priorityOrder.indexOf(a.id) - priorityOrder.indexOf(b.id)
-    ).slice(0, 4)
+    )
+
+    let sorted
+    if (mode === 'coach') {
+      sorted = ranked.slice(0, 4)
+    } else if (dayOfWeek === 0 || isLastDayOfMonth(new Date())) {
+      // Standard: on wrap days the weekly / monthly summary takes the day's one slot
+      sorted = []
+    } else {
+      const pick = pickDailyNudge(ranked.filter(n => n.id !== 34))
+      sorted = pick ? [pick] : []
+    }
 
     if (sorted.length > 0) {
       await LocalNotifications.schedule({ notifications: sorted })

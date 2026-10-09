@@ -35,30 +35,6 @@ const ACTIVITY_STEPS = {
   very_active:       { steps_half_threshold: 7000, steps_full_threshold: 12000, steps_bonus_start: 15000, steps_bonus_end: 22000 },
 }
 
-const EATING_PATTERNS = [
-  { id: 'fixed',     label: 'Fixed meal times',     desc: 'Same times every day' },
-  { id: 'irregular', label: 'Irregular eating',      desc: 'Varies day to day' },
-  { id: 'late',      label: 'Late dinners frequent', desc: 'Often eating past 9 PM' },
-]
-
-const SLEEP_PATTERNS = [
-  { id: 'consistent', label: 'Consistent',       desc: 'Same time daily' },
-  { id: 'slight',     label: 'Slight variation', desc: 'Within 1 hour' },
-  { id: 'irregular',  label: 'Irregular',        desc: 'Very different each day' },
-]
-
-const DIET_PREFS = [
-  { id: 'vegetarian', label: 'Vegetarian' },
-  { id: 'eggetarian', label: 'Eggetarian' },
-  { id: 'non_veg',    label: 'Non-vegetarian' },
-]
-
-const TIME_CONSTRAINTS = [
-  { id: 'short',    label: '<30 min/day', desc: 'Very limited time' },
-  { id: 'medium',   label: '30–60 min',  desc: 'Can manage a session' },
-  { id: 'flexible', label: 'Flexible',   desc: 'No real constraint' },
-]
-
 const STRUGGLES = [
   { id: 'late_dinner',   label: 'Late-night eating',        icon: '🌙' },
   { id: 'skip_workout',  label: 'Skipping workouts',        icon: '🏃' },
@@ -97,37 +73,34 @@ function buildWeights(goals, activityLevel, primaryStruggle) {
 const TUTORIAL_SLIDES = [
   {
     icon: '🏆',
-    title: 'Core Idea',
-    body: 'Your score reflects daily habits — not perfection. Small consistent actions compound into real change.',
+    title: 'How the score works',
+    bullets: [
+      'Every day starts at 0 and builds to 100',
+      'Diet, fasting, workout and sleep each add points',
+      'Late dinner and sleeping after midnight take points off',
+    ],
   },
   {
-    icon: '🥗',
-    title: 'Diet',
-    bullets: ['Protein foods earn points', 'Junk food = penalty deduction', 'Portion control matters', 'Dinner before 9 PM saves 5 pts'],
+    icon: '➕',
+    title: 'How to log',
+    bullets: [
+      'Today shows the one thing to do next — tap it',
+      'Meals, steps, sleep and weight are one tap from Today',
+      'Everything saves as you go — there is no Save button',
+    ],
   },
   {
-    icon: '🏃',
-    title: 'Workout',
-    bullets: ['Any movement counts', 'Consistency > intensity', 'Steps + walk + exercise stack', 'A post-dinner walk earns bonus pts'],
-  },
-  {
-    icon: '😴',
-    title: 'Sleep',
-    bullets: ['7–8 hours = max points', 'Late nights reduce recovery score', 'Screen time is deducted from sleep', 'Consistent wake time is key'],
-  },
-  {
-    icon: '🎯',
-    title: 'Strategy',
-    body: 'Fix your biggest mistake first — not everything at once. The app surfaces your root cause every week.',
-  },
-  {
-    icon: '📊',
-    title: 'Weekly Summary',
-    body: 'Every week we tell you what actually went wrong — biggest wins, damage, and one strategic fix to try next week.',
+    icon: '📈',
+    title: 'Where to see progress',
+    bullets: [
+      'Progress → Week gives you one thing to fix',
+      'Progress → Month shows every day on a calendar',
+      'Profile keeps your level, goals and badges',
+    ],
   },
 ]
 
-export function TutorialSlides({ onDone, doneLabel = 'Got it. Show my dashboard' }) {
+export function TutorialSlides({ onDone, doneLabel = 'Show me Today' }) {
   const [slide, setSlide] = useState(0)
   const startX = useRef(null)
 
@@ -224,28 +197,16 @@ export default function Onboarding({ onComplete }) {
   const [step, setStep]                   = useState(0)
   const [goals, setGoals]                 = useState([])
   const [activityLevel, setActivityLevel] = useState(null)
-  const [eatingPattern, setEatingPattern] = useState(null)
-  const [sleepPattern, setSleepPattern]   = useState(null)
-  const [dietPref, setDietPref]           = useState(null)
-  const [timeConstraint, setTimeConstraint] = useState(null)
   const [primaryStruggle, setPrimaryStruggle] = useState(null)
   const [saving, setSaving]               = useState(false)
-
-  // Auto-advance computing screen after 1.5s
-  useEffect(() => {
-    if (step === 4) {
-      const t = setTimeout(() => setStep(5), 1500)
-      return () => clearTimeout(t)
-    }
-  }, [step])
 
   const toggleGoal = (id) =>
     setGoals(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id])
 
   const canNext = () => {
     if (step === 1) return goals.length > 0
-    if (step === 2) return !!(activityLevel && eatingPattern && sleepPattern)
-    if (step === 3) return !!(dietPref && timeConstraint && primaryStruggle)
+    if (step === 2) return !!activityLevel
+    if (step === 3) return !!primaryStruggle
     return true
   }
 
@@ -274,7 +235,7 @@ export default function Onboarding({ onComplete }) {
     onComplete()
   }
 
-  const TOTAL = 6
+  const TOTAL = 4
 
   // ── Screen 0: Welcome ──────────────────────────────────────────────────────
   if (step === 0) return (
@@ -284,13 +245,13 @@ export default function Onboarding({ onComplete }) {
         <h1 className="text-2xl font-bold text-text-primary mb-1">Health Quest</h1>
         <p className="text-2xl font-bold text-brand-light mb-5">Track less. Improve faster.</p>
         <p className="text-sm text-text-muted max-w-xs mx-auto leading-relaxed">
-          In 60 seconds, we'll personalise your scoring system so the app actually fits your goals and lifestyle.
+          Three quick questions, and your scoring is set up around your goals.
         </p>
       </div>
       <div className="w-full max-w-xs space-y-3">
         <button onClick={() => setStep(1)}
           className="btn-primary w-full py-4 rounded-2xl text-sm font-semibold">
-          Start Setup (≈ 1 min)
+          Start setup
         </button>
         <button onClick={handleSkip}
           className="w-full py-3 text-sm text-text-muted">
@@ -332,41 +293,19 @@ export default function Onboarding({ onComplete }) {
     </div>
   )
 
-  // ── Screen 2: Lifestyle Snapshot ───────────────────────────────────────────
+  // ── Screen 2: Activity level ───────────────────────────────────────────────
   if (step === 2) return (
     <div className="min-h-screen bg-surface-base flex flex-col">
       <ProgressBar current={1} total={TOTAL} />
-      <div className="flex-1 px-4 py-4 overflow-y-auto space-y-6 pb-2">
+      <div className="flex-1 px-4 py-4 overflow-y-auto space-y-5 pb-2">
         <div>
-          <h2 className="text-xl font-bold text-text-primary mb-1">Your lifestyle snapshot</h2>
-          <p className="text-sm text-text-muted">3 quick questions — no typing needed</p>
+          <h2 className="text-xl font-bold text-text-primary mb-1">How active are you now?</h2>
+          <p className="text-sm text-text-muted">Sets a step target you can actually reach</p>
         </div>
-
-        <div>
-          <p className="text-sm font-semibold text-text-primary mb-2">Activity level</p>
-          <div className="space-y-2">
-            {ACTIVITY_LEVELS.map(a => (
-              <OptionRow key={a.id} selected={activityLevel === a.id} onClick={() => setActivityLevel(a.id)} label={a.label} desc={a.desc} />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-semibold text-text-primary mb-2">Eating pattern</p>
-          <div className="space-y-2">
-            {EATING_PATTERNS.map(e => (
-              <OptionRow key={e.id} selected={eatingPattern === e.id} onClick={() => setEatingPattern(e.id)} label={e.label} desc={e.desc} />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-semibold text-text-primary mb-2">Sleep pattern</p>
-          <div className="space-y-2">
-            {SLEEP_PATTERNS.map(s => (
-              <OptionRow key={s.id} selected={sleepPattern === s.id} onClick={() => setSleepPattern(s.id)} label={s.label} desc={s.desc} />
-            ))}
-          </div>
+        <div className="space-y-2">
+          {ACTIVITY_LEVELS.map(a => (
+            <OptionRow key={a.id} selected={activityLevel === a.id} onClick={() => setActivityLevel(a.id)} label={a.label} desc={a.desc} />
+          ))}
         </div>
       </div>
       <div className="px-4 pb-8 pt-4 flex gap-3">
@@ -382,45 +321,19 @@ export default function Onboarding({ onComplete }) {
     </div>
   )
 
-  // ── Screen 3: Constraints & Preferences ───────────────────────────────────
+  // ── Screen 3: Main struggle ────────────────────────────────────────────────
   if (step === 3) return (
     <div className="min-h-screen bg-surface-base flex flex-col">
       <ProgressBar current={2} total={TOTAL} />
-      <div className="flex-1 px-4 py-4 overflow-y-auto space-y-6 pb-2">
+      <div className="flex-1 px-4 py-4 overflow-y-auto space-y-5 pb-2">
         <div>
-          <h2 className="text-xl font-bold text-text-primary mb-1">Constraints & preferences</h2>
-          <p className="text-sm text-text-muted">Helps us avoid unrealistic recommendations</p>
+          <h2 className="text-xl font-bold text-text-primary mb-1">What usually breaks your routine?</h2>
+          <p className="text-sm text-text-muted">Pick the one that hits most often</p>
         </div>
-
-        <div>
-          <p className="text-sm font-semibold text-text-primary mb-2">Diet preference</p>
-          <div className="grid grid-cols-3 gap-2">
-            {DIET_PREFS.map(d => (
-              <button key={d.id} onClick={() => setDietPref(d.id)}
-                className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all ${dietPref === d.id ? 'border-brand bg-brand/10 text-brand-light' : 'border-surface-border bg-surface-card text-text-primary'}`}>
-                {d.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-semibold text-text-primary mb-2">Time available for workouts</p>
-          <div className="space-y-2">
-            {TIME_CONSTRAINTS.map(t => (
-              <OptionRow key={t.id} selected={timeConstraint === t.id} onClick={() => setTimeConstraint(t.id)} label={t.label} desc={t.desc} />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-semibold text-text-primary mb-1">What usually breaks your routine?</p>
-          <p className="text-xs text-text-muted mb-2">Pick the one that hits most often</p>
-          <div className="space-y-2">
-            {STRUGGLES.map(s => (
-              <OptionRow key={s.id} selected={primaryStruggle === s.id} onClick={() => setPrimaryStruggle(s.id)} label={s.label} icon={s.icon} />
-            ))}
-          </div>
+        <div className="space-y-2">
+          {STRUGGLES.map(s => (
+            <OptionRow key={s.id} selected={primaryStruggle === s.id} onClick={() => setPrimaryStruggle(s.id)} label={s.label} icon={s.icon} />
+          ))}
         </div>
       </div>
       <div className="px-4 pb-8 pt-4 flex gap-3">
@@ -436,35 +349,18 @@ export default function Onboarding({ onComplete }) {
     </div>
   )
 
-  // ── Screen 4: Computing (auto-advances to tutorial) ────────────────────────
+  // ── Screen 4: Tutorial ─────────────────────────────────────────────────────
   if (step === 4) return (
-    <div className="min-h-screen bg-surface-base flex flex-col items-center justify-center px-6 text-center">
-      <div className="text-5xl mb-6">⚙️</div>
-      <h2 className="text-xl font-bold text-text-primary mb-2">Personalising your experience…</h2>
-      <p className="text-sm text-text-muted max-w-xs">
-        Computing your scoring weights based on your goals and lifestyle.
-      </p>
-      <div className="mt-8 flex gap-1.5">
-        {[0, 1, 2].map(i => (
-          <div key={i} className="w-2 h-2 rounded-full bg-brand animate-pulse"
-            style={{ animationDelay: `${i * 0.2}s` }} />
-        ))}
-      </div>
-    </div>
-  )
-
-  // ── Screen 5: Tutorial ─────────────────────────────────────────────────────
-  if (step === 5) return (
     <div className="min-h-screen bg-surface-base flex flex-col">
-      <ProgressBar current={4} total={TOTAL} />
+      <ProgressBar current={3} total={TOTAL} />
       <div className="px-6 pt-4 pb-2">
-        <h2 className="text-xl font-bold text-text-primary mb-1">How to win in this app</h2>
-        <p className="text-sm text-text-muted">Swipe through — takes 30 seconds</p>
+        <h2 className="text-xl font-bold text-text-primary mb-1">How Health Quest works</h2>
+        <p className="text-sm text-text-muted">Three things to know</p>
       </div>
       <div className="flex-1 flex flex-col min-h-0">
         <TutorialSlides
           onDone={handleComplete}
-          doneLabel={saving ? 'Saving…' : 'Got it. Show my dashboard'}
+          doneLabel={saving ? 'Saving…' : 'Show me Today'}
         />
       </div>
     </div>

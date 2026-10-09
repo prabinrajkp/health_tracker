@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format, subDays, parseISO } from 'date-fns'
 import toast from 'react-hot-toast'
-import { Save, Scale, Minus, Plus, TrendingDown, TrendingUp, Target, Flame, Settings2 } from 'lucide-react'
+import { Save, Scale, Minus, Plus, TrendingDown, TrendingUp, Target, ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from 'recharts'
 import { getWeightEntry, getWeightEntries, saveWeightEntry, getConfig } from '../api/client'
-import { dieteticsFromConfig } from '../services/dietetics'
 import useStore from '../store/useStore'
 
 const RANGES = [
@@ -32,26 +31,12 @@ function StatTile({ label, value, unit, color, Icon }) {
       style={{ boxShadow: `0 2px 12px ${color}20` }}>
       <div className="flex items-center gap-1.5">
         {Icon && <Icon size={12} style={{ color }} />}
-        <p className="text-[10px] text-text-muted">{label}</p>
+        <p className="text-xs text-text-muted">{label}</p>
       </div>
       <p className="text-xl font-black tabular-nums" style={{ color }}>
         {value}
         {unit && <span className="text-xs font-semibold text-text-muted ml-0.5">{unit}</span>}
       </p>
-    </div>
-  )
-}
-
-function MacroBar({ label, range, color }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-text-muted w-14 shrink-0">{label}</span>
-      <div className="flex-1 h-2.5 rounded-full overflow-hidden bg-surface-elevated">
-        <div className="h-full rounded-full" style={{ width: '100%', background: `linear-gradient(90deg, ${color}99, ${color})` }} />
-      </div>
-      <span className="text-xs font-semibold text-text-primary tabular-nums w-20 text-right shrink-0">
-        {range.min}–{range.max} g
-      </span>
     </div>
   )
 }
@@ -124,11 +109,6 @@ export default function Weight() {
     }
   }, [entries, targetWeight, today, now])
 
-  const dietetics = useMemo(
-    () => (stats ? dieteticsFromConfig(config, stats.latest) : null),
-    [config, stats],
-  )
-
   const chartData = useMemo(() => {
     const from = format(subDays(now, range), 'yyyy-MM-dd')
     return entries
@@ -164,9 +144,10 @@ export default function Weight() {
   return (
     <div className="min-h-screen bg-surface-base pb-28 animate-fade-in">
       <div className="page-header">
-        <div className="p-2 bg-brand/10 rounded-xl border border-brand/20">
-          <Scale size={16} className="text-brand-light" />
-        </div>
+        <button onClick={() => navigate(-1)} aria-label="Back"
+          className="w-10 h-10 rounded-2xl bg-surface-elevated border border-surface-border flex items-center justify-center shrink-0">
+          <ArrowLeft size={17} className="text-text-secondary" />
+        </button>
         <div className="flex-1">
           <h1 className="text-base font-semibold text-text-primary">Weight</h1>
           <p className="text-xs text-text-muted">{format(now, 'EEEE, MMM d')}</p>
@@ -280,15 +261,15 @@ export default function Weight() {
               <LineChart data={chartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--c-surface-border))" vertical={false} />
                 <XAxis dataKey="label" type="category"
-                  tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 10, fontFamily: 'Inter' }}
+                  tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 11, fontFamily: 'Inter' }}
                   axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis domain={['dataMin - 2', 'dataMax + 2']}
-                  tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 10, fontFamily: 'Inter' }}
+                  tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 11, fontFamily: 'Inter' }}
                   axisLine={false} tickLine={false} />
                 <Tooltip content={<WeightTooltip />} />
                 {targetWeight && (
                   <ReferenceLine y={targetWeight} stroke="#a78bfa" strokeDasharray="4 2"
-                    label={{ value: `target ${targetWeight}`, position: 'insideTopRight', fontSize: 9, fill: '#a78bfa' }} />
+                    label={{ value: `target ${targetWeight}`, position: 'insideTopRight', fontSize: 11, fill: '#a78bfa' }} />
                 )}
                 <Line dataKey="weight" stroke={trendColor} strokeWidth={2}
                   dot={{ r: 3, fill: trendColor, stroke: 'none' }} activeDot={{ r: 5 }}
@@ -303,60 +284,6 @@ export default function Weight() {
               {stats ? `${stats.count} entr${stats.count === 1 ? 'y' : 'ies'} so far` : 'No entries yet'}
             </p>
           </div>
-        )}
-
-        {/* ── Targets ───────────────────────────────────────────────────── */}
-        {dietetics ? (
-          <div className="card space-y-3">
-            <div className="flex items-center gap-2">
-              <Flame size={14} style={{ color: '#f97316' }} />
-              <p className="section-label flex-1">Daily targets</p>
-              <span className="badge badge-muted">{dietetics.activity_level}</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                ['BMR', dietetics.bmr, 'kcal'],
-                ['Maintain', dietetics.maintenance, 'kcal'],
-                ['Target', dietetics.energy, 'kcal'],
-              ].map(([label, value, unit]) => (
-                <div key={label} className="bg-surface-base rounded-xl p-2.5 text-center">
-                  <p className="text-[10px] text-text-muted">{label}</p>
-                  <p className="text-base font-bold tabular-nums text-text-primary">{value}</p>
-                  <p className="text-[9px] text-text-muted">{unit}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-2 pt-1">
-              <MacroBar label="Protein" range={dietetics.proteins} color="#22c55e" />
-              <MacroBar label="Carbs"   range={dietetics.carbs}    color="#38bdf8" />
-              <MacroBar label="Fat"     range={dietetics.fat}      color="#f59e0b" />
-              <MacroBar label="Fibre"   range={dietetics.fibre}    color="#a78bfa" />
-            </div>
-
-            <p className="text-xs text-text-muted border-t border-surface-border pt-2.5">
-              BMI {dietetics.bmi} · ideal weight around {dietetics.ideal_weight} kg.
-              {dietetics.energy < dietetics.maintenance
-                ? ` Target is ${dietetics.maintenance - dietetics.energy} kcal below maintenance.`
-                : ''}
-            </p>
-          </div>
-        ) : (
-          <button onClick={() => navigate('/settings?section=body')}
-            className="w-full card flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
-            style={{ background: 'rgba(236,72,153,0.06)', borderColor: 'rgba(236,72,153,0.25)' }}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: 'rgba(236,72,153,0.15)' }}>
-              <Settings2 size={16} style={{ color: '#ec4899' }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#ec4899' }}>Set up</p>
-              <p className="text-sm font-semibold text-text-primary leading-tight">
-                {stats ? 'Add your height and age for calorie targets' : 'Log a weight and add your body metrics'}
-              </p>
-            </div>
-          </button>
         )}
 
       </div>

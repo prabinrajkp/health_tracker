@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, subDays, parseISO, addWeeks } from 'date-fns'
-import { ChevronLeft, ChevronRight, BarChart2, X, Share2, TrendingUp, TrendingDown, Minus as MinusIcon, CheckCircle2, XCircle, Zap, Award } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, BarChart2, X, Share2, TrendingUp, TrendingDown, Minus as MinusIcon, CheckCircle2, XCircle, Zap } from 'lucide-react'
 import { toPng } from 'html-to-image'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import toast from 'react-hot-toast'
-import { getMonthlyScores, getDiet, getWorkout, getSleep } from '../api/client'
+import { getMonthlyScores, getDiet, getWorkout, getSleep, getConfig } from '../api/client'
 import {
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   LineChart, Line, ReferenceLine,
@@ -12,10 +13,9 @@ import {
 import { DayDetailPanel } from '../components/DayDetail'
 import db from '../services/db'
 import { getWeekBounds, computeWeeklySummary } from '../services/weeklyInsights'
-import { getBadgeStates } from '../services/badgeEngine'
-import BadgeShelf from '../components/BadgeShelf'
 import { computeMonthlyInsights } from '../services/monthlyInsights'
 import { getMealAnalytics } from '../services/localStore'
+import { weightsFromConfig, categoryMaxes } from '../services/scoreMeta'
 
 // Deterministic, history-driven meal analytics (see recommendationEngine.js) —
 // top foods/templates, diversity, and repetition over the last 30 days.
@@ -100,16 +100,64 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-export default function History() {
+const TABS = [['week', 'Week'], ['month', 'Month'], ['trends', 'Trends']]
+
+export default function Progress() {
   // ── Tab state ────────────────────────────────────────────────────────────
-  const [historyTab, setHistoryTab] = useState('week')
+  const [searchParams] = useSearchParams()
+  const [historyTab, setHistoryTab] = useState(() => {
+    const t = searchParams.get('tab')
+    return TABS.some(([key]) => key === t) ? t : 'week'
+  })
+  const [whyOpen, setWhyOpen]           = useState(false)
+  const [insightsOpen, setInsightsOpen] = useState(false)
+  const [lifetime, setLifetime]         = useState(null)
+  const [maxes, setMaxes]               = useState(categoryMaxes())
+
+  const [weights, setWeights]           = useState(null)
+
+  useEffect(() => {
+    getConfig().then(rows => {
+      const w = weightsFromConfig(rows)
+      setWeights(w)
+      setMaxes(categoryMaxes(w))
+    }).catch(() => {})
+  }, [])
+
+  // ── Lifetime stats (Trends) ──────────────────────────────────────────────
+  useEffect(() => {
+    if (historyTab !== 'trends' || lifetime) return
+    Promise.all([
+      db.daily_scores.orderBy('date').toArray(),
+      db.workout_logs.toArray(),
+      db.sleep_logs.toArray(),
+    ]).then(([allScores, allWorkout, allSleep]) => {
+      const dates = allScores.map(r => r.date)
+      let best = dates.length ? 1 : 0, run = 1
+      for (let i = 1; i < dates.length; i++) {
+        const gap = Math.round((new Date(dates[i] + 'T00:00:00') - new Date(dates[i - 1] + 'T00:00:00')) / 86400000)
+        run = gap === 1 ? run + 1 : 1
+        if (run > best) best = run
+      }
+      const goodDays = allScores.filter(r => r.total_score >= 70).length
+      setLifetime({
+        days:      allScores.length,
+        avg:       allScores.length ? Math.round(allScores.reduce((a, r) => a + r.total_score, 0) / allScores.length) : 0,
+        steps:     allWorkout.reduce((a, w) => a + (w.steps || 0), 0),
+        workouts:  allWorkout.filter(w => w.exercise_done).length,
+        sleepH:    Math.round(allSleep.reduce((a, sl) => a + (sl.sleep_hours || 0), 0)),
+        topDays:   allScores.filter(r => r.total_score >= 90).length,
+        goodPct:   allScores.length >= 7 ? Math.round((goodDays / allScores.length) * 100) : null,
+        bestStreak: best,
+      })
+    }).catch(() => {})
+  }, [historyTab])
 
   // ── Week state ───────────────────────────────────────────────────────────
   const [weekRef, setWeekRef]         = useState(new Date())
   const [weekSummary, setWeekSummary] = useState(null)
   const [weekRange, setWeekRange]     = useState(null)
   const [weekLoading, setWeekLoading] = useState(false)
-  const [allBadges, setAllBadges]     = useState(null)
 
   // ── Month state ──────────────────────────────────────────────────────────
   const [viewDate, setViewDate] = useState(new Date())
@@ -125,14 +173,13 @@ export default function History() {
 
   // ── Monthly insights state ───────────────────────────────────────────────
   const [monthlyInsights, setMonthlyInsights] = useState(null)
-  const [monthBadges, setMonthBadges]         = useState(null)
 
   const LINE_METRICS = [
     { key: 'total',   color: '#FBBC04', label: 'Total',   max: 100 },
-    { key: 'diet',    color: '#34A853', label: 'Diet',    max: 35 },
-    { key: 'workout', color: '#1A73E8', label: 'Workout', max: 35 },
-    { key: 'sleep',   color: '#a78bfa', label: 'Sleep',   max: 30 },
-    { key: 'fasting', color: '#f97316', label: 'Fasting', max: 10 },
+    { key: 'diet',    color: '#34A853', label: 'Diet',    max: maxes.diet },
+    { key: 'workout', color: '#1A73E8', label: 'Workout', max: maxes.workout },
+    { key: 'sleep',   color: '#a78bfa', label: 'Sleep',   max: maxes.sleep },
+    { key: 'fasting', color: '#f97316', label: 'Fasting', max: maxes.fasting },
     { key: 'steps',   color: '#06b6d4', label: 'Steps',   max: 15000 },
   ]
   const activeLine = LINE_METRICS.find(m => m.key === selectedLine) || LINE_METRICS[0]
@@ -171,7 +218,6 @@ export default function History() {
     setDayDetail(null)
     setPrevMonthScores([])
     setMonthlyInsights(null)
-    setMonthBadges(null)
 
     const now = new Date()
     const viewingCurrentMonth = year === now.getFullYear() && month === (now.getMonth() + 1)
@@ -204,10 +250,6 @@ export default function History() {
     ]).then(([s, d, w, sl, ps]) => {
       const ins = computeMonthlyInsights({ scores: s, prevScores: ps, dietLogs: d, workoutLogs: w, sleepLogs: sl, year, month })
       setMonthlyInsights(ins)
-      getBadgeStates().then(all => {
-        const mb = all.filter(b => b.unlocked && b.unlockedAt && b.unlockedAt >= mStart && b.unlockedAt <= mEnd)
-        setMonthBadges(mb.length ? mb : null)
-      }).catch(() => {})
     }).catch(() => {})
   }, [historyTab, year, month])
 
@@ -215,7 +257,7 @@ export default function History() {
   useEffect(() => {
     if (historyTab !== 'week') return
     setWeekLoading(true)
-    getBadgeStates().then(setAllBadges).catch(() => {})
+    setWhyOpen(false)
     const { start, end } = getWeekBounds(weekRef)
     const prevRef = addWeeks(weekRef, -1)
     const { start: ps, end: pe } = getWeekBounds(prevRef)
@@ -233,9 +275,10 @@ export default function History() {
       setWeekSummary(computeWeeklySummary({
         scores, dietLogs: diet, workoutLogs: workout, sleepLogs: sleep,
         prevScores: pScores, prevDietLogs: pDiet, prevWorkoutLogs: pWorkout, prevSleepLogs: pSleep,
+        weights,
       }))
     }).finally(() => setWeekLoading(false))
-  }, [historyTab, weekRef])
+  }, [historyTab, weekRef, weights])
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const pastScores = scores.filter(s => s.date <= todayStr)
@@ -307,75 +350,89 @@ export default function History() {
     return <span className="flex items-center gap-1 text-xs font-semibold text-text-muted"><MinusIcon size={12} />Same as last week</span>
   }
 
+  const monthNav = (
+    <div className="flex items-center justify-between bg-surface-card border border-surface-border rounded-2xl px-4 py-3">
+      <button onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))} aria-label="Previous month"
+        className="p-1.5 rounded-lg text-text-muted">
+        <ChevronLeft size={16} />
+      </button>
+      <span className="text-sm font-semibold text-text-primary">{format(viewDate, 'MMMM yyyy')}</span>
+      <button onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))} aria-label="Next month"
+        disabled={isCurrentMonth} className="p-1.5 rounded-lg text-text-muted disabled:opacity-30">
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  )
+
+  const fmtSteps = (n) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n)
+
   return (
     <div className="min-h-screen bg-surface-base pb-28 animate-fade-in">
       <div className="page-header">
         <div className="p-2 bg-warning/10 rounded-xl border border-warning/20">
           <BarChart2 size={16} className="text-warning" />
         </div>
-        <h1 className="text-base font-semibold text-text-primary">History</h1>
+        <h1 className="text-base font-semibold text-text-primary">Progress</h1>
       </div>
 
-      {/* Tab toggle */}
       <div className="max-w-lg mx-auto px-4 pt-2 pb-0">
         <div className="flex gap-1 bg-surface-elevated rounded-xl p-1">
-          {[['week', 'Weekly Executive'], ['month', 'Monthly Calendar']].map(([key, label]) => (
+          {TABS.map(([key, label]) => (
             <button key={key} onClick={() => setHistoryTab(key)}
-              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${historyTab === key ? 'bg-surface-card text-text-primary shadow-sm' : 'text-text-muted'}`}>
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${historyTab === key ? 'bg-surface-card text-text-primary shadow-sm' : 'text-text-muted'}`}>
               {label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── WEEK TAB ── */}
+      {/* ── WEEK ── */}
       {historyTab === 'week' && (
         <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
 
-          {/* Week navigator */}
           <div className="flex items-center justify-between bg-surface-card border border-surface-border rounded-2xl px-4 py-3">
-            <button onClick={() => setWeekRef(d => addWeeks(d, -1))}
-              className="p-1.5 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">
+            <button onClick={() => setWeekRef(d => addWeeks(d, -1))} aria-label="Previous week" className="p-1.5 rounded-lg text-text-muted">
               <ChevronLeft size={16} />
             </button>
-            <div className="text-center">
-              <p className="text-sm font-semibold text-text-primary">
-                {weekRange ? `${format(new Date(weekRange.start + 'T00:00:00'), 'MMM d')} – ${format(new Date(weekRange.end + 'T00:00:00'), 'MMM d, yyyy')}` : '…'}
-              </p>
-              <p className="text-xs text-text-muted mt-0.5">Week summary</p>
-            </div>
-            <button onClick={() => setWeekRef(d => addWeeks(d, 1))}
+            <p className="text-sm font-semibold text-text-primary">
+              {weekRange ? `${format(new Date(weekRange.start + 'T00:00:00'), 'MMM d')} – ${format(new Date(weekRange.end + 'T00:00:00'), 'MMM d, yyyy')}` : '…'}
+            </p>
+            <button onClick={() => setWeekRef(d => addWeeks(d, 1))} aria-label="Next week"
               disabled={weekRange && weekRange.end >= format(new Date(), 'yyyy-MM-dd')}
-              className="p-1.5 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors disabled:opacity-30">
+              className="p-1.5 rounded-lg text-text-muted disabled:opacity-30">
               <ChevronRight size={16} />
             </button>
           </div>
 
-          {weekLoading && <div className="text-center py-12 text-text-muted text-sm">Analysing your week…</div>}
+          {weekLoading && <div className="text-center py-12 text-text-muted text-sm">Looking at your week…</div>}
 
           {!weekLoading && !weekSummary && (
             <div className="card text-center py-10 space-y-2">
               <p className="text-3xl">📭</p>
-              <p className="text-sm font-semibold text-text-primary">No data logged this week</p>
-              <p className="text-xs text-text-muted">Log at least one day via Activity to see your weekly executive summary</p>
+              <p className="text-sm font-semibold text-text-primary">Nothing logged this week</p>
+              <p className="text-xs text-text-muted">Log at least one day to see your weekly summary</p>
             </div>
           )}
 
           {!weekLoading && weekSummary && (() => {
             const s = weekSummary
+            const wins  = whyOpen ? s.wins   : s.wins.slice(0, 2)
+            const costs = whyOpen ? s.damage : s.damage.slice(0, 2)
+            const hasMore = s.wins.length > 2 || s.damage.length > 2 || s.stackedFailures.length > 0
+              || s.topJunk.length > 0 || (s.bestDay && s.worstDay)
             return (
               <>
-                {/* ── Score card ── */}
+                {/* ── Score ── */}
                 <div className="card">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="section-label">Weekly Avg Score</p>
+                      <p className="section-label">Average score</p>
                       <div className="flex items-end gap-3 mt-2">
                         <p className="text-5xl font-bold tabular-nums" style={{ color: s.grade.color }}>{s.avgScore}</p>
                         <div className="pb-1">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold"
-                            style={{ color: s.grade.color, borderColor: `${s.grade.color}40`, background: `${s.grade.color}12` }}>
-                            {s.grade.letter} — {s.grade.label}
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
+                            style={{ color: s.grade.color, background: `${s.grade.color}18` }}>
+                            {s.grade.letter} · {s.grade.label}
                           </div>
                           <div className="mt-1.5"><TrendBadge trend={s.trend} /></div>
                         </div>
@@ -384,41 +441,41 @@ export default function History() {
                     <div className="text-right shrink-0">
                       <p className="text-xs text-text-muted">Days logged</p>
                       <p className="text-2xl font-bold tabular-nums text-text-primary">{s.daysLogged}<span className="text-sm text-text-muted font-normal">/7</span></p>
-                      <p className="text-xs text-text-muted mt-1">{s.metrics.idealDays} ideal days ≥70</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-4 gap-2 mt-4">
                     {[
-                      { label: 'Avg Steps', value: s.metrics.avgSteps >= 1000 ? `${(s.metrics.avgSteps/1000).toFixed(1)}k` : String(s.metrics.avgSteps), color: '#38bdf8' },
-                      { label: 'Avg Sleep', value: `${s.metrics.avgSleep}h`, color: '#a78bfa' },
-                      { label: 'Workouts', value: String(s.metrics.workoutSessions), color: '#22c55e' },
-                      { label: 'Late 🍽️', value: String(s.metrics.lateDinnerDays), color: s.metrics.lateDinnerDays >= 3 ? '#ef4444' : s.metrics.lateDinnerDays > 0 ? '#f59e0b' : '#22c55e' },
+                      { label: 'Avg steps', value: s.metrics.avgSteps >= 1000 ? `${(s.metrics.avgSteps / 1000).toFixed(1)}k` : String(s.metrics.avgSteps) },
+                      { label: 'Avg sleep', value: `${s.metrics.avgSleep}h` },
+                      { label: 'Workouts',  value: String(s.metrics.workoutSessions) },
+                      { label: 'Late dinners', value: String(s.metrics.lateDinnerDays) },
                     ].map(m => (
                       <div key={m.label} className="bg-surface-elevated rounded-xl p-2.5 text-center">
-                        <p className="text-base font-bold tabular-nums" style={{ color: m.color }}>{m.value}</p>
-                        <p className="text-[10px] text-text-muted mt-0.5">{m.label}</p>
+                        <p className="text-base font-bold tabular-nums text-text-primary">{m.value}</p>
+                        <p className="text-[11px] text-text-muted mt-0.5 leading-tight">{m.label}</p>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* ── Badge Shelf ── */}
-                {allBadges && (
-                  <div className="card">
-                    <BadgeShelf badges={allBadges} />
+                {/* ── What to fix ── */}
+                <div className="card border-2" style={{ borderColor: '#a78bfa40', background: '#a78bfa08' }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap size={14} className="text-brand" />
+                    <h2 className="text-sm font-semibold text-text-primary">What to fix</h2>
+                    <span className="text-xs text-text-muted ml-auto">Highest impact</span>
                   </div>
-                )}
+                  <p className="text-sm font-medium text-text-primary leading-relaxed">{s.strategicFix}</p>
+                </div>
 
-                {/* ── Biggest Wins ── */}
-                {s.wins.length > 0 && (
-                  <div className="card space-y-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Award size={14} className="text-success" />
-                      <h2 className="text-sm font-semibold text-text-primary">Biggest Wins</h2>
-                    </div>
-                    {s.wins.map((w, i) => (
-                      <div key={i} className="flex items-start gap-2.5 py-1">
+                {/* ── Why ── */}
+                {(s.wins.length > 0 || s.damage.length > 0) && (
+                  <div className="card space-y-3">
+                    <h2 className="text-sm font-semibold text-text-primary">Why</h2>
+
+                    {wins.map((w, i) => (
+                      <div key={`w${i}`} className="flex items-start gap-2.5">
                         <CheckCircle2 size={15} className="text-success shrink-0 mt-0.5" />
                         <div>
                           <p className="text-sm font-medium text-text-primary">{w.text}</p>
@@ -426,18 +483,8 @@ export default function History() {
                         </div>
                       </div>
                     ))}
-                  </div>
-                )}
-
-                {/* ── Biggest Damage ── */}
-                {s.damage.length > 0 && (
-                  <div className="card space-y-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <XCircle size={14} className="text-danger" />
-                      <h2 className="text-sm font-semibold text-text-primary">Biggest Damage</h2>
-                    </div>
-                    {s.damage.map((d, i) => (
-                      <div key={i} className="flex items-start gap-2.5 py-1">
+                    {costs.map((d, i) => (
+                      <div key={`c${i}`} className="flex items-start gap-2.5">
                         <XCircle size={15} className="text-danger shrink-0 mt-0.5" />
                         <div>
                           <p className="text-sm font-medium text-text-primary">{d.text}</p>
@@ -445,54 +492,52 @@ export default function History() {
                         </div>
                       </div>
                     ))}
-                    {s.stackedFailures.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-surface-border">
-                        <p className="text-xs text-warning font-medium">⚡ Stacked failure detected:</p>
-                        {s.stackedFailures.map((f, i) => (
-                          <p key={i} className="text-xs text-text-muted mt-0.5">{format(new Date(f.date + 'T00:00:00'), 'EEE MMM d')}: {f.label}</p>
-                        ))}
+
+                    {whyOpen && (
+                      <div className="space-y-3 pt-3 border-t border-surface-border">
+                        {s.stackedFailures.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-warning">Two things went wrong on the same day</p>
+                            {s.stackedFailures.map((f, i) => (
+                              <p key={i} className="text-xs text-text-muted mt-0.5">{format(new Date(f.date + 'T00:00:00'), 'EEE MMM d')}: {f.label}</p>
+                            ))}
+                          </div>
+                        )}
+                        {s.bestDay && s.worstDay && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { label: 'Best day', day: s.bestDay, color: '#22c55e' },
+                              { label: 'Hardest day', day: s.worstDay, color: '#f97316' },
+                            ].map(({ label, day, color }) => (
+                              <div key={label} className="bg-surface-elevated rounded-xl p-3 text-center">
+                                <p className="text-xs text-text-muted">{label}</p>
+                                <p className="text-xl font-bold tabular-nums" style={{ color }}>{Math.round(day.total_score)}</p>
+                                <p className="text-xs text-text-secondary">{format(new Date(day.date + 'T00:00:00'), 'EEE, MMM d')}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {s.topJunk.length > 0 && (
+                          <div className="space-y-1.5">
+                            <p className="text-xs font-semibold text-text-secondary">Most frequent junk foods</p>
+                            {s.topJunk.map(({ label, count }) => (
+                              <div key={label} className="flex items-center justify-between">
+                                <span className="text-sm text-text-secondary">{label}</span>
+                                <span className="text-xs font-semibold text-danger">×{count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* ── Strategic Fix ── */}
-                <div className="card border-2" style={{ borderColor: '#a78bfa40', background: '#a78bfa08' }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Zap size={14} className="text-brand" />
-                    <h2 className="text-sm font-semibold text-text-primary">Strategic Fix</h2>
-                    <span className="text-xs text-text-muted ml-auto">Highest-impact action</span>
-                  </div>
-                  <p className="text-sm font-medium text-text-primary leading-relaxed">👉 {s.strategicFix}</p>
-                </div>
-
-                {/* ── Best / Worst day ── */}
-                {s.bestDay && s.worstDay && (
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: '🏆 Best Day', day: s.bestDay, color: '#22c55e' },
-                      { label: '📉 Worst Day', day: s.worstDay, color: '#ef4444' },
-                    ].map(({ label, day, color }) => (
-                      <div key={label} className="card text-center">
-                        <p className="text-xs text-text-muted mb-1">{label}</p>
-                        <p className="text-sm font-semibold text-text-primary">{format(new Date(day.date + 'T00:00:00'), 'EEE, MMM d')}</p>
-                        <p className="text-2xl font-bold tabular-nums mt-1" style={{ color }}>{Math.round(day.total_score)}</p>
-                        <p className="text-xs text-text-muted">pts</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* ── Top junk foods ── */}
-                {s.topJunk.length > 0 && (
-                  <div className="card space-y-2">
-                    <h2 className="text-sm font-semibold text-text-primary">Most Frequent Junk Foods</h2>
-                    {s.topJunk.map(({ label, count }) => (
-                      <div key={label} className="flex items-center justify-between">
-                        <span className="text-sm text-text-secondary">{label}</span>
-                        <span className="text-xs font-semibold text-danger bg-danger/10 px-2 py-0.5 rounded-full">×{count} this week</span>
-                      </div>
-                    ))}
+                    {hasMore && (
+                      <button onClick={() => setWhyOpen(o => !o)}
+                        className="w-full flex items-center justify-center gap-1 text-xs font-semibold text-brand-light pt-1">
+                        {whyOpen ? 'Show less' : 'Show more'}
+                        <ChevronDown size={13} className={`transition-transform ${whyOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
                   </div>
                 )}
               </>
@@ -501,82 +546,10 @@ export default function History() {
         </div>
       )}
 
-      {/* ── MONTH TAB ── */}
+      {/* ── MONTH ── */}
       {historyTab === 'month' && (
         <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-
-          {/* Month nav */}
-          <div className="flex items-center justify-between bg-surface-card border border-surface-border rounded-2xl px-4 py-3">
-            <button onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-              className="p-1.5 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm font-semibold text-text-primary">
-              {format(viewDate, 'MMMM yyyy')}
-            </span>
-            <button onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-              className="p-1.5 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">
-              <ChevronRight size={16} />
-            </button>
-          </div>
-
-          {/* Hero Performance Card */}
-          {monthlyInsights ? (
-            <div className="rounded-2xl p-5 relative overflow-hidden" style={{ background: monthlyInsights.identity.grad }}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="inline-flex items-center gap-1.5 bg-black/25 px-3 py-1.5 rounded-full">
-                  <span className="text-base leading-none">{monthlyInsights.identity.emoji}</span>
-                  <span className="text-xs font-bold text-white">{monthlyInsights.identity.label}</span>
-                </div>
-                {monthlyInsights.trend !== null && (
-                  <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${monthlyInsights.trend >= 0 ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'}`}>
-                    {monthlyInsights.trend >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                    {monthlyInsights.trend >= 0 ? '+' : ''}{monthlyInsights.trend} vs last month
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-end gap-3 mb-3">
-                <p className="text-6xl font-black text-white tabular-nums leading-none">{monthlyInsights.avgScore}</p>
-                <div className="pb-1.5">
-                  <p className="text-2xl font-black leading-none" style={{ color: monthlyInsights.grade.color }}>{monthlyInsights.grade.letter}</p>
-                  <p className="text-xs text-white/70 mt-0.5">{monthlyInsights.grade.label}</p>
-                </div>
-              </div>
-
-              <p className="text-sm text-white/85 leading-relaxed mb-4">{monthlyInsights.narrative}</p>
-
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { label: 'Days', value: monthlyInsights.daysLogged },
-                  { label: 'Sleep', value: `${monthlyInsights.stats.avgSleep}h` },
-                  { label: 'Workouts', value: monthlyInsights.stats.workoutSessions },
-                  { label: 'Junk Days', value: monthlyInsights.stats.junkFoodDays },
-                ].map(m => (
-                  <div key={m.label} className="bg-black/20 rounded-xl p-2 text-center">
-                    <p className="text-sm font-bold text-white tabular-nums">{m.value}</p>
-                    <p className="text-[10px] text-white/60 mt-0.5 leading-tight">{m.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Avg Score', value: avg, color: '#34A853' },
-                { label: 'Best Day',  value: best, color: '#FBBC04' },
-                { label: 'Days Logged', value: logged, color: '#1A73E8' },
-              ].map(m => (
-                <div key={m.label} className="metric-card">
-                  <p className="metric-value" style={{ color: m.color }}>{m.value}</p>
-                  <p className="metric-label">{m.label}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Meal Insights — deterministic, history-driven (see recommendationEngine.js) */}
-          <MealInsightsCard />
+          {monthNav}
 
           {/* Calendar */}
           <div className="card">
@@ -613,11 +586,11 @@ export default function History() {
                           ${isToday(day) && !isSelected ? 'ring-2 ring-brand/60 ring-offset-1 ring-offset-surface-card' : ''}`}
                         style={{ background: color ? `${color}${s.total_score >= 80 ? '35' : '20'}` : 'rgb(var(--c-surface-elevated))' }}
                       >
-                        <span className="text-[10px] font-medium text-text-secondary">{format(day, 'd')}</span>
+                        <span className="text-[11px] font-medium text-text-secondary">{format(day, 'd')}</span>
                         {isBestDay ? (
-                          <span className="text-[9px] leading-none">🏆</span>
+                          <span className="text-[11px] leading-none">🏆</span>
                         ) : isExerciseDay ? (
-                          <span className="text-[9px] leading-none">⚡</span>
+                          <span className="text-[11px] leading-none">⚡</span>
                         ) : color ? (
                           <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
                         ) : null}
@@ -682,140 +655,160 @@ export default function History() {
             </div>
           )}
 
-          {/* Monthly badge shelf */}
-          {monthBadges && monthBadges.length > 0 && (
-            <div className="card">
-              <div className="flex items-center gap-2 mb-3">
-                <Award size={14} style={{ color: '#f59e0b' }} />
-                <h2 className="text-sm font-semibold text-text-primary">Badges Earned This Month</h2>
-              </div>
-              <BadgeShelf badges={monthBadges} />
-            </div>
-          )}
 
-          {/* Monthly Story Arc */}
-          {monthlyInsights?.storyArc?.length > 0 && (
+          {/* ── Summary ── */}
+          {monthlyInsights ? (
             <div className="card">
-              <h2 className="text-sm font-semibold text-text-primary mb-3">Monthly Story Arc</h2>
-              <div className="space-y-2">
-                {monthlyInsights.storyArc.map(w => (
-                  <div key={w.week} className="flex items-center gap-3 bg-surface-elevated rounded-xl px-3 py-2.5">
-                    <span className="text-xl shrink-0">{w.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold text-text-primary truncate">{w.theme}</p>
-                        <p className="text-sm font-bold tabular-nums shrink-0" style={{ color: scoreColor(w.avg) }}>{w.avg}</p>
-                      </div>
-                      <p className="text-[10px] text-text-muted mt-0.5">
-                        Wk {w.week}: {format(new Date(w.wsStr + 'T00:00:00'), 'MMM d')}–{format(new Date(w.weStr + 'T00:00:00'), 'MMM d')} · {w.note}
-                      </p>
-                    </div>
+              <div className="flex items-end justify-between">
+                <div className="flex items-end gap-3">
+                  <p className="text-5xl font-bold tabular-nums leading-none" style={{ color: monthlyInsights.grade.color }}>{monthlyInsights.avgScore}</p>
+                  <div className="pb-0.5">
+                    <p className="text-sm font-bold" style={{ color: monthlyInsights.grade.color }}>{monthlyInsights.grade.letter} · {monthlyInsights.grade.label}</p>
+                    <p className="text-xs text-text-muted">average score</p>
+                  </div>
+                </div>
+                {monthlyInsights.trend !== null && (
+                  <span className={`flex items-center gap-1 text-xs font-semibold ${monthlyInsights.trend >= 0 ? 'text-success' : 'text-danger'}`}>
+                    {monthlyInsights.trend >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                    {monthlyInsights.trend >= 0 ? '+' : ''}{monthlyInsights.trend} vs last month
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-text-secondary leading-relaxed mt-3">{monthlyInsights.narrative}</p>
+              <div className="grid grid-cols-4 gap-2 mt-4">
+                {[
+                  { label: 'Days', value: monthlyInsights.daysLogged },
+                  { label: 'Avg sleep', value: `${monthlyInsights.stats.avgSleep}h` },
+                  { label: 'Workouts', value: monthlyInsights.stats.workoutSessions },
+                  { label: 'Junk days', value: monthlyInsights.stats.junkFoodDays },
+                ].map(m => (
+                  <div key={m.label} className="bg-surface-elevated rounded-xl p-2.5 text-center">
+                    <p className="text-base font-bold text-text-primary tabular-nums">{m.value}</p>
+                    <p className="text-[11px] text-text-muted mt-0.5 leading-tight">{m.label}</p>
                   </div>
                 ))}
               </div>
             </div>
-          )}
-
-          {/* Trajectory */}
-          {monthlyInsights?.trajectory && (() => {
-            const t = monthlyInsights.trajectory
-            const up = t.halfTrend >= 0
-            return (
-              <div className="card border-2" style={{
-                borderColor: up ? '#22c55e30' : '#ef444430',
-                background:  up ? '#22c55e06' : '#ef444406',
-              }}>
-                <div className="flex items-center gap-2 mb-3">
-                  {up ? <TrendingUp size={14} className="text-success" /> : <TrendingDown size={14} className="text-danger" />}
-                  <h2 className="text-sm font-semibold text-text-primary">Trajectory</h2>
-                  <span className="text-xs text-text-muted ml-auto">Half-month analysis</span>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Avg score', value: avg },
+                { label: 'Best day',  value: best },
+                { label: 'Days logged', value: logged },
+              ].map(m => (
+                <div key={m.label} className="metric-card">
+                  <p className="metric-value">{m.value}</p>
+                  <p className="metric-label">{m.label}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-3 text-center mb-3">
-                  <div>
-                    <p className="text-2xl font-bold tabular-nums text-text-primary">{t.firstAvg}</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">First Half</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold tabular-nums text-text-primary">{t.secondAvg}</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">Second Half</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold tabular-nums" style={{ color: up ? '#22c55e' : '#ef4444' }}>{t.projected}</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">Next Month</p>
-                  </div>
-                </div>
-                <p className="text-xs text-text-muted text-center">
-                  {up
-                    ? `↗ +${t.halfTrend} pts second-half momentum → on track for ${t.projected} next month`
-                    : `↘ ${t.halfTrend} pts second-half dip → projected ${t.projected} next month`}
-                </p>
-              </div>
-            )
-          })()}
-
-          {/* Insight Intelligence */}
-          {monthlyInsights && (monthlyInsights.positives.length > 0 || monthlyInsights.risks.length > 0) && (
-            <div className={`grid gap-3 ${monthlyInsights.positives.length > 0 && monthlyInsights.risks.length > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-              {monthlyInsights.positives.length > 0 && (
-                <div className="card space-y-2.5">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <CheckCircle2 size={13} className="text-success shrink-0" />
-                    <p className="text-xs font-semibold text-text-primary">Driving Scores Up</p>
-                  </div>
-                  {monthlyInsights.positives.map((p, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <span className="text-sm shrink-0 mt-0.5">{p.icon}</span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-text-primary leading-snug">{p.text}</p>
-                        <p className="text-[10px] text-text-muted mt-0.5 leading-snug">{p.sub}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {monthlyInsights.risks.length > 0 && (
-                <div className="card space-y-2.5">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <XCircle size={13} className="text-danger shrink-0" />
-                    <p className="text-xs font-semibold text-text-primary">Score Drags</p>
-                  </div>
-                  {monthlyInsights.risks.map((r, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <span className="text-sm shrink-0 mt-0.5">{r.icon}</span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-text-primary leading-snug">{r.text}</p>
-                        <p className="text-[10px] text-text-muted mt-0.5 leading-snug">{r.sub}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              ))}
             </div>
           )}
 
-          {/* Near-miss psychology */}
-          {monthlyInsights?.nearMiss?.length > 0 && (
+          {/* ── Month insights (collapsed) ── */}
+          {monthlyInsights && (monthlyInsights.storyArc?.length > 0 || monthlyInsights.trajectory
+            || monthlyInsights.positives.length > 0 || monthlyInsights.risks.length > 0 || monthlyInsights.nearMiss?.length > 0) && (
             <div className="card">
-              <div className="flex items-center gap-2 mb-3">
-                <Zap size={13} style={{ color: '#f59e0b' }} />
-                <p className="text-xs font-semibold text-text-primary">Near Misses</p>
-                <span className="text-xs text-text-muted">— you were this close</span>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                {monthlyInsights.nearMiss.map((m, i) => (
-                  <div key={i} className="bg-warning/10 border border-warning/25 rounded-full px-3 py-1.5">
-                    <p className="text-xs font-medium text-warning">🎯 {m}</p>
-                  </div>
-                ))}
-              </div>
+              <button onClick={() => setInsightsOpen(o => !o)} className="w-full flex items-center gap-2 text-left">
+                <span className="text-sm font-semibold text-text-primary flex-1">Month insights</span>
+                <span className="text-xs text-text-muted">Week by week, what helped, what hurt</span>
+                <ChevronDown size={15} className={`text-text-muted transition-transform ${insightsOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {insightsOpen && (
+                <div className="space-y-5 mt-4 pt-4 border-t border-surface-border">
+                  {monthlyInsights.storyArc?.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="section-label">Week by week</p>
+                      {monthlyInsights.storyArc.map(w => (
+                        <div key={w.week} className="flex items-center gap-3 bg-surface-elevated rounded-xl px-3 py-2.5">
+                          <span className="text-xl shrink-0">{w.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-text-primary truncate">{w.theme}</p>
+                            <p className="text-xs text-text-muted mt-0.5">
+                              {format(new Date(w.wsStr + 'T00:00:00'), 'MMM d')}–{format(new Date(w.weStr + 'T00:00:00'), 'MMM d')} · {w.note}
+                            </p>
+                          </div>
+                          <p className="text-sm font-bold tabular-nums shrink-0" style={{ color: scoreColor(w.avg) }}>{w.avg}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {monthlyInsights.trajectory && (() => {
+                    const t = monthlyInsights.trajectory
+                    const up = t.halfTrend >= 0
+                    return (
+                      <div>
+                        <p className="section-label mb-2">Direction</p>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          {[['First half', t.firstAvg], ['Second half', t.secondAvg], ['Next month (est.)', t.projected]].map(([label, value], i) => (
+                            <div key={label} className="bg-surface-elevated rounded-xl p-2.5">
+                              <p className="text-xl font-bold tabular-nums" style={{ color: i === 2 ? (up ? '#22c55e' : '#f97316') : 'rgb(var(--c-text-primary))' }}>{value}</p>
+                              <p className="text-[11px] text-text-muted mt-0.5 leading-tight">{label}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {monthlyInsights.positives.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="section-label">What helped</p>
+                      {monthlyInsights.positives.map((p, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-sm shrink-0 mt-0.5">{p.icon}</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-text-primary leading-snug">{p.text}</p>
+                            <p className="text-xs text-text-muted mt-0.5 leading-snug">{p.sub}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {monthlyInsights.risks.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="section-label">What cost you points</p>
+                      {monthlyInsights.risks.map((r, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-sm shrink-0 mt-0.5">{r.icon}</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-text-primary leading-snug">{r.text}</p>
+                            <p className="text-xs text-text-muted mt-0.5 leading-snug">{r.sub}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {monthlyInsights.nearMiss?.length > 0 && (
+                    <div>
+                      <p className="section-label mb-2">Almost there</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {monthlyInsights.nearMiss.map((m, i) => (
+                          <span key={i} className="bg-warning/10 border border-warning/25 rounded-full px-3 py-1.5 text-xs font-medium text-warning">{m}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
+        </div>
+      )}
 
-          {/* Monthly chart */}
+      {/* ── TRENDS ── */}
+      {historyTab === 'trends' && (
+        <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
+          {monthNav}
+
+          {/* Score chart for the viewed month */}
           {chartData.length > 0 && (
             <div className="card">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-text-primary">Monthly Breakdown</h2>
+                <h2 className="text-sm font-semibold text-text-primary">Scores this month</h2>
                 <div className="flex gap-0.5 bg-surface-elevated rounded-lg p-0.5">
                   <button
                     onClick={() => setChartMode('line')}
@@ -847,12 +840,12 @@ export default function History() {
               {chartMode === 'bar' && (
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={chartData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
-                    <XAxis dataKey="label" type="category" tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 10, fontFamily: 'Inter' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis domain={[0, 100]} tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 10, fontFamily: 'Inter' }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="label" type="category" tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 11, fontFamily: 'Inter' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis domain={[0, 100]} tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 11, fontFamily: 'Inter' }} axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgb(var(--c-surface-elevated))' }} />
                     {prevTail.length > 0 && monthBoundaryLabel && (
                       <ReferenceLine x={monthBoundaryLabel} stroke="rgb(var(--c-surface-border))" strokeDasharray="4 2"
-                        label={{ value: format(viewDate, 'MMM'), position: 'insideTopRight', fontSize: 9, fill: 'rgb(var(--c-text-muted))' }} />
+                        label={{ value: format(viewDate, 'MMM'), position: 'insideTopRight', fontSize: 11, fill: 'rgb(var(--c-text-muted))' }} />
                     )}
                     <Bar dataKey="diet" stackId="a" fill="#34A853" radius={[0,0,0,0]}>
                       {chartData.map((e, i) => <Cell key={i} fillOpacity={e.isPrev ? 0.35 : 1} />)}
@@ -871,16 +864,16 @@ export default function History() {
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={chartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--c-surface-border))" vertical={false} />
-                    <XAxis dataKey="label" type="category" tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 10, fontFamily: 'Inter' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <XAxis dataKey="label" type="category" tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 11, fontFamily: 'Inter' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis
                       domain={[0, activeLine.max]}
-                      tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 10, fontFamily: 'Inter' }}
+                      tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 11, fontFamily: 'Inter' }}
                       axisLine={false} tickLine={false}
                     />
                     <Tooltip content={<CustomTooltip />} />
                     {prevTail.length > 0 && monthBoundaryLabel && (
                       <ReferenceLine x={monthBoundaryLabel} stroke="rgb(var(--c-surface-border))" strokeDasharray="4 2"
-                        label={{ value: format(viewDate, 'MMM'), position: 'insideTopRight', fontSize: 9, fill: 'rgb(var(--c-text-muted))' }} />
+                        label={{ value: format(viewDate, 'MMM'), position: 'insideTopRight', fontSize: 11, fill: 'rgb(var(--c-text-muted))' }} />
                     )}
                     <Line
                       dataKey={selectedLine}
@@ -911,7 +904,7 @@ export default function History() {
                   <div className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ background: activeLine.color }} />
                     <span className="text-xs text-text-muted">{activeLine.label}</span>
-                    <span className="text-xs text-text-muted">/ {activeLine.key === 'steps' ? '10k steps' : `${activeLine.max} pts`}</span>
+                    <span className="text-xs text-text-muted">{activeLine.key === 'steps' ? 'per day' : `/ ${activeLine.max} pts`}</span>
                   </div>
                 )}
                 {prevTail.length > 0 && (
@@ -920,8 +913,40 @@ export default function History() {
               </div>
             </div>
           )}
+
+          {chartData.length === 0 && !loading && (
+            <div className="card text-center py-8">
+              <p className="text-sm text-text-secondary">No scores in this month yet</p>
+            </div>
+          )}
+
+          {/* Meal Insights — deterministic, history-driven (see recommendationEngine.js) */}
+          <MealInsightsCard />
+
+          {lifetime && lifetime.days > 0 && (
+            <div className="card">
+              <h2 className="text-sm font-semibold text-text-primary mb-3">All time</h2>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ['Days logged', lifetime.days],
+                  ['Average score', lifetime.avg],
+                  ['Total steps', fmtSteps(lifetime.steps)],
+                  ['Exercise sessions', lifetime.workouts],
+                  ['Hours slept', `${lifetime.sleepH}h`],
+                  ['Days at 90+', lifetime.topDays],
+                  ['Longest logging run', `${lifetime.bestStreak} days`],
+                  ...(lifetime.goodPct !== null ? [['Days at 70+', `${lifetime.goodPct}%`]] : []),
+                ].map(([label, value]) => (
+                  <div key={label} className="bg-surface-elevated rounded-xl px-3 py-2.5">
+                    <p className="text-xs text-text-muted">{label}</p>
+                    <p className="text-lg font-bold tabular-nums text-text-primary">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )} {/* end month tab */}
+      )}
     </div>
   )
 }

@@ -1,10 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Zap, BarChart2, User } from 'lucide-react'
+import { LayoutDashboard, PlusCircle, BarChart2, User } from 'lucide-react'
 
 const links = [
-  { to: '/',         icon: LayoutDashboard, label: 'Home'     },
-  { to: '/activity', icon: Zap,             label: 'Activity' },
-  { to: '/history',  icon: BarChart2,       label: 'History'  },
+  { to: '/',         icon: LayoutDashboard, label: 'Today'    },
+  { to: '/log',      icon: PlusCircle,      label: 'Log'      },
+  { to: '/progress', icon: BarChart2,       label: 'Progress' },
   { to: '/profile',  icon: User,            label: 'Profile'  },
 ]
 
@@ -41,7 +41,7 @@ export default function Navbar() {
                   />
                 </div>
                 <span
-                  className="text-[9px] font-semibold leading-none transition-colors duration-200"
+                  className="text-[11px] font-semibold leading-none transition-colors duration-200"
                   style={{ color: isActive ? 'rgb(var(--c-brand-light))' : 'rgb(var(--c-text-muted))' }}
                 >
                   {label}

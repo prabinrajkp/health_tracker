@@ -2,6 +2,42 @@
 
 All notable changes to this project are documented here.
 
+## [v4.29] — 2026-10-09
+
+The app revamp: fewer things on every screen, one name for each number, and no Save button in logging. Scores, logs, badges and backups are untouched. See `docs/revamp_plan.md`.
+
+### Added
+- **Next action on Today** — one card shows the most useful thing left to do today with the points it is worth; tapping it opens the right place. It no longer rotates by itself
+- **Notification level** — Settings → Reminders has Quiet, Standard and Coach. Standard is the new default and sends at most three a day (bedtime, dinner, one nudge); Coach keeps everything as before
+- **Trends tab** — the score chart, Meal Insights and all-time stats have their own tab under Progress
+- **All badges page** — Profile shows your earned badges; "See all" lists every badge by category, with the three combination badges
+- **Meal times on the Log screen** — each main meal shows its time next to it, and the first log of a meal stamps the time automatically
+
+### Changed
+- **Tabs renamed** — Home → Today, Activity → Log, History → Progress. Old links still open the right screen
+- **Today is three blocks** — score with the four bars, the next action, and four log buttons (Meal · Move · Sleep · Weight). The character tier, rotating power-ups, quest cards, badge shelf and shortcuts are gone from this screen
+- **Everything saves as you go** — the log sheet and its "Claim XP" button are removed. Taps save at once, typing saves a moment after you stop, and a small "Saved" tick confirms it
+- **Add food in fewer steps** — "+ Add" on a meal opens Add Meal directly instead of a sheet inside a sheet
+- **Steps you type in are kept** — a manual step count now wins for the rest of the day; tap Sync to replace it with the synced count
+- **One vocabulary** — daily points are always "pts"; XP and Level appear only in Profile; "Quests" are now "Goals"
+- **Progress → Week** — score, What to fix, and one Why card. **Month** — the calendar comes first, with insights behind one expander
+- **Profile is four sections** — you, next badge, goals, badges. Settings moved to a gear icon
+- **Settings in four groups** — the six scoring screens are now one Scoring rules screen; current weight comes only from the weight log
+- **Calorie targets moved** — daily calorie and macro targets are on Log → Food instead of the Weight page
+- **Onboarding is shorter** — three questions and a three-step tour; the four questions that were never used are removed
+- **Targets follow your settings** — step targets, category maximums and point values shown on Today, Log, Progress, day detail and the home-screen widget are read from Settings instead of fixed numbers
+- **Easier to read** — no text is smaller than 11 px, and wording is plainer ("Cost you points", "Hardest day", "What to fix")
+- **Late dinner applies when logged through Add Meal** — because the dinner time is now stamped when you log it, a dinner logged after 9 PM gets the late-dinner penalty. Correct the time on Log → Food if you ate earlier
+- **Sleep tab shows only today's night** — it no longer falls back to showing yesterday's sleep when today has none
+- **Developer Tools hidden** — opened by tapping the version number in Settings seven times
+
+### Fixed
+- **Unreachable screens removed** — the old Workout and Sleep pages that nothing linked to are deleted
+- **"Better than yesterday" notification** — it was only wired to one of those removed pages, so it never fired; it now fires from the sleep timer (Coach level)
+- **Bell icon** — the bell on Home that did nothing is removed
+
+---
+
 ## [v4.28] — 2026-09-10
 
 ### Changed

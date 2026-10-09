@@ -88,66 +88,38 @@ Above 10,000 steps, points increase linearly to 28 at 18,000 steps. All threshol
 
 ## Features
 
-### Dashboard
-- Score ring with grade (S/A/B/C/D/F) and today's date
-- Per-category stat bars: Diet · Fasting · Workout · Sleep
-- Inline penalty chips when rules are broken (dinner after 9 PM, sleep after midnight)
-- Performance radar chart (Diet / Workout / Sleep proportional to max)
-- Score breakdown with bonus
-- Notes & comments: foods logged, sleep times, fasting window, screen time
-- Daily quests (tap to go to each log page)
-- Day streak counter
-- Daily rules reminder
+Four tabs, each with one job. Everything saves as you change it — there is no Save button in logging.
 
-### Diet Log
-- Four meal tabs: Breakfast · Lunch · Dinner · Snacks
-- Per-food-item portion tracking with points per portion and ideal portions
-- Snacks tab: each item carries its own timestamp
-- Fasting widget: shows current fast progress with elapsed time in `Xh Ymin` format
-  - Resets to "next fast" mode after today's dinner is logged
-- Dinner-after-9-PM penalty preview
-- Custom meal options managed in Settings (good/bad categories, ideal portions)
+### Today
+- Score, grade (S/A/B/C/D/F) and the four category bars: Diet · Fasting · Workout · Sleep
+- One **Next** card: the most useful thing left to do today. Tapping it opens the place to do it
+- Any penalty already applied (late dinner, sleep after midnight) shown under it
+- Four log buttons with done-state: Meal · Move · Sleep · Weight
+- "Full detail" opens the day's radar, breakdown and optional AI health summary
 
-### Workout Log
-- Step count with color-coded target progress
-- Post-dinner walk toggle + duration
-- Exercise session toggle + type + duration
-- Live score preview
+### Log
+- **Food:** each meal lists its foods with portions and the meal time; **+ Add** opens Add Meal on that meal (search, Repeat Yesterday, frequent and recent meals, named meals, optional AI lookup). One fasting line and the calories and macro targets sit below
+- **Move:** steps synced from Health Connect or the phone sensor, or typed in (a typed count is kept for the day until you tap Sync); switches for post-dinner walk and exercise
+- **Sleep:** one timer button with automatic screen-time deduction; manual times, presets, quality and notes under Edit details
 
-### Sleep Log
-- Sleep timer: tap to start at bedtime, tap Wake Up in the morning
-- Automatic screen-time deduction via Android Usage Stats API
-- Completed sleep summary card (fell asleep · woke up · total · effective · sleep points)
-- Manual time entry + quick presets
-- Screen time stepper (0.5 h increments)
-- Sleep quality rating (1–5)
-- Notes field
-- Live score preview
+### Progress
+- **Week:** average score, one **What to fix**, and a **Why** card with wins and costs
+- **Month:** colour-coded calendar first; tap a day for full detail and share it as a PNG; month insights behind one expander
+- **Trends:** line or stacked score chart, Meal Insights, and all-time stats
 
-### History
-- Monthly calendar with color-coded dots (green/yellow/orange/red by score)
-- Tap any past day → full detail panel:
-  - Score, grade, performance radar
-  - Category breakdown
-  - Foods logged (all meals including snacks + times)
-  - Sleep times, total, effective, screen time
-  - Fasting window
-  - Notes
-- Share / export day as PNG image (Web Share API with Filesystem fallback)
-- Monthly chart toggle: Stacked bar (Diet · Workout · Sleep) or Line chart
-- Line chart metrics: **Total · Diet · Workout · Sleep · Fasting · Steps**
-- Monthly summary: avg score, best day, days logged
+### Profile
+- Level and XP, streak, the next badge closest to unlocking, today's and this week's goals, earned badges
+- "See all" lists every badge by category, including combination badges
+- The gear icon opens Settings
+
+### Weight
+- Daily weigh-in, 7-day average, change vs last week and since start, distance to target, 30d / 90d / 1y trend
 
 ### Settings
-- Theme toggle (Dark / Light)
-- Player profile: display name, current weight, target weight
-- Configurable score weights: all category maxes and individual item points
-- Step thresholds: partial credit, full credit, bonus start, max bonus (all configurable)
-- Fasting targets: min hours, target hours, max points
-- Penalty amounts: dinner timing, sleep after midnight
-- Custom meal options: add/remove foods with category, points/portion, ideal portions
-- Reminders (Android): bedtime, wake-up, step check-ins (×3), lunch, hydration (fixed)
-- Data export: full Excel workbook (scores, diet, workout, sleep, food items)
+- **You:** name, body & goal (height, age, activity, target weight, rate of loss), theme
+- **Scoring:** one screen for category maximums, workout points and step targets, sleep, fasting and penalties, with Reset to defaults
+- **Food & AI:** custom foods with points, ideal portions and nutrition; optional AI key
+- **Reminders & data:** Quiet / Standard / Coach notification level, reminder times, Excel export, JSON backup and restore, tutorial
 
 ---
 
@@ -179,14 +151,14 @@ The script will:
 
 **Option A — USB (fastest):**
 ```bash
-adb install health-quest-v2.13-debug.apk
+adb install health-quest-v4.29-debug.apk
 ```
 
 **Option B — WiFi (same network):**
 ```bash
 python3 -m http.server 9999 --directory .
 ```
-Then open `http://<your-pc-ip>:9999/health-quest-v2.13-debug.apk` on your phone and tap to install.
+Then open `http://<your-pc-ip>:9999/health-quest-v4.29-debug.apk` on your phone and tap to install.
 
 > Settings → Apps → Install unknown apps → enable for your browser
 
@@ -200,22 +172,22 @@ health_tracker/
 │   ├── src/
 │   │   ├── api/
 │   │   │   └── client.js          # Routes to local store (Capacitor) or FastAPI (browser)
-│   │   ├── components/
-│   │   │   ├── DayDetail.jsx      # Shared radar + score breakdown + notes panel
-│   │   │   ├── Navbar.jsx
-│   │   │   ├── ScoreRing.jsx      # Animated SVG score ring
-│   │   │   └── StatBar.jsx        # Progress bar component
+│   │   ├── components/            # AddMealFlow, BottomSheet, DayDetail, BadgeTile, Navbar…
 │   │   ├── pages/
-│   │   │   ├── Dashboard.jsx      # Home screen
-│   │   │   ├── DietLog.jsx        # Meal + fasting tracking
-│   │   │   ├── WorkoutLog.jsx     # Steps + exercise tracking
-│   │   │   ├── SleepLog.jsx       # Sleep timer + manual entry
-│   │   │   ├── History.jsx        # Calendar + charts + day detail
+│   │   │   ├── Today.jsx          # Score, next action, log buttons
+│   │   │   ├── Log.jsx            # Food / Move / Sleep switch (auto-save)
+│   │   │   ├── log/               # FoodSection, MoveSection, SleepSection
+│   │   │   ├── Progress.jsx       # Week / Month / Trends
+│   │   │   ├── Profile.jsx        # Level, next badge, goals, badges
+│   │   │   ├── Badges.jsx         # All badges by category
+│   │   │   ├── Weight.jsx         # Weight log and trend
 │   │   │   └── Settings.jsx       # All configuration
 │   │   ├── services/
 │   │   │   ├── db.js              # Dexie schema + default weights
 │   │   │   ├── localStore.js      # All CRUD operations + score computation
-│   │   │   └── scoring.js         # Pure scoring functions (no side effects)
+│   │   │   ├── scoring.js         # Pure scoring functions (no side effects)
+│   │   │   ├── nextAction.js      # Picks Today's one next action
+│   │   │   └── reminders.js       # Fixed reminders and the notification level
 │   │   └── store/
 │   │       └── useStore.js        # Zustand global state
 │   └── android/                   # Capacitor Android project

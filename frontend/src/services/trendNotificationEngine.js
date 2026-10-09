@@ -30,6 +30,7 @@ import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { format, subDays, startOfMonth, isLastDayOfMonth } from 'date-fns'
 import db from './db'
+import { getNotificationMode } from './reminders'
 
 const TREND_IDS = [40, 41, 42, 43, 44]
 
@@ -182,7 +183,7 @@ async function buildWeeklySummary() {
   const arrow = delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : '±0'
   return {
     title: `📊 Week wrap — avg ${thisAvg} pts (${arrow} vs last week)`,
-    body:  'Consistent week. Review your best day in History and repeat those habits.',
+    body:  'Consistent week. Review your best day in Progress and repeat those habits.',
   }
 }
 
@@ -213,7 +214,7 @@ async function buildMonthlySummary() {
     const best = Math.round(Math.max(...thisMonth.map(r => r.total_score || 0)))
     return {
       title: `🗓️ ${monthName} summary — avg ${thisAvg} pts`,
-      body:  `${thisMonth.length} days logged · best day ${best} pts. Open History for your full breakdown.`,
+      body:  `${thisMonth.length} days logged · best day ${best} pts. Open Progress for your full breakdown.`,
     }
   }
 
@@ -274,15 +275,19 @@ export async function scheduleTrendNotifications() {
 
     const notifications = []
 
+    // Daily trend alerts are Coach-only; the weekly and monthly wraps go to everyone.
+    const mode  = await getNotificationMode()
+    const coach = mode === 'coach'
+
     // ── ID 40: After-dinner review (9:30 PM) — today vs yesterday ─────────────
-    if (isInFuture(21, 30) && todayScore && yesterdayScore) {
+    if (coach && isInFuture(21, 30) && todayScore && yesterdayScore) {
       const d = diff(todayScore, yesterdayScore)
       const n = buildDecline(40, d, 'today')
       if (n) notifications.push({ ...n, schedule: { at: todayAt(21, 30), repeats: false, allowWhileIdle: true } })
     }
 
     // ── ID 41: Morning briefing (9 AM) — yesterday vs day-before ──────────────
-    if (isInFuture(9, 0) && yesterdayScore && dayBeforeScore) {
+    if (coach && isInFuture(9, 0) && yesterdayScore && dayBeforeScore) {
       const d = diff(yesterdayScore, dayBeforeScore)
       const n = buildDecline(41, d, 'yesterday')
       if (n) {
@@ -293,16 +298,21 @@ export async function scheduleTrendNotifications() {
       }
     }
 
-    // ── ID 43: Weekly wrap (Sunday 8 PM) ──────────────────────────────────────
-    if (dayOfWeek === 0 && isInFuture(20, 0)) {
-      const weekly = await buildWeeklySummary()
-      if (weekly) notifications.push({ id: 43, ...weekly, schedule: { at: todayAt(20, 0), repeats: false, allowWhileIdle: true } })
-    }
-
     // ── ID 44: Monthly wrap (last day of month 8 PM) ──────────────────────────
+    let monthlyScheduled = false
     if (isLastDayOfMonth(now) && isInFuture(20, 0)) {
       const monthly = await buildMonthlySummary()
-      if (monthly) notifications.push({ id: 44, ...monthly, schedule: { at: todayAt(20, 0), repeats: false, allowWhileIdle: true } })
+      if (monthly) {
+        notifications.push({ id: 44, ...monthly, schedule: { at: todayAt(20, 0), repeats: false, allowWhileIdle: true } })
+        monthlyScheduled = true
+      }
+    }
+
+    // ── ID 43: Weekly wrap (Sunday 8 PM) ──────────────────────────────────────
+    // Outside Coach mode the monthly wrap replaces it when both land on one day.
+    if (dayOfWeek === 0 && isInFuture(20, 0) && (coach || !monthlyScheduled)) {
+      const weekly = await buildWeeklySummary()
+      if (weekly) notifications.push({ id: 43, ...weekly, schedule: { at: todayAt(20, 0), repeats: false, allowWhileIdle: true } })
     }
 
     if (notifications.length > 0) {
@@ -313,7 +323,7 @@ export async function scheduleTrendNotifications() {
   }
 }
 
-// ── On-demand appreciation (called directly from SleepLog stopTimer) ──────────
+// ── On-demand appreciation (called directly from the sleep timer's stop handler) ──────────
 // logDate = the wake-up date whose score was just finalized (e.g. "2026-05-19").
 // Compares logDate's score vs logDate-1. Fires in ~10 s if it was a better day.
 
@@ -322,6 +332,7 @@ export async function checkAndFireAppreciation(logDate) {
   try {
     const perm = await LocalNotifications.checkPermissions()
     if (perm.display !== 'granted') return
+    if ((await getNotificationMode()) !== 'coach') return
 
     const prevDate = format(subDays(new Date(logDate), 1), 'yyyy-MM-dd')
     const [current, previous] = await Promise.all([

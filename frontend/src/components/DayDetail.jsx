@@ -1,5 +1,5 @@
 /**
- * Shared day-detail sub-components used by both Dashboard (today) and History (any day).
+ * Shared day-detail sub-components used by both Today and Progress (any day).
  */
 import { useEffect, useState } from 'react'
 import {
@@ -8,6 +8,7 @@ import {
 import { BrainCircuit, Loader2, RefreshCw } from 'lucide-react'
 import { getConfig } from '../api/client'
 import { generateHealthSummary } from '../services/llmApi'
+import { weightsFromConfig, categoryMaxes } from '../services/scoreMeta'
 
 export const MEAL_COLORS = {
   breakfast: '#f59e0b',
@@ -213,7 +214,7 @@ function SummaryMarkdown({ text }) {
 
 /**
  * Full rich day view: radar + score breakdown + AI health summary.
- * Used on Dashboard (today) and History (selected day).
+ * Used on Today and on Progress → Month (selected day).
  */
 export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, date }) {
   if (!score) return null
@@ -226,11 +227,13 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
   })
   const [summaryLoading, setLoading] = useState(false)
   const [summaryError, setError]     = useState('')
+  const [max, setMax]                = useState(categoryMaxes())
 
   useEffect(() => {
     getConfig().then(rows => {
       const map = {}
       rows?.forEach?.(r => { map[r.key] = r.value })
+      setMax(categoryMaxes(weightsFromConfig(map)))
       if (map.openrouter_api_key || map.groq_api_key) {
         setAiConfig({ openrouter_api_key: map.openrouter_api_key, groq_api_key: map.groq_api_key })
       }
@@ -257,9 +260,9 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
   const grade    = scoreGrade(total)
 
   const radarData = [
-    { subject: 'Diet',    value: Math.round((score.diet_score    / 35) * 100), fullMark: 100 },
-    { subject: 'Workout', value: Math.round((score.workout_score / 35) * 100), fullMark: 100 },
-    { subject: 'Sleep',   value: Math.round((score.sleep_score   / 30) * 100), fullMark: 100 },
+    { subject: 'Diet',    value: Math.round((score.diet_score    / max.diet) * 100), fullMark: 100 },
+    { subject: 'Workout', value: Math.round((score.workout_score / max.workout) * 100), fullMark: 100 },
+    { subject: 'Sleep',   value: Math.round((score.sleep_score   / max.sleep) * 100), fullMark: 100 },
   ]
 
   return (
@@ -288,7 +291,7 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
             />
             <PolarRadiusAxis
               angle={90} domain={[0, 100]}
-              tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 9 }}
+              tick={{ fill: 'rgb(var(--c-text-muted))', fontSize: 11 }}
               tickCount={4} axisLine={false}
             />
             <Radar
@@ -302,12 +305,12 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
       {/* Score breakdown */}
       <div className="space-y-3">
         <p className="section-label">Score Breakdown</p>
-        <StatBarSimple label="Diet"    value={score.diet_score    ?? 0} max={35} color="#34A853" />
+        <StatBarSimple label="Diet"    value={score.diet_score    ?? 0} max={max.diet} color="#34A853" />
         {(score.fasting_score > 0) && (
-          <StatBarSimple label="Fasting" value={score.fasting_score} max={10} color="#f97316" />
+          <StatBarSimple label="Fasting" value={score.fasting_score} max={max.fasting} color="#f97316" />
         )}
-        <StatBarSimple label="Workout" value={score.workout_score ?? 0} max={35} color="#1A73E8" />
-        <StatBarSimple label="Sleep"   value={score.sleep_score   ?? 0} max={30} color="#a78bfa" />
+        <StatBarSimple label="Workout" value={score.workout_score ?? 0} max={max.workout} color="#1A73E8" />
+        <StatBarSimple label="Sleep"   value={score.sleep_score   ?? 0} max={max.sleep} color="#a78bfa" />
         {(score.bonus_points ?? 0) > 0 && (
           <div className="flex items-center justify-between text-xs">
             <span className="text-text-muted">Bonus</span>
@@ -345,7 +348,7 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
           {!summaryLoading && summary && <SummaryMarkdown text={summary} />}
           {!summaryLoading && !summary && !summaryError && !hasAi && (
             <p className="text-xs text-text-muted text-center py-2">
-              Add a free API key in <strong>Settings → AI Assistant</strong> to enable health coaching summaries
+              Add a free API key in <strong>Settings → AI assistant</strong> to enable health coaching summaries
             </p>
           )}
           {!summaryLoading && !summary && !summaryError && hasAi && (

@@ -1,25 +1,32 @@
 import { useEffect, useState } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import BadgeUnlockOverlay from './components/BadgeUnlockOverlay'
 import Navbar from './components/Navbar'
-import Dashboard from './pages/Dashboard'
-import Activity from './pages/Activity'
-import WorkoutLog from './pages/WorkoutLog'
-import SleepLog from './pages/SleepLog'
-import History from './pages/History'
+import Today from './pages/Today'
+import Log from './pages/Log'
+import Progress from './pages/Progress'
 import Settings from './pages/Settings'
 import Profile from './pages/Profile'
+import Badges from './pages/Badges'
 import Weight from './pages/Weight'
 import Onboarding from './pages/Onboarding'
 import { migrateHistoricalScores, migrateSleepDates, migrateSleepDatesV8 } from './services/localStore'
 import db from './services/db'
 import { scheduleSmartNotifications } from './services/notificationEngine'
 import { scheduleTrendNotifications } from './services/trendNotificationEngine'
+import { migrateFixedReminders } from './services/reminders'
 import { seedFoodDefaults } from './services/foodDefaults'
 import { syncStepsBackground } from './services/stepSync'
 import { runBadgeEngine } from './services/badgeEngine'
 
 const STEP_SYNC_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes
+
+// Old tab routes still open the right screen (query string kept), so links
+// saved before the tabs were renamed keep working.
+function Redirect({ to }) {
+  const { search } = useLocation()
+  return <Navigate to={`${to}${search}`} replace />
+}
 
 export default function App() {
   const [onboardingDone, setOnboardingDone] = useState(null)
@@ -54,6 +61,7 @@ export default function App() {
       .catch(() => setOnboardingDone(true)) // On db error, never block existing users
 
     // Schedule smart notifications for today based on current data
+    migrateFixedReminders().catch(() => {})
     scheduleSmartNotifications().catch(() => {})
     scheduleTrendNotifications().catch(() => {})
 
@@ -74,14 +82,16 @@ export default function App() {
   return (
     <div className="min-h-screen bg-surface-base">
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/activity" element={<Activity />} />
-        <Route path="/workout" element={<WorkoutLog />} />
-        <Route path="/sleep" element={<SleepLog />} />
-        <Route path="/history" element={<History />} />
+        <Route path="/" element={<Today />} />
+        <Route path="/log" element={<Log />} />
+        <Route path="/progress" element={<Progress />} />
         <Route path="/weight" element={<Weight />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/badges" element={<Badges />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/activity" element={<Redirect to="/log" />} />
+        <Route path="/history" element={<Redirect to="/progress" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Navbar />
       {unlockQueue.length > 0 && (

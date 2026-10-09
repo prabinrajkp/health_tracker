@@ -12,11 +12,11 @@ import { TutorialSlides } from './Onboarding'
 import * as XLSX from 'xlsx'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
-import { LocalNotifications } from '@capacitor/local-notifications'
-import { getConfig, saveConfig, getScoreForDate } from '../api/client'
+import { getConfig, saveConfig, getScoreForDate, getLatestWeight } from '../api/client'
+import { scheduleFixedReminders, NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/reminders'
 import { version as APP_VERSION } from '../../package.json'
 import useStore from '../store/useStore'
-import db from '../services/db'
+import db, { DEFAULT_WEIGHTS } from '../services/db'
 import { ACTIVITY_PAC, LOSS_RATES, computeDietetics, ageFromBirthYear } from '../services/dietetics'
 import { hasLlmKey, analyzeFoodWithAI, bulkAnalyzeFoodsWithAI } from '../services/llmApi'
 
@@ -29,20 +29,11 @@ const ACTIVITY_OPTIONS = [
   { id: 'athlete',           label: 'Athlete',           desc: 'Twice-daily training or physical job' },
 ]
 
-const DEFAULT_WEIGHTS = {
-  diet_max: 35, workout_max: 35, sleep_max: 30,
-  diet: { breakfast: 5, lunch: 5, dinner_on_time: 8, no_post_dinner_snack: 7 },
-  workout: {
-    steps_8000: 15, steps_10000_bonus: 3, post_dinner_walk: 10, exercise_session: 10,
-    steps_half_threshold: 5000, steps_full_threshold: 8000,
-    steps_bonus_start: 10000, steps_bonus_end: 18000,
-  },
-  sleep: { sleep_before_1130: 10, seven_plus_hours: 12, wake_by_7: 8 },
-  bonus: { all_rules_followed: 5, perfect_score: 10 },
-  penalties: { dinner_after_9pm: -5, sleep_after_midnight: -8 },
-  fasting: { target_hours: 16, min_hours: 12, max_points: 10 },
-  calories: { max_points: 10, tolerance: 0.10, zero_at: 0.35, min_coverage: 0.7 },
-}
+// Old per-topic scoring screens now live on one Scoring screen; links that
+// still name them open it.
+const SCORING_ALIASES = ['weights', 'diet', 'workout', 'sleep', 'fasting', 'penalties']
+const resolveSection = (key) => (SCORING_ALIASES.includes(key) ? 'scoring' : key)
+const DEV_TAPS = 7   // taps on the version number that reveal Developer Tools
 
 // ── Small reusable pieces ─────────────────────────────────────────────────────
 function Stepper({ label, sublabel, value, onChange, min = 0, max = 20 }) {
@@ -134,7 +125,9 @@ export default function Settings() {
   const [lunchReminderTime, setLunchReminderTime] = useState('12:30')
   const [dinnerReminderTime, setDinnerReminderTime] = useState('20:00')
   const [eveningLogTime, setEveningLogTime] = useState('22:00')
-  const [activeSection, setActiveSection] = useState(() => searchParams.get('section') || null)
+  const [notificationMode, setNotificationMode] = useState(DEFAULT_NOTIFICATION_MODE)
+  const [activeSection, setActiveSection] = useState(() => resolveSection(searchParams.get('section')) || null)
+  const versionTaps = useRef(0)
 
   // Developer tools
   const [devUnlocked, setDevUnlocked] = useState(false)
@@ -154,7 +147,6 @@ export default function Settings() {
       if (map.score_weights)       { try { setWeights(JSON.parse(map.score_weights)) } catch {} }
       if (map.player_name)         setPlayerName(map.player_name)
       if (map.target_weight)       setTargetWeight(map.target_weight)
-      if (map.current_weight)      setCurrentWeight(map.current_weight)
       if (map.height_cm)           setHeightCm(map.height_cm)
       if (map.birth_year)          setBirthYear(map.birth_year)
       if (map.gender)              setGender(map.gender)
@@ -171,7 +163,10 @@ export default function Settings() {
       if (map.lunch_reminder_time)   setLunchReminderTime(map.lunch_reminder_time)
       if (map.dinner_reminder_time)  setDinnerReminderTime(map.dinner_reminder_time)
       if (map.evening_log_time)      setEveningLogTime(map.evening_log_time)
+      if (map.notification_mode)     setNotificationMode(map.notification_mode)
     })
+    // Weight has one source: the weight log
+    getLatestWeight().then(w => { if (w) setCurrentWeight(String(w.weight_kg)) }).catch(() => {})
   }, [])
 
   const setW = (cat, key, val) => setWeights(w => ({ ...w, [cat]: { ...w[cat], [key]: Number(val) } }))
@@ -345,51 +340,6 @@ export default function Settings() {
     setAiMode(null); setAiResult(null); setAiPasteText(''); setAiShowHowTo(false); setAiCopied(false)
   }
 
-  const scheduleNotifications = async () => {
-    if (!Capacitor.isNativePlatform()) return
-    try {
-      const perm = await LocalNotifications.requestPermissions()
-      if (perm.display !== 'granted') return
-
-      const cancelIds = [1, 2, 10, 11, 12, 20, 21, 22, 23, 24, 25, 26]
-      await LocalNotifications.cancel({ notifications: cancelIds.map(id => ({ id })) })
-
-      const stepTarget  = weights.workout?.steps_full_threshold ?? 8000
-      const bonusStart  = weights.workout?.steps_bonus_start    ?? 10000
-      const stepTargetK = stepTarget >= 1000 ? `${(stepTarget / 1000).toFixed(0)}k` : String(stepTarget)
-      const bonusK      = bonusStart  >= 1000 ? `${(bonusStart  / 1000).toFixed(0)}k` : String(bonusStart)
-
-      const STEP_MESSAGES = [
-        { title: '🌅 Step check-in (1/3)', body: `Morning push — get moving! Target: ${stepTargetK} steps today · bonus from ${bonusK}` },
-        { title: '🌞 Step check-in (2/3)', body: `Midday check — stay on track for ${stepTargetK} steps. You can do it!` },
-        { title: '🌆 Step check-in (3/3)', body: `Evening sprint — push for ${stepTargetK} steps! Extra pts from ${bonusK} 🏃` },
-      ]
-
-      const [bh, bm]  = bedTime.split(':').map(Number)
-      const [wh, wm]  = wakeTime.split(':').map(Number)
-      const [lh, lm]  = lunchReminderTime.split(':').map(Number)
-      const [drh, drm] = dinnerReminderTime.split(':').map(Number)
-      const [elh, elm] = eveningLogTime.split(':').map(Number)
-
-      await LocalNotifications.schedule({ notifications: [
-        { id: 1,  title: '🌙 Bedtime reminder',   body: 'Start your sleep timer in Health Quest — good sleep = good score!', schedule: { on: { hour: bh, minute: bm }, repeats: true } },
-        { id: 2,  title: '☀️ Good morning!',       body: 'Stop your sleep timer and start the day strong!',                   schedule: { on: { hour: wh, minute: wm }, repeats: true } },
-        ...stepTimes.map((t, i) => {
-          const [h, m] = t.split(':').map(Number)
-          const msg = STEP_MESSAGES[i] || STEP_MESSAGES[2]
-          return { id: 10 + i, title: msg.title, body: msg.body, schedule: { on: { hour: h, minute: m }, repeats: true } }
-        }),
-        { id: 20, title: '🥗 Lunch time!',         body: `Log your lunch in Health Quest — protein first for max points!`,   schedule: { on: { hour: lh, minute: lm }, repeats: true } },
-        { id: 21, title: '💧 Stay hydrated!',       body: 'Drink a glass of water — hydration keeps energy sharp.',           schedule: { on: { hour: 11, minute: 0  }, repeats: true } },
-        { id: 22, title: '💧 Afternoon hydration',  body: 'Another glass of water! Stay fuelled for the rest of the day.',    schedule: { on: { hour: 15, minute: 30 }, repeats: true } },
-        { id: 23, title: '🍽️ Dinner reminder',      body: `Aim to eat dinner now — after 9 PM triggers a score penalty!`,    schedule: { on: { hour: drh, minute: drm }, repeats: true } },
-        { id: 24, title: '🚫 No late snacks!',       body: 'Avoid post-dinner snacking to protect your diet score.',           schedule: { on: { hour: 21, minute: 30  }, repeats: true } },
-        { id: 25, title: '🚶 Post-dinner walk?',     body: 'A short walk after dinner earns bonus workout points!',            schedule: { on: { hour: drh, minute: Math.min(59, drm + 40) }, repeats: true } },
-        { id: 26, title: '📋 Log your day!',         body: `Don't forget to record Sleep & Workout before midnight.`,          schedule: { on: { hour: elh, minute: elm }, repeats: true } },
-      ] })
-    } catch {}
-  }
-
   const handleSave = async () => {
     setSaving(true)
     try {
@@ -397,7 +347,6 @@ export default function Settings() {
         saveConfig({ key: 'score_weights',       value: JSON.stringify(weights) }),
         saveConfig({ key: 'player_name',          value: playerName }),
         saveConfig({ key: 'target_weight',        value: targetWeight }),
-        saveConfig({ key: 'current_weight',       value: currentWeight }),
         saveConfig({ key: 'height_cm',            value: heightCm }),
         saveConfig({ key: 'birth_year',           value: birthYear }),
         saveConfig({ key: 'gender',               value: gender }),
@@ -412,9 +361,10 @@ export default function Settings() {
         saveConfig({ key: 'lunch_reminder_time',   value: lunchReminderTime }),
         saveConfig({ key: 'dinner_reminder_time',  value: dinnerReminderTime }),
         saveConfig({ key: 'evening_log_time',      value: eveningLogTime }),
+        saveConfig({ key: 'notification_mode',     value: notificationMode }),
       ])
       await fetchConfig()
-      await scheduleNotifications()
+      await scheduleFixedReminders({ requestPermission: true })
       toast.success('Settings saved')
     } catch { toast.error('Failed to save') }
     finally { setSaving(false) }
@@ -551,24 +501,31 @@ export default function Settings() {
         deficitKcal: LOSS_RATES.find(r => r.id === lossRate)?.deficit,
       })
     : null
-  const MENU = [
-    { key: 'profile',    Icon: User,          color: '#a78bfa', label: 'Player Profile',      desc: `${playerName || 'Not set'} · ${currentWeight || '—'} kg` },
-    { key: 'body',       Icon: HeartPulse,    color: '#ec4899', label: 'Body & Goal',          desc: bodyComplete ? `${heightCm} cm · ${targetWeight || '—'} kg goal · ${LOSS_RATES.find(r => r.id === lossRate)?.label ?? 'Standard'}` : 'Set up calorie & macro targets' },
-    { key: 'appearance', Icon: Sun,           color: '#f59e0b', label: 'Appearance',           desc: `${theme === 'dark' ? 'Dark' : 'Light'} theme` },
-    { key: 'weights',    Icon: Scale,         color: '#FBBC04', label: 'Category Weights',     desc: `Diet ${weights.diet_max} · Workout ${weights.workout_max} · Sleep ${weights.sleep_max} · Total ${totalMax}` },
-    { key: 'diet',       Icon: Utensils,      color: '#34A853', label: 'Diet Scoring',         desc: 'Meal points and dinner timing' },
-    { key: 'workout',    Icon: Dumbbell,      color: '#1A73E8', label: 'Workout Scoring',      desc: 'Steps, walk, exercise thresholds' },
-    { key: 'sleep',      Icon: Moon,          color: '#a78bfa', label: 'Sleep Scoring',        desc: 'Bedtime, duration, wake-up' },
-    { key: 'fasting',    Icon: Timer,         color: '#38bdf8', label: 'Intermittent Fasting', desc: `${weights.fasting?.min_hours ?? 12}h min · ${weights.fasting?.target_hours ?? 16}h target` },
-    { key: 'penalties',  Icon: AlertTriangle, color: '#EA4335', label: 'Penalties',            desc: 'Dinner late & sleep after midnight' },
-    { key: 'foods',      Icon: Sparkles,      color: '#f97316', label: 'Custom Meal Options',  desc: `${customOptions.length} food${customOptions.length !== 1 ? 's' : ''} configured` },
-    { key: 'ai_provider', Icon: KeyRound,     color: '#7c3aed', label: 'AI Assistant',         desc: hasLlmKey(aiConfig) ? 'Connected' : 'Not configured' },
-    { key: 'reminders',  Icon: Bell,          color: '#a78bfa', label: 'Reminders',            desc: `Bed ${bedTime} · Wake ${wakeTime} · Dinner ${dinnerReminderTime}` },
-    { key: 'export',     Icon: Download,      color: '#34A853', label: 'Data Export & Import',  desc: 'Excel · JSON backup · restore on new device' },
-    { key: 'tutorial',   Icon: BookOpen,      color: '#38bdf8', label: 'View Tutorial',        desc: 'How to win — scoring explained' },
-    { key: 'reset_onboarding', Icon: RefreshCw, color: '#f97316', label: 'Reset Onboarding', desc: 'Replay goals & personalisation setup' },
-    { key: 'dev_tools',        Icon: Lock,      color: '#64748b', label: 'Developer Tools',  desc: 'Restricted — advanced data override' },
+  const modeLabel = NOTIFICATION_MODES.find(m => m.id === notificationMode)?.label ?? 'Standard'
+  const MENU_GROUPS = [
+    { title: 'You', items: [
+      { key: 'profile',    Icon: User,       color: '#a78bfa', label: 'Name',        desc: playerName || 'Not set' },
+      { key: 'body',       Icon: HeartPulse, color: '#ec4899', label: 'Body & goal', desc: bodyComplete ? `${heightCm} cm · ${targetWeight || '—'} kg goal · ${LOSS_RATES.find(r => r.id === lossRate)?.label ?? 'Standard'}` : 'Set up calorie & macro targets' },
+      { key: 'appearance', Icon: Sun,        color: '#f59e0b', label: 'Theme',       desc: theme === 'dark' ? 'Dark' : 'Light' },
+    ] },
+    { title: 'Scoring', items: [
+      { key: 'scoring', Icon: Sliders, color: '#FBBC04', label: 'Scoring rules', desc: `Advanced · Diet ${weights.diet_max} · Workout ${weights.workout_max} · Sleep ${weights.sleep_max}` },
+    ] },
+    { title: 'Food & AI', items: [
+      { key: 'foods',       Icon: Sparkles, color: '#f97316', label: 'Custom foods', desc: `${customOptions.length} food${customOptions.length !== 1 ? 's' : ''}` },
+      { key: 'ai_provider', Icon: KeyRound, color: '#7c3aed', label: 'AI assistant', desc: hasLlmKey(aiConfig) ? 'Connected' : 'Not set up' },
+    ] },
+    { title: 'Reminders & data', items: [
+      { key: 'reminders', Icon: Bell,     color: '#38bdf8', label: 'Reminders',        desc: `${modeLabel} · bed ${bedTime}` },
+      { key: 'export',    Icon: Download, color: '#34A853', label: 'Export & backup',  desc: 'Excel · JSON backup · restore' },
+      { key: 'tutorial',  Icon: BookOpen, color: '#38bdf8', label: 'How scoring works', desc: 'A three-step tour' },
+    ] },
   ]
+
+  const tapVersion = () => {
+    versionTaps.current += 1
+    if (versionTaps.current >= DEV_TAPS) { versionTaps.current = 0; setActiveSection('dev_tools') }
+  }
 
   // ── Detail screens ────────────────────────────────────────────────────────
   const renderDetail = () => {
@@ -591,21 +548,11 @@ export default function Settings() {
 
     if (activeSection === 'profile') return (
       <div className="flex flex-col h-full">
-        <DetailHeader title="Player Profile" onBack={back} />
+        <DetailHeader title="Name" onBack={back} />
         <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
           <div>
             <label className="section-label block mb-1.5">Display name</label>
             <input className="input" placeholder="Your name" value={playerName} onChange={e => setPlayerName(e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="section-label block mb-1.5">Current weight (kg)</label>
-              <input type="number" className="input" placeholder="e.g. 80" value={currentWeight} onChange={e => setCurrentWeight(e.target.value)} />
-            </div>
-            <div>
-              <label className="section-label block mb-1.5">Target weight (kg)</label>
-              <input type="number" className="input" placeholder="e.g. 70" value={targetWeight} onChange={e => setTargetWeight(e.target.value)} />
-            </div>
           </div>
         </div>
         <SaveBtn />
@@ -614,7 +561,7 @@ export default function Settings() {
 
     if (activeSection === 'body') return (
       <div className="flex flex-col h-full">
-        <DetailHeader title="Body & Goal" onBack={back} />
+        <DetailHeader title="Body & goal" onBack={back} />
         <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
           <p className="text-xs text-text-muted">
             Used to work out your daily calorie and macro targets. Weight comes from your
@@ -732,7 +679,7 @@ export default function Settings() {
 
     if (activeSection === 'appearance') return (
       <div className="flex flex-col h-full">
-        <DetailHeader title="Appearance" onBack={back} />
+        <DetailHeader title="Theme" onBack={back} />
         <div className="overflow-y-auto flex-1 px-4 py-6">
           <p className="section-label mb-3">Theme</p>
           <div className="grid grid-cols-2 gap-3">
@@ -748,112 +695,85 @@ export default function Settings() {
       </div>
     )
 
-    if (activeSection === 'weights') return (
+    if (activeSection === 'scoring') return (
       <div className="flex flex-col h-full">
-        <DetailHeader title="Category Weights" onBack={back} />
-        <div className="overflow-y-auto flex-1 px-4 py-4">
-          <div className="card space-y-0">
-            <Stepper label="Diet max points"    value={weights.diet_max}    onChange={v => setWeights(w => ({ ...w, diet_max: v }))}    max={50} />
-            <Stepper label="Workout max points" value={weights.workout_max} onChange={v => setWeights(w => ({ ...w, workout_max: v }))} max={50} />
-            <Stepper label="Sleep max points"   value={weights.sleep_max}   onChange={v => setWeights(w => ({ ...w, sleep_max: v }))}   max={50} />
-          </div>
-          <div className="flex items-center justify-between mt-3 px-1">
-            <span className="text-xs text-text-muted">Total possible score</span>
-            <span className={`badge ${totalMax === 100 ? 'badge-success' : 'badge-warning'}`}>{totalMax} pts</span>
-          </div>
-          <button onClick={() => { setWeights(DEFAULT_WEIGHTS); toast('Reset to defaults — save to apply', { icon: '↩' }) }}
-            className="btn-ghost w-full mt-4"><RotateCcw size={13} />Reset all to defaults</button>
-        </div>
-        <SaveBtn />
-      </div>
-    )
+        <DetailHeader title="Scoring rules" onBack={back} />
+        <div className="overflow-y-auto flex-1 px-4 py-4 space-y-5">
+          <p className="text-xs text-text-muted px-1">
+            Advanced. The defaults suit most people — change these only if you want the score to weigh things differently.
+          </p>
 
-    if (activeSection === 'diet') return (
-      <div className="flex flex-col h-full">
-        <DetailHeader title="Diet Scoring" onBack={back} />
-        <div className="overflow-y-auto flex-1 px-4 py-4">
-          <div className="card space-y-0">
-            <Stepper label="Breakfast logged"           value={weights.diet?.breakfast         ?? 5} onChange={v => setW('diet', 'breakfast', v)} />
-            <Stepper label="Lunch logged"               value={weights.diet?.lunch              ?? 5} onChange={v => setW('diet', 'lunch', v)} />
-            <Stepper label="Dinner on time (≤8:30 PM)"  value={weights.diet?.dinner_on_time     ?? 8} onChange={v => setW('diet', 'dinner_on_time', v)} />
-            <Stepper label="No post-dinner snacks"      value={weights.diet?.no_post_dinner_snack ?? 7} onChange={v => setW('diet', 'no_post_dinner_snack', v)} />
-          </div>
-        </div>
-        <SaveBtn />
-      </div>
-    )
-
-    if (activeSection === 'workout') return (
-      <div className="flex flex-col h-full">
-        <DetailHeader title="Workout Scoring" onBack={back} />
-        <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
-          <div className="card space-y-0">
-            <Stepper label="Base pts at full-credit threshold" sublabel="Half earned at partial threshold" value={weights.workout?.steps_8000 ?? 15} onChange={v => setW('workout', 'steps_8000', v)} max={20} />
-            <Stepper label="Bonus pts at bonus-start"          sublabel="Then +10 linear to max"          value={weights.workout?.steps_10000_bonus ?? 3} onChange={v => setW('workout', 'steps_10000_bonus', v)} />
-            <Stepper label="Post-dinner walk"                  value={weights.workout?.post_dinner_walk   ?? 10} onChange={v => setW('workout', 'post_dinner_walk', v)} />
-            <Stepper label="Exercise session"                  sublabel="Badminton, stairs, etc."         value={weights.workout?.exercise_session    ?? 10} onChange={v => setW('workout', 'exercise_session', v)} />
-          </div>
-          <div className="card">
-            <p className="section-label mb-3">Step Thresholds</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Partial credit from', key: 'steps_half_threshold', def: 5000,  hint: '50% pts from here' },
-                { label: 'Full credit from',    key: 'steps_full_threshold', def: 8000,  hint: '100% base pts' },
-                { label: 'Bonus starts at',     key: 'steps_bonus_start',    def: 10000, hint: '+10 extra pts begin' },
-                { label: 'Max bonus at',        key: 'steps_bonus_end',      def: 18000, hint: 'Full +10 bonus here' },
-              ].map(({ label, key, def, hint }) => (
-                <div key={key}>
-                  <label className="section-label block mb-1">{label}</label>
-                  <input type="number" step="500" min="0" max="50000" className="input text-center tabular-nums"
-                    value={weights.workout?.[key] ?? def} onChange={e => setW('workout', key, Number(e.target.value))} />
-                  <p className="text-xs text-text-muted mt-0.5">{hint}</p>
-                </div>
-              ))}
+          <div>
+            <p className="section-label mb-2 px-1">Category maximums</p>
+            <div className="card space-y-0">
+              <Stepper label="Diet max points"    value={weights.diet_max}    onChange={v => setWeights(w => ({ ...w, diet_max: v }))}    max={50} />
+              <Stepper label="Workout max points" value={weights.workout_max} onChange={v => setWeights(w => ({ ...w, workout_max: v }))} max={50} />
+              <Stepper label="Sleep max points"   value={weights.sleep_max}   onChange={v => setWeights(w => ({ ...w, sleep_max: v }))}   max={50} />
+            </div>
+            <div className="flex items-center justify-between mt-2 px-1">
+              <span className="text-xs text-text-muted">Total of the three</span>
+              <span className={`badge ${totalMax === 100 ? 'badge-success' : 'badge-warning'}`}>{totalMax} pts</span>
             </div>
           </div>
-        </div>
-        <SaveBtn />
-      </div>
-    )
 
-    if (activeSection === 'sleep') return (
-      <div className="flex flex-col h-full">
-        <DetailHeader title="Sleep Scoring" onBack={back} />
-        <div className="overflow-y-auto flex-1 px-4 py-4">
-          <div className="card space-y-0">
-            <Stepper label="Sleep before 11:30 PM"  sublabel="Rule #6"                                        value={weights.sleep?.sleep_before_1130 ?? 10} onChange={v => setW('sleep', 'sleep_before_1130', v)} />
-            <Stepper label="7+ hours of sleep"      sublabel="Uses effective hours (minus screen time)"        value={weights.sleep?.seven_plus_hours   ?? 12} onChange={v => setW('sleep', 'seven_plus_hours', v)} />
-            <Stepper label="Wake by 8 AM"            sublabel="Full ≤8 AM · half 8–9 AM · none after 9"        value={weights.sleep?.wake_by_7          ?? 8}  onChange={v => setW('sleep', 'wake_by_7', v)} />
+          <div>
+            <p className="section-label mb-2 px-1">Workout</p>
+            <div className="card space-y-0">
+              <Stepper label="Steps at the full-credit target" sublabel="Half earned at the partial target" value={weights.workout?.steps_8000 ?? 15} onChange={v => setW('workout', 'steps_8000', v)} max={20} />
+              <Stepper label="Extra at the bonus start"         sublabel="Then up to +10 more by the bonus end" value={weights.workout?.steps_10000_bonus ?? 3} onChange={v => setW('workout', 'steps_10000_bonus', v)} />
+              <Stepper label="Post-dinner walk"                 value={weights.workout?.post_dinner_walk ?? 10} onChange={v => setW('workout', 'post_dinner_walk', v)} />
+              <Stepper label="Exercise session"                 value={weights.workout?.exercise_session ?? 10} onChange={v => setW('workout', 'exercise_session', v)} />
+            </div>
+            <div className="card mt-3">
+              <p className="section-label mb-3">Step targets</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Partial credit from', key: 'steps_half_threshold', def: 5000,  hint: 'Half the step points' },
+                  { label: 'Full credit from',    key: 'steps_full_threshold', def: 8000,  hint: 'All the step points' },
+                  { label: 'Bonus starts at',     key: 'steps_bonus_start',    def: 10000, hint: 'Extra points begin' },
+                  { label: 'Bonus ends at',       key: 'steps_bonus_end',      def: 18000, hint: 'Maximum bonus' },
+                ].map(({ label, key, def, hint }) => (
+                  <div key={key}>
+                    <label className="text-xs font-semibold text-text-secondary block mb-1">{label}</label>
+                    <input type="number" step="500" min="0" max="50000" className="input text-center tabular-nums"
+                      value={weights.workout?.[key] ?? def} onChange={e => setW('workout', key, Number(e.target.value))} />
+                    <p className="text-xs text-text-muted mt-0.5">{hint}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-        <SaveBtn />
-      </div>
-    )
 
-    if (activeSection === 'fasting') return (
-      <div className="flex flex-col h-full">
-        <DetailHeader title="Intermittent Fasting" onBack={back} />
-        <div className="overflow-y-auto flex-1 px-4 py-4">
-          <p className="text-xs text-text-muted mb-4 px-1">Score is calculated from yesterday's dinner → today's breakfast. Points scale logistically toward the target.</p>
-          <div className="card space-y-0">
-            <Stepper label="Target fasting hours"     sublabel="Full points at this duration" value={weights.fasting?.target_hours ?? 16} onChange={v => setWeights(w => ({ ...w, fasting: { ...(w.fasting||{}), target_hours: v } }))} min={8} max={24} />
-            <Stepper label="Minimum hours for points" sublabel="No points below this"         value={weights.fasting?.min_hours    ?? 12} onChange={v => setWeights(w => ({ ...w, fasting: { ...(w.fasting||{}), min_hours: v } }))}    min={4} max={20} />
-            <Stepper label="Max fasting points"                                               value={weights.fasting?.max_points   ?? 10} onChange={v => setWeights(w => ({ ...w, fasting: { ...(w.fasting||{}), max_points: v } }))}   max={20} />
+          <div>
+            <p className="section-label mb-2 px-1">Sleep</p>
+            <div className="card space-y-0">
+              <Stepper label="Asleep before 11:30 PM"                                               value={weights.sleep?.sleep_before_1130 ?? 10} onChange={v => setW('sleep', 'sleep_before_1130', v)} />
+              <Stepper label="7+ hours of sleep" sublabel="Effective hours, after screen time"      value={weights.sleep?.seven_plus_hours   ?? 12} onChange={v => setW('sleep', 'seven_plus_hours', v)} />
+              <Stepper label="Awake by 8 AM"     sublabel="Full by 8 AM · half until 9 · none after" value={weights.sleep?.wake_by_7          ?? 8}  onChange={v => setW('sleep', 'wake_by_7', v)} />
+            </div>
           </div>
-        </div>
-        <SaveBtn />
-      </div>
-    )
 
-    if (activeSection === 'penalties') return (
-      <div className="flex flex-col h-full">
-        <DetailHeader title="Penalties" onBack={back} />
-        <div className="overflow-y-auto flex-1 px-4 py-4">
-          <div className="card space-y-0">
-            <Stepper label="Dinner after 9 PM"   value={Math.abs(weights.penalties?.dinner_after_9pm   ?? 5)} onChange={v => setWeights(w => ({ ...w, penalties: { ...w.penalties, dinner_after_9pm: -v } }))} />
-            <Stepper label="Sleep after midnight" value={Math.abs(weights.penalties?.sleep_after_midnight ?? 8)} onChange={v => setWeights(w => ({ ...w, penalties: { ...w.penalties, sleep_after_midnight: -v } }))} />
+          <div>
+            <p className="section-label mb-2 px-1">Fasting</p>
+            <div className="card space-y-0">
+              <Stepper label="Target hours"   sublabel="Full points at this length" value={weights.fasting?.target_hours ?? 16} onChange={v => setWeights(w => ({ ...w, fasting: { ...(w.fasting||{}), target_hours: v } }))} min={8} max={24} />
+              <Stepper label="Minimum hours"  sublabel="No points below this"       value={weights.fasting?.min_hours    ?? 12} onChange={v => setWeights(w => ({ ...w, fasting: { ...(w.fasting||{}), min_hours: v } }))}    min={4} max={20} />
+              <Stepper label="Max fasting points"                                   value={weights.fasting?.max_points   ?? 10} onChange={v => setWeights(w => ({ ...w, fasting: { ...(w.fasting||{}), max_points: v } }))}   max={20} />
+            </div>
+            <p className="text-xs text-text-muted mt-2 px-1">Measured from yesterday's dinner to today's breakfast.</p>
           </div>
-          <p className="text-xs text-text-muted mt-3 px-1">Penalties are deducted from the respective category score (diet / sleep).</p>
+
+          <div>
+            <p className="section-label mb-2 px-1">Penalties</p>
+            <div className="card space-y-0">
+              <Stepper label="Dinner after 9 PM"    value={Math.abs(weights.penalties?.dinner_after_9pm   ?? 5)} onChange={v => setWeights(w => ({ ...w, penalties: { ...w.penalties, dinner_after_9pm: -v } }))} />
+              <Stepper label="Sleep after midnight" value={Math.abs(weights.penalties?.sleep_after_midnight ?? 8)} onChange={v => setWeights(w => ({ ...w, penalties: { ...w.penalties, sleep_after_midnight: -v } }))} />
+            </div>
+            <p className="text-xs text-text-muted mt-2 px-1">Taken off the diet and sleep scores. Food points are set per food under Custom foods.</p>
+          </div>
+
+          <button onClick={() => { setWeights(DEFAULT_WEIGHTS); toast('Reset to defaults — save to apply', { icon: '↩' }) }}
+            className="btn-ghost w-full"><RotateCcw size={13} />Reset to defaults</button>
         </div>
         <SaveBtn />
       </div>
@@ -868,7 +788,7 @@ export default function Settings() {
               <KeyRound size={14} style={{ color: '#7c3aed' }} />
               <p className="section-label flex-1">AI Provider (free tier)</p>
               {hasLlmKey(aiConfig) && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
                   style={{ background: '#22c55e20', color: '#22c55e' }}>Connected</span>
               )}
             </div>
@@ -884,8 +804,8 @@ export default function Settings() {
             <div className="space-y-2">
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <p className="text-[10px] text-text-muted">OpenRouter API key</p>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                  <p className="text-[11px] text-text-muted">OpenRouter API key</p>
+                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
                     style={{ background: '#7c3aed20', color: '#7c3aed' }}>PRIMARY</span>
                 </div>
                 <input type={showKeys ? 'text' : 'password'} className="input text-xs font-mono" placeholder="sk-or-v1-…"
@@ -893,8 +813,8 @@ export default function Settings() {
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <p className="text-[10px] text-text-muted">Groq API key</p>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                  <p className="text-[11px] text-text-muted">Groq API key</p>
+                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
                     style={{ background: '#64748b20', color: '#94a3b8' }}>BACKUP</span>
                 </div>
                 <input type={showKeys ? 'text' : 'password'} className="input text-xs font-mono" placeholder="gsk_…"
@@ -932,7 +852,7 @@ export default function Settings() {
 
       return (
         <div className="flex flex-col h-full">
-          <DetailHeader title="Meal Options" onBack={back} />
+          <DetailHeader title="Custom foods" onBack={back} />
           <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3">
             {/* Add new */}
             <div className="card space-y-3">
@@ -985,7 +905,7 @@ export default function Settings() {
                         placeholder="—"
                         value={newOption[key] ?? ''}
                         onChange={e => setNewOption(o => ({ ...o, [key]: e.target.value === '' ? null : Number(e.target.value) }))} />
-                      <p className="text-[10px] text-text-muted text-center mt-0.5">{label}</p>
+                      <p className="text-[11px] text-text-muted text-center mt-0.5">{label}</p>
                     </div>
                   ))}
                 </div>
@@ -1092,7 +1012,7 @@ export default function Settings() {
                                   placeholder="—"
                                   value={editDraft[key] ?? ''}
                                   onChange={e => setEditDraft(d => ({ ...d, [key]: e.target.value === '' ? null : Number(e.target.value) }))} />
-                                <p className="text-[10px] text-text-muted text-center mt-0.5">{label}</p>
+                                <p className="text-[11px] text-text-muted text-center mt-0.5">{label}</p>
                               </div>
                             ))}
                           </div>
@@ -1126,42 +1046,51 @@ export default function Settings() {
           {!Capacitor.isNativePlatform() && (
             <p className="text-xs text-warning bg-warning/10 rounded-xl px-3 py-2">Notifications only work on the Android app.</p>
           )}
-          <div className="card space-y-4">
-            <p className="section-label">Sleep reminders</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="section-label block mb-1.5">Bed time</label><input type="time" className="input" value={bedTime} onChange={e => setBedTime(e.target.value)} /></div>
-              <div><label className="section-label block mb-1.5">Wake up</label><input type="time" className="input" value={wakeTime} onChange={e => setWakeTime(e.target.value)} /></div>
-            </div>
-          </div>
-          <div className="card space-y-3">
-            <p className="section-label">Step check-ins <span className="text-text-muted font-normal">(3 per day)</span></p>
-            <div className="grid grid-cols-3 gap-2">
-              {stepTimes.map((t, i) => (
-                <div key={i}>
-                  <label className="section-label block mb-1">Reminder {i + 1}</label>
-                  <input type="time" className="input py-1.5 text-xs" value={t}
-                    onChange={e => setStepTimes(prev => prev.map((v, j) => j === i ? e.target.value : v))} />
-                </div>
+
+          <div>
+            <p className="section-label mb-2 px-1">How much should the app remind you?</p>
+            <div className="space-y-2">
+              {NOTIFICATION_MODES.map(m => (
+                <button key={m.id} onClick={() => setNotificationMode(m.id)}
+                  className={`w-full text-left px-3.5 py-3 rounded-xl border-2 transition-all ${
+                    notificationMode === m.id ? 'border-brand bg-brand/10' : 'border-surface-border bg-surface-elevated'
+                  }`}>
+                  <p className="text-sm font-semibold text-text-primary">{m.label}</p>
+                  <p className="text-xs text-text-muted mt-0.5">{m.desc}</p>
+                </button>
               ))}
             </div>
           </div>
-          <div className="card space-y-3">
-            <p className="section-label">Meal reminders</p>
+
+          <div className="card space-y-4">
+            <p className="section-label">Times</p>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="section-label block mb-1.5">Lunch reminder</label><input type="time" className="input" value={lunchReminderTime} onChange={e => setLunchReminderTime(e.target.value)} /></div>
-              <div><label className="section-label block mb-1.5">Dinner reminder</label><input type="time" className="input" value={dinnerReminderTime} onChange={e => setDinnerReminderTime(e.target.value)} /></div>
+              <div><label className="text-xs font-semibold text-text-secondary block mb-1.5">Bedtime</label><input type="time" className="input" value={bedTime} onChange={e => setBedTime(e.target.value)} /></div>
+              {notificationMode !== 'quiet' && (
+                <div><label className="text-xs font-semibold text-text-secondary block mb-1.5">Dinner</label><input type="time" className="input" value={dinnerReminderTime} onChange={e => setDinnerReminderTime(e.target.value)} /></div>
+              )}
+              {notificationMode === 'coach' && (
+                <>
+                  <div><label className="text-xs font-semibold text-text-secondary block mb-1.5">Wake up</label><input type="time" className="input" value={wakeTime} onChange={e => setWakeTime(e.target.value)} /></div>
+                  <div><label className="text-xs font-semibold text-text-secondary block mb-1.5">Lunch</label><input type="time" className="input" value={lunchReminderTime} onChange={e => setLunchReminderTime(e.target.value)} /></div>
+                  <div><label className="text-xs font-semibold text-text-secondary block mb-1.5">Log your day</label><input type="time" className="input" value={eveningLogTime} onChange={e => setEveningLogTime(e.target.value)} /></div>
+                </>
+              )}
             </div>
-            <p className="text-xs text-text-muted">No-snacking alert sent at 9:30 PM · Post-dinner walk reminder 40 min after dinner time</p>
           </div>
-          <div className="card space-y-3">
-            <p className="section-label">End-of-day</p>
-            <div><label className="section-label block mb-1.5">Log reminder</label><input type="time" className="input" value={eveningLogTime} onChange={e => setEveningLogTime(e.target.value)} /></div>
-            <p className="text-xs text-text-muted">Prompts you to log Sleep &amp; Workout before midnight</p>
-          </div>
-          <div className="card">
-            <p className="section-label mb-2">Always-on reminders</p>
-            <p className="text-xs text-text-muted">Hydration at 11:00 &amp; 15:30 · Step notifications include your configured step target</p>
-          </div>
+
+          {notificationMode === 'coach' && (
+            <div className="card space-y-3">
+              <p className="section-label">Step check-ins</p>
+              <div className="grid grid-cols-3 gap-2">
+                {stepTimes.map((t, i) => (
+                  <input key={i} type="time" aria-label={`Step check-in ${i + 1}`} className="input py-2 text-xs" value={t}
+                    onChange={e => setStepTimes(prev => prev.map((v, j) => j === i ? e.target.value : v))} />
+                ))}
+              </div>
+              <p className="text-xs text-text-muted">Coach also sends hydration reminders at 11:00 and 15:30, a no-snacking reminder at 9:30 PM, a post-dinner walk prompt, and daily trend alerts.</p>
+            </div>
+          )}
         </div>
         <SaveBtn />
       </div>
@@ -1169,7 +1098,7 @@ export default function Settings() {
 
     if (activeSection === 'export') return (
       <div className="flex flex-col h-full">
-        <DetailHeader title="Data Export & Import" onBack={back} />
+        <DetailHeader title="Export & backup" onBack={back} />
         <div className="overflow-y-auto flex-1 px-4 py-6 space-y-4">
           <div className="card space-y-3">
             <p className="section-label">Export data</p>
@@ -1195,7 +1124,7 @@ export default function Settings() {
 
     if (activeSection === 'tutorial') return (
       <div className="flex flex-col h-full">
-        <DetailHeader title="How to Win" onBack={back} />
+        <DetailHeader title="How scoring works" onBack={back} />
         <div className="flex-1 flex flex-col min-h-0">
           <TutorialSlides onDone={back} doneLabel="Back to Settings" />
         </div>
@@ -1204,7 +1133,7 @@ export default function Settings() {
 
     if (activeSection === 'reset_onboarding') return (
       <div className="flex flex-col h-full">
-        <DetailHeader title="Reset Onboarding" onBack={back} />
+        <DetailHeader title="Replay setup" onBack={back} />
         <div className="overflow-y-auto flex-1 px-4 py-6 space-y-4">
           <p className="text-sm text-text-muted leading-relaxed">
             This will clear your onboarding data and show the setup flow on next app launch — letting you re-select your goals, activity level, and primary struggle.
@@ -1478,33 +1407,46 @@ export default function Settings() {
         <>
           {/* Header */}
           <div className="page-header">
-            <img src="/logo.png" alt="Health Quest" className="w-8 h-8 rounded-xl object-cover shrink-0" />
+            <button onClick={() => navigate('/profile')} aria-label="Back to Profile"
+              className="w-10 h-10 rounded-2xl bg-surface-elevated border border-surface-border flex items-center justify-center shrink-0">
+              <ArrowLeft size={17} className="text-text-secondary" />
+            </button>
             <h1 className="text-base font-semibold text-text-primary flex-1">Settings</h1>
           </div>
 
-          {/* Menu list */}
-          <div className="max-w-lg mx-auto w-full px-4 py-4">
-            <div className="card space-y-0 divide-y divide-surface-border">
-              {MENU.map(({ key, Icon, color, label, desc }) => (
-                <button key={key} onClick={() => setActiveSection(key)}
-                  className="list-row w-full text-left py-3.5 hover:bg-surface-elevated/50 transition-colors active:opacity-70">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: `${color}18` }}>
-                    <Icon size={16} style={{ color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text-primary">{label}</p>
-                    <p className="text-xs text-text-muted truncate mt-0.5">{desc}</p>
-                  </div>
-                  <ChevronRight size={15} className="text-text-muted shrink-0" />
-                </button>
-              ))}
-            </div>
+          {/* Menu, in four groups */}
+          <div className="max-w-lg mx-auto w-full px-4 pb-4 space-y-4">
+            {MENU_GROUPS.map(group => (
+              <div key={group.title}>
+                <p className="section-label mb-2 px-1">{group.title}</p>
+                <div className="card py-1 space-y-0 divide-y divide-surface-border">
+                  {group.items.map(({ key, Icon, color, label, desc }) => (
+                    <button key={key} onClick={() => setActiveSection(key)}
+                      className="list-row w-full text-left py-3.5 active:opacity-70">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: `${color}18` }}>
+                        <Icon size={16} style={{ color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-text-primary">{label}</p>
+                        <p className="text-xs text-text-muted truncate mt-0.5">{desc}</p>
+                      </div>
+                      <ChevronRight size={15} className="text-text-muted shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
 
-            {/* Version footer */}
-            <p className="text-center text-xs text-text-muted mt-5 mb-1 select-none">
-              Health Quest v{APP_VERSION}
-            </p>
+            {/* About */}
+            <div className="text-center pt-2 space-y-2">
+              <button onClick={() => setActiveSection('reset_onboarding')} className="text-xs font-semibold text-text-muted underline underline-offset-2">
+                Replay setup
+              </button>
+              <p onClick={tapVersion} className="text-xs text-text-muted select-none">
+                Health Quest v{APP_VERSION}
+              </p>
+            </div>
           </div>
         </>
       )}

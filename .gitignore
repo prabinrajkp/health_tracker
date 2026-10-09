@@ -21,7 +21,7 @@ image.png
 # APKs: only the latest release is tracked (the .gitignore file
 # android/.gitignore also ignores *.apk, hence the explicit override)
 health-quest-v*.apk
-!health-quest-v4.28-debug.apk
+!health-quest-v4.29-debug.apk
 
 # python
 *.pyc
