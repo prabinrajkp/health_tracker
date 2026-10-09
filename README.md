@@ -2,6 +2,8 @@
 
 > A fully offline, gamified personal health tracker built for fat loss, triglyceride control, and prediabetes reversal — running entirely on your Android phone with no cloud, no account, and no backend required.
 
+**Guide & APK download:** https://prabinrajkp.github.io/health_tracker
+
 ---
 
 ## What is this?
