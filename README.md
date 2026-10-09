@@ -221,7 +221,7 @@ health_tracker/
 │   └── android/                   # Capacitor Android project
 ├── backend/                       # FastAPI (optional, for desktop browser dev)
 ├── build_apk.sh                   # One-command APK builder
-└── requiremet_doc.MD              # Original health plan
+└── docs/                          # Planning docs and original health plan (requiremet_doc.MD)
 ```
 
 ---
