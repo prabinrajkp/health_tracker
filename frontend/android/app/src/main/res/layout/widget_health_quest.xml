@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="10dp">
+
+    <!-- Header: emoji · tier + score · refresh -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/wCharEmoji"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="26sp"
+            android:layout_marginEnd="8dp"
+            android:text="🛡️" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/wCharTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:textColor="#BB99FF"
+                    android:letterSpacing="0.08"
+                    android:text="WARRIOR" />
+
+                <TextView
+                    android:id="@+id/wStreak"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="9sp"
+                    android:textColor="#FF9500"
+                    android:layout_marginStart="6dp"
+                    android:text="" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/wScore"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:text="0 / 100" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/wRefreshBtn"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:text="↻"
+            android:textSize="18sp"
+            android:textColor="#BB99FF"
+            android:background="@android:color/transparent" />
+
+    </LinearLayout>
+
+    <!-- Subtitle / mood line -->
+    <TextView
+        android:id="@+id/wSubtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="8sp"
+        android:textColor="#55FFFFFF"
+        android:textStyle="italic"
+        android:layout_marginTop="1dp"
+        android:layout_marginBottom="2dp"
+        android:text="" />
+
+    <!-- Performance radar (fills remaining space) -->
+    <ImageView
+        android:id="@+id/wChart"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scaleType="fitCenter" />
+
+    <!-- Quick metrics row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="3dp">
+
+        <TextView
+            android:id="@+id/wDietMetric"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:textColor="#FF22C55E"
+            android:gravity="center"
+            android:text="🥗 —" />
+
+        <TextView
+            android:id="@+id/wWorkoutMetric"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:textColor="#FF38BDF8"
+            android:gravity="center"
+            android:text="⚡ —" />
+
+        <TextView
+            android:id="@+id/wSleepMetric"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:textColor="#FFA78BFA"
+            android:gravity="center"
+            android:text="🌙 —" />
+
+    </LinearLayout>
+
+</LinearLayout>

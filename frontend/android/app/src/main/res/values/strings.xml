@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">HEALTH QUEST</string>
+    <string name="title_activity_main">HEALTH QUEST</string>
+    <string name="package_name">com.healthquest.tracker</string>
+    <string name="custom_url_scheme">com.healthquest.tracker</string>
+</resources>

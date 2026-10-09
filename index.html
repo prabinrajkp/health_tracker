@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Health Quest — Guide &amp; Download</title>
+<meta name="description" content="Health Quest is a fully offline, gamified health tracker for Android. Install guide, scoring system and feature tour.">
+<link rel="icon" href="logo.png">
+<style>
+  :root {
+    --bg: #070b1f; --bg2: #0d1333; --card: #111a42; --line: #222d62;
+    --text: #e9edff; --muted: #9aa6d6;
+    --purple: #a45cff; --blue: #3b7bff; --cyan: #1de9e0;
+    --grad: linear-gradient(135deg, var(--purple), var(--blue) 50%, var(--cyan));
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--cyan); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  nav { position: sticky; top: 0; z-index: 10; background: rgba(7,11,31,.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 16px; height: 56px; overflow-x: auto; white-space: nowrap; }
+  nav img { width: 28px; height: 28px; border-radius: 8px; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 14px; }
+  nav a:hover { color: var(--text); }
+  nav strong { margin-right: auto; }
+
+  .hero { text-align: center; padding: 72px 0 56px; background: radial-gradient(600px 300px at 50% 0, rgba(91,92,255,.28), transparent 70%); }
+  .hero img { width: 112px; height: 112px; border-radius: 26px; box-shadow: 0 10px 40px rgba(59,123,255,.4); }
+  h1 { font-size: clamp(2rem, 6vw, 3.2rem); margin: 20px 0 8px; line-height: 1.15; }
+  h1 span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { color: var(--muted); max-width: 620px; margin: 0 auto 28px; font-size: 1.1rem; }
+  .btn { display: inline-flex; align-items: center; gap: 10px; background: var(--grad); color: #04102a; font-weight: 700; font-size: 1.05rem; padding: 14px 28px; border-radius: 999px; text-decoration: none; box-shadow: 0 8px 30px rgba(59,123,255,.4); transition: transform .15s; }
+  .btn:hover { transform: translateY(-2px); }
+  .btn svg { width: 22px; height: 22px; }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 14px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 28px; }
+  .pill { border: 1px solid var(--line); background: var(--bg2); color: var(--muted); border-radius: 999px; padding: 4px 14px; font-size: 13px; }
+
+  section { padding: 48px 0; border-top: 1px solid var(--line); scroll-margin-top: 56px; }
+  h2 { font-size: 1.7rem; margin-bottom: 8px; }
+  h2 + p { color: var(--muted); margin-bottom: 24px; }
+  h3 { font-size: 1.05rem; margin-bottom: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .card p, .card li { color: var(--muted); font-size: 15px; }
+  .card ul { padding-left: 18px; }
+  .ico { font-size: 1.6rem; margin-bottom: 8px; }
+
+  ol.steps { list-style: none; counter-reset: s; display: grid; gap: 14px; }
+  ol.steps li { counter-increment: s; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 18px 18px 64px; position: relative; }
+  ol.steps li::before { content: counter(s); position: absolute; left: 18px; top: 16px; width: 32px; height: 32px; border-radius: 50%; background: var(--grad); color: #04102a; font-weight: 800; display: grid; place-items: center; }
+  ol.steps p { color: var(--muted); font-size: 15px; }
+  .note { margin-top: 16px; border-left: 3px solid var(--purple); background: var(--bg2); padding: 12px 16px; border-radius: 0 12px 12px 0; color: var(--muted); font-size: 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .tbl { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow-x: auto; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  tr:last-child td { border-bottom: 0; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+  .rules { list-style: none; counter-reset: r; }
+  .rules li { counter-increment: r; padding: 10px 0 10px 36px; position: relative; border-bottom: 1px solid var(--line); color: var(--text); font-size: 15px; }
+  .rules li:last-child { border: 0; }
+  .rules li::before { content: counter(r); position: absolute; left: 0; color: var(--cyan); font-weight: 700; }
+  .g { font-weight: 800; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--muted); margin-top: 8px; font-size: 15px; }
+  code { background: var(--bg2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; font-size: 13px; }
+  .cta { text-align: center; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0; text-align: center; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <img src="logo.png" alt=""><strong>Health Quest</strong>
+    <a href="#install">Install</a>
+    <a href="#tour">App tour</a>
+    <a href="#scoring">Scoring</a>
+    <a href="#game">Gamification</a>
+    <a href="#faq">FAQ</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <img src="logo.png" alt="Health Quest logo">
+    <h1>Turn healthy habits into a <span>daily game</span></h1>
+    <p class="lead">A fully offline, gamified health tracker for Android. Score your diet, fasting, workouts and sleep every day — no account, no cloud, no internet needed.</p>
+    <a class="btn" href="health-quest-v4.28-debug.apk" download>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
+      Download APK · v4.28
+    </a>
+    <p class="meta">Android 7+ · ~7.8 MB · Debug build · Released 10 Sep 2026</p>
+    <div class="pills">
+      <span class="pill">100% offline</span><span class="pill">No sign-up</span><span class="pill">Data stays on your phone</span><span class="pill">AI coach (optional)</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="install">
+  <h2>Install in 4 steps</h2>
+  <p>The app is distributed as an APK file, so Android needs permission to install it from outside the Play Store.</p>
+  <ol class="steps">
+    <li><h3>Download the APK</h3><p>Tap the <strong>Download APK</strong> button above on your phone (or download on a PC and copy the file over via USB / cable).</p></li>
+    <li><h3>Allow installs from your browser</h3><p>Open <code>Settings → Apps → Special access → Install unknown apps</code>, choose your browser or file manager, and enable <em>Allow from this source</em>.</p></li>
+    <li><h3>Open the file and tap Install</h3><p>Open the downloaded <code>health-quest-v4.28-debug.apk</code> from your notifications or Downloads folder. If Play Protect warns about an unknown app, choose <em>Install anyway</em> — it's a personal debug build.</p></li>
+    <li><h3>Finish onboarding</h3><p>Launch Health Quest, enter your profile (name, weight, goal) and allow notifications, Usage Access and Health Connect when asked so reminders, screen-time and step sync work.</p></li>
+  </ol>
+  <p class="note"><strong>From a PC with USB debugging:</strong> run <code>adb install health-quest-v4.28-debug.apk</code>. Updating from an older version keeps your data; installing over it just works.</p>
+</section>
+
+<section id="tour">
+  <h2>App tour</h2>
+  <p>Every screen answers one question.</p>
+  <div class="grid">
+    <div class="card"><div class="ico">🏠</div><h3>Home</h3><p>How am I doing right now? A score ring with grade (S–F), Diet / Fasting / Workout / Sleep bars, a radar chart, penalty chips, daily quests and your streak. Tap <em>Add Meal</em> to log food fast.</p></div>
+    <div class="card"><div class="ico">🍽️</div><h3>Activity · Diet</h3><p>Four meal tabs (breakfast, lunch, dinner, snacks). Pick foods and portions, repeat yesterday's meal in one tap, save favorites and name your frequent meals. Live fasting timer included.</p></div>
+    <div class="card"><div class="ico">👟</div><h3>Activity · Workout</h3><p>Steps (synced from Health Connect), post-dinner walk and exercise sessions with a live score preview against your step targets.</p></div>
+    <div class="card"><div class="ico">🌙</div><h3>Sleep</h3><p>Tap to start the sleep timer at bedtime and Wake Up in the morning. Screen time is deducted automatically to give your <em>effective</em> sleep. Add a 1–5 quality rating.</p></div>
+    <div class="card"><div class="ico">📅</div><h3>History</h3><p>Colour-coded monthly calendar. Tap any day for full detail, share it as an image, switch to stacked-bar or line charts, and see Meal Insights (top foods, repeat rates, diversity).</p></div>
+    <div class="card"><div class="ico">⚖️</div><h3>Weight</h3><p>Log daily weight and watch the trend line approach your target: 7-day average, change vs last week, and 30d / 90d / 1y views.</p></div>
+    <div class="card"><div class="ico">🧑‍🚀</div><h3>Profile</h3><p>Your identity hub: level, XP bar, prestige score, active title and the full badge inventory.</p></div>
+    <div class="card"><div class="ico">⚙️</div><h3>Settings</h3><p>Dark / light theme, calorie &amp; macro targets (BMR, maintenance, safe deficit), editable score weights, custom foods, reminders, AI key, Excel export and JSON backup / restore.</p></div>
+  </div>
+</section>
+
+<section id="scoring">
+  <h2>How scoring works</h2>
+  <p>Every day starts at 0. You earn points for what you actually did — the score is honest, not flattering.</p>
+  <div class="two">
+    <div class="tbl"><table>
+      <tr><th>Category</th><th>Max</th><th>Earned by</th></tr>
+      <tr><td>Diet</td><td>35</td><td>Good food, portions; penalty for dinner after 9 PM</td></tr>
+      <tr><td>Fasting</td><td>10</td><td>12 h minimum, 16 h target (dinner → breakfast)</td></tr>
+      <tr><td>Workout</td><td>35</td><td>Steps, post-dinner walk, exercise</td></tr>
+      <tr><td>Sleep</td><td>30</td><td>Timing, duration, effective hours</td></tr>
+      <tr><td>Bonus</td><td>+10</td><td>Near-perfect or perfect day</td></tr>
+    </table></div>
+    <div class="tbl"><table>
+      <tr><th>Score</th><th>Grade</th></tr>
+      <tr><td>90–100</td><td><span class="g">S</span> Outstanding</td></tr>
+      <tr><td>80–89</td><td><span class="g">A</span> Excellent</td></tr>
+      <tr><td>70–79</td><td><span class="g">B</span> Great</td></tr>
+      <tr><td>60–69</td><td><span class="g">C</span> Good</td></tr>
+      <tr><td>40–59</td><td><span class="g">D</span> Below target</td></tr>
+      <tr><td>&lt; 40</td><td><span class="g">F</span> Needs work</td></tr>
+    </table></div>
+  </div>
+  <h3 style="margin:28px 0 12px">Steps curve</h3>
+  <div class="tbl"><table>
+    <tr><th>Steps</th><th>&lt; 5,000</th><th>5,000</th><th>8,000</th><th>10,000</th><th>18,000+</th></tr>
+    <tr><td>Points</td><td>0</td><td>7.5</td><td>15</td><td>18</td><td>28 (max)</td></tr>
+  </table></div>
+  <p class="note">All thresholds, weights and penalties are editable in <strong>Settings</strong>.</p>
+  <h3 style="margin:28px 0 8px">The six daily rules</h3>
+  <div class="card"><ol class="rules">
+    <li>No banana chips after dinner</li>
+    <li>Dinner by 8:30 PM</li>
+    <li>Tea: 1 spoon sugar only</li>
+    <li>Protein first, rice second</li>
+    <li>8,000+ steps daily</li>
+    <li>Sleep before 11:30 PM</li>
+  </ol></div>
+</section>
+
+<section id="game">
+  <h2>Gamification &amp; coaching</h2>
+  <p>Progress is meant to feel rewarding, not like a spreadsheet.</p>
+  <div class="grid">
+    <div class="card"><div class="ico">🏅</div><h3>100 badges</h3><p>Six categories — Consistency, Nutrition, Fitness, Sleep, Comeback, Elite — plus hidden legendary badges. Earn a badge repeatedly to evolve it: Bronze → Silver → Gold → Neon Legendary.</p></div>
+    <div class="card"><div class="ico">⚡</div><h3>Levels &amp; XP</h3><p>Every logged day earns XP from your score. Level up, build prestige, and keep a streak alive (quality days count).</p></div>
+    <div class="card"><div class="ico">🔔</div><h3>Smart notifications</h3><p>Bedtime and wake reminders, step check-ins, a 9:30 PM trend alert, 9 AM morning review, plus weekly and monthly trend summaries.</p></div>
+    <div class="card"><div class="ico">🤖</div><h3>AI health summary</h3><p>Optional. Add an API key in Settings and generate a per-day diet / sleep / workout brief with tomorrow's priorities. Without a key, everything else still works.</p></div>
+  </div>
+</section>
+
+<section id="faq">
+  <h2>FAQ</h2>
+  <details><summary>Where is my data stored?</summary><p>Only on your phone, in the app's local database. Nothing is uploaded. Use <em>Settings → Backup</em> to save a JSON file and restore it on a new device.</p></details>
+  <details><summary>Do I need internet?</summary><p>No. Only the optional AI summary needs a connection.</p></details>
+  <details><summary>Why does Android warn me during install?</summary><p>The APK is a debug build shared outside the Play Store, so Play Protect doesn't recognise it. Only install it from a source you trust.</p></details>
+  <details><summary>Steps aren't syncing — what do I check?</summary><p>Make sure Health Connect is installed and that Health Quest has permission to read Steps. Sleep screen-time deduction needs <em>Usage Access</em> enabled for the app.</p></details>
+  <details><summary>Reminders don't fire on time.</summary><p>Allow notifications and exact alarms, and set battery usage for Health Quest to <em>Unrestricted</em> on phones with aggressive battery savers.</p></details>
+  <details><summary>Can I export my data?</summary><p>Yes — Settings has a full Excel export (scores, diet, workouts, sleep, weight) and a JSON backup.</p></details>
+</section>
+
+<section class="cta">
+  <h2>Ready to start your quest?</h2>
+  <p>Download, install, and log your first day.</p>
+  <a class="btn" href="health-quest-v4.28-debug.apk" download>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
+    Download APK · v4.28
+  </a>
+</section>
+
+</main>
+
+<footer>Health Quest · Built for one person's health journey · Personal use</footer>
+</body>
+</html>

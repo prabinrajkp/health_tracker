@@ -1,0 +1,24 @@
+# dependencies & build output
+node_modules/
+dist/
+.venv/
+__pycache__/
+build/
+.gradle/
+*.log
+
+# local / secret config
+.env
+.env.*
+local.properties
+*.db
+.claude/
+
+# personal files
+*.pdf
+image.png
+
+# APKs: only the latest release is tracked (the .gitignore file
+# android/.gitignore also ignores *.apk, hence the explicit override)
+health-quest-v*.apk
+!health-quest-v4.28-debug.apk
