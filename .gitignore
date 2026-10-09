@@ -22,3 +22,30 @@ image.png
 # android/.gitignore also ignores *.apk, hence the explicit override)
 health-quest-v*.apk
 !health-quest-v4.28-debug.apk
+
+# python
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+venv/
+env/
+
+# editors & OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# android
+.cxx/
+captures/
+*.keystore
+*.jks
+frontend/android/capacitor-cordova-android-plugins/
+
+# node
+npm-debug.log*
+.vite/
+coverage/
