@@ -1,6 +1,6 @@
 # Health Quest 🏃
 
-> A fully offline, gamified personal health tracker built for fat loss, triglyceride control, and prediabetes reversal — running entirely on your Android phone with no cloud, no account, and no backend required.
+> A fully offline, gamified health tracker for Android. Score your diet, fasting, workouts and sleep every day — no cloud, no account, and no backend required.
 
 **Guide & APK download:** https://prabinrajkp.github.io/health_tracker
 
@@ -10,13 +10,7 @@
 
 Health Quest turns daily health habits into a scored game. Every day you start at 0 and earn points by eating well, walking, exercising, sleeping on time, and fasting long enough. The score tells you honestly how your day went — not how you felt about it.
 
-Built around a real health plan targeting:
-
-- Weight reduction (135 kg → 120 kg first target)
-- Triglycerides: 538 → normal
-- HbA1c: 6.0 → pre-diabetic reversal
-- Fatty liver improvement
-- Consistent sleep and energy
+A short setup asks for your goals, activity level and main struggle, and tunes the scoring to match. From then on the app shows one score, one next action, and one thing to fix each week. Levels, goals and 100+ badges keep it rewarding over time.
 
 ---
 
@@ -40,16 +34,19 @@ Built around a real health plan targeting:
 
 ## Scoring System
 
+These are the default maximums. Setup adjusts them to your goals, and all of them can be changed in Settings → Scoring rules.
+
 | Category | Max Points | How it's earned |
 |----------|-----------|----------------|
-| **Diet** | 35 pts | Per-meal food items with portion scoring; penalty for dinner after 9 PM |
+| **Diet** | 35 pts | Points per food and portion; junk food and dinner after 9 PM take points off |
 | **Fasting** | 10 pts | Logistic curve from last dinner → first breakfast (12 h min, 16 h target) |
 | **Workout** | 35 pts | Steps + post-dinner walk + exercise session |
-| **Sleep** | 30 pts | Sleep timing + duration + effective hours (minus screen time) |
+| **Sleep** | 30 pts | Bedtime + effective hours (minus screen time) + wake time |
+| **Calories** | 10 pts | Staying near your calorie target; only counted once body details and food nutrition are set |
 | **Bonus** | +10 pts | Near-perfect or perfect day |
-| **Total** | ~100 pts | All components added; bonus can push above 100 briefly |
+| **Total** | 100 pts | All components added and capped at 100 |
 
-### Steps Scoring Curve
+### Steps Scoring Curve (default)
 
 | Steps | Points |
 |-------|--------|
@@ -60,7 +57,7 @@ Built around a real health plan targeting:
 | 14,000 | ~23 pts |
 | 18,000+ | **28 pts max** |
 
-Above 10,000 steps, points increase linearly to 28 at 18,000 steps. All thresholds are configurable in Settings.
+Above 10,000 steps, points increase linearly to 28 at 18,000 steps. The step targets shift with the activity level chosen in setup, from 6,000 for sedentary up to 12,000 for very active.
 
 ### Grade Scale
 
@@ -72,17 +69,6 @@ Above 10,000 steps, points increase linearly to 28 at 18,000 steps. All threshol
 | 60–69 | C — Good |
 | 40–59 | D — Below target |
 | < 40 | F — Needs work |
-
----
-
-## Daily Rules (Non-Negotiable)
-
-1. No banana chips after dinner
-2. Dinner by 8:30 PM
-3. Tea: 1 spoon sugar only
-4. Protein first, rice second
-5. 8,000+ steps daily
-6. Sleep before 11:30 PM
 
 ---
 
@@ -193,7 +179,7 @@ health_tracker/
 │   └── android/                   # Capacitor Android project
 ├── backend/                       # FastAPI (optional, for desktop browser dev)
 ├── build_apk.sh                   # One-command APK builder
-└── docs/                          # Planning docs and original health plan (requiremet_doc.MD)
+└── docs/                          # Planning docs, app critique and revamp plan
 ```
 
 ---
@@ -207,8 +193,12 @@ All data is stored in `IndexedDB` via Dexie under the database name `HealthQuest
 | `diet_logs` | Daily meal items, portion data, meal times |
 | `workout_logs` | Steps, walk, exercise per day |
 | `sleep_logs` | Sleep/wake times, hours, screen time, quality |
-| `daily_scores` | Computed score per day (diet, fasting, workout, sleep, bonus, total, steps) |
-| `tracker_config` | All settings: weights, custom meals, notifications, profile |
+| `weight_logs` | Daily weigh-ins |
+| `meals` | Each logged meal, used for Repeat Yesterday, frequent meals and Meal Insights |
+| `meal_templates` | Meals you repeat, learned automatically |
+| `badges` | Badge progress, unlock dates and earn counts |
+| `daily_scores` | Computed score per day (diet, fasting, workout, sleep, calories, bonus, total, steps) |
+| `tracker_config` | All settings: scoring rules, custom foods, reminders, profile |
 
 Scores are recomputed on every save and cached in `daily_scores`. A startup migration ensures historical records have all fields (fasting_score, steps) populated.
 
@@ -233,4 +223,4 @@ npm run dev
 
 ## License
 
-Personal use. Built for one person's health journey.
+Personal use.

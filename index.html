@@ -59,10 +59,6 @@
   th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
   tr:last-child td { border-bottom: 0; }
   .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
-  .rules { list-style: none; counter-reset: r; }
-  .rules li { counter-increment: r; padding: 10px 0 10px 36px; position: relative; border-bottom: 1px solid var(--line); color: var(--text); font-size: 15px; }
-  .rules li:last-child { border: 0; }
-  .rules li::before { content: counter(r); position: absolute; left: 0; color: var(--cyan); font-weight: 700; }
   .g { font-weight: 800; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
   details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
@@ -113,7 +109,7 @@
     <li><h3>Download the APK</h3><p>Tap the <strong>Download APK</strong> button above on your phone (or download on a PC and copy the file over via USB / cable).</p></li>
     <li><h3>Allow installs from your browser</h3><p>Open <code>Settings → Apps → Special access → Install unknown apps</code>, choose your browser or file manager, and enable <em>Allow from this source</em>.</p></li>
     <li><h3>Open the file and tap Install</h3><p>Open the downloaded <code>health-quest-v4.29-debug.apk</code> from your notifications or Downloads folder. If Play Protect warns about an unknown app, choose <em>Install anyway</em> — it's a personal debug build.</p></li>
-    <li><h3>Finish onboarding</h3><p>Launch Health Quest, enter your profile (name, weight, goal) and allow notifications, Usage Access and Health Connect when asked so reminders, screen-time and step sync work.</p></li>
+    <li><h3>Finish onboarding</h3><p>Launch Health Quest, answer three quick setup questions (your goals, activity level and main struggle) and allow notifications, Usage Access and Health Connect when asked so reminders, screen-time and step sync work.</p></li>
   </ol>
   <p class="note"><strong>From a PC with USB debugging:</strong> run <code>adb install health-quest-v4.29-debug.apk</code>. Updating from an older version keeps your data; installing over it just works.</p>
 </section>
@@ -135,14 +131,15 @@
 
 <section id="scoring">
   <h2>How scoring works</h2>
-  <p>Every day starts at 0. You earn points for what you actually did — the score is honest, not flattering.</p>
+  <p>Every day starts at 0 and builds toward 100. You earn points for what you actually did — the score is honest, not flattering. The maximums below are the defaults; setup adjusts them to your goals.</p>
   <div class="two">
     <div class="tbl"><table>
       <tr><th>Category</th><th>Max</th><th>Earned by</th></tr>
-      <tr><td>Diet</td><td>35</td><td>Good food, portions; penalty for dinner after 9 PM</td></tr>
+      <tr><td>Diet</td><td>35</td><td>Points per food and portion; junk food and dinner after 9 PM take points off</td></tr>
       <tr><td>Fasting</td><td>10</td><td>12 h minimum, 16 h target (dinner → breakfast)</td></tr>
       <tr><td>Workout</td><td>35</td><td>Steps, post-dinner walk, exercise</td></tr>
-      <tr><td>Sleep</td><td>30</td><td>Timing, duration, effective hours</td></tr>
+      <tr><td>Sleep</td><td>30</td><td>Bedtime, effective hours (after screen time), wake time</td></tr>
+      <tr><td>Calories</td><td>10</td><td>Staying near your calorie target, once body details and food nutrition are set</td></tr>
       <tr><td>Bonus</td><td>+10</td><td>Near-perfect or perfect day</td></tr>
     </table></div>
     <div class="tbl"><table>
@@ -155,38 +152,29 @@
       <tr><td>&lt; 40</td><td><span class="g">F</span> Needs work</td></tr>
     </table></div>
   </div>
-  <h3 style="margin:28px 0 12px">Steps curve</h3>
+  <h3 style="margin:28px 0 12px">Steps curve (default)</h3>
   <div class="tbl"><table>
     <tr><th>Steps</th><th>&lt; 5,000</th><th>5,000</th><th>8,000</th><th>10,000</th><th>18,000+</th></tr>
     <tr><td>Points</td><td>0</td><td>7.5</td><td>15</td><td>18</td><td>28 (max)</td></tr>
   </table></div>
-  <p class="note">All thresholds, weights and penalties are editable in <strong>Settings</strong>.</p>
-  <h3 style="margin:28px 0 8px">The six daily rules</h3>
-  <div class="card"><ol class="rules">
-    <li>No banana chips after dinner</li>
-    <li>Dinner by 8:30 PM</li>
-    <li>Tea: 1 spoon sugar only</li>
-    <li>Protein first, rice second</li>
-    <li>8,000+ steps daily</li>
-    <li>Sleep before 11:30 PM</li>
-  </ol></div>
+  <p class="note">The step targets shift with the activity level you pick in setup. All targets, maximums and penalties are editable in <strong>Settings → Scoring rules</strong>.</p>
 </section>
 
 <section id="game">
   <h2>Gamification &amp; coaching</h2>
   <p>Progress is meant to feel rewarding, not like a spreadsheet.</p>
   <div class="grid">
-    <div class="card"><div class="ico">🏅</div><h3>100 badges</h3><p>Six categories — Consistency, Nutrition, Fitness, Sleep, Comeback, Elite — plus hidden legendary badges. Earn a badge repeatedly to evolve it: Bronze → Silver → Gold → Neon Legendary.</p></div>
-    <div class="card"><div class="ico">⚡</div><h3>Levels &amp; XP</h3><p>Every logged day earns XP from your score. Level up, build prestige, and keep a streak alive (quality days count).</p></div>
-    <div class="card"><div class="ico">🔔</div><h3>Smart notifications</h3><p>Bedtime and wake reminders, step check-ins, a 9:30 PM trend alert, 9 AM morning review, plus weekly and monthly trend summaries.</p></div>
-    <div class="card"><div class="ico">🤖</div><h3>AI health summary</h3><p>Optional. Add an API key in Settings and generate a per-day diet / sleep / workout brief with tomorrow's priorities. Without a key, everything else still works.</p></div>
+    <div class="card"><div class="ico">🏅</div><h3>100+ badges</h3><p>Six categories — Consistency, Nutrition, Fitness, Sleep, Comeback, Elite — plus hidden badges and three combination badges. Habit badges can be earned again and again.</p></div>
+    <div class="card"><div class="ico">⚡</div><h3>Levels &amp; XP</h3><p>Every logged day earns XP from your score, and so do daily and weekly goals. Level up and keep a streak alive (quality days count).</p></div>
+    <div class="card"><div class="ico">🔔</div><h3>Reminders at your level</h3><p>Choose Quiet, Standard or Coach. Standard sends at most three a day (bedtime, dinner and one nudge); Coach adds step check-ins and daily trend alerts. Everyone gets the weekly and monthly summary.</p></div>
+    <div class="card"><div class="ico">🤖</div><h3>AI health summary</h3><p>Optional. Add a free API key in Settings and generate a per-day diet / sleep / workout brief with tomorrow's priorities. Without a key, everything else still works.</p></div>
   </div>
 </section>
 
 <section id="faq">
   <h2>FAQ</h2>
-  <details><summary>Where is my data stored?</summary><p>Only on your phone, in the app's local database. Nothing is uploaded. Use <em>Settings → Backup</em> to save a JSON file and restore it on a new device.</p></details>
-  <details><summary>Do I need internet?</summary><p>No. Only the optional AI summary needs a connection.</p></details>
+  <details><summary>Where is my data stored?</summary><p>Only on your phone, in the app's local database. Nothing is uploaded. Use <em>Settings → Export &amp; backup</em> to save a JSON file and restore it on a new device.</p></details>
+  <details><summary>Do I need internet?</summary><p>No. Only the optional AI features (health summary and food lookup) need a connection.</p></details>
   <details><summary>Why does Android warn me during install?</summary><p>The APK is a debug build shared outside the Play Store, so Play Protect doesn't recognise it. Only install it from a source you trust.</p></details>
   <details><summary>Steps aren't syncing — what do I check?</summary><p>Make sure Health Connect is installed and that Health Quest has permission to read Steps. Sleep screen-time deduction needs <em>Usage Access</em> enabled for the app.</p></details>
   <details><summary>Reminders don't fire on time.</summary><p>Allow notifications and exact alarms, and set battery usage for Health Quest to <em>Unrestricted</em> on phones with aggressive battery savers.</p></details>
@@ -204,6 +192,6 @@
 
 </main>
 
-<footer>Health Quest · Built for one person's health journey · Personal use · <a href="https://github.com/prabinrajkp/health_tracker" target="_blank" rel="noopener">View source on GitHub</a></footer>
+<footer>Health Quest · Offline health tracker for Android · <a href="https://github.com/prabinrajkp/health_tracker" target="_blank" rel="noopener">View source on GitHub</a></footer>
 </body>
 </html>
