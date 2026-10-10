@@ -12,7 +12,7 @@ build/
 .env.*
 local.properties
 *.db
-.claude/
+.claude/settings.local.json
 
 # personal files
 *.pdf
