@@ -223,4 +223,4 @@ npm run dev
 
 ## License
 
-Personal use.
+Released under the [MIT License](LICENSE). You are free to use, modify and share it; it comes with no warranty.
