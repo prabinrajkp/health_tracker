@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { format, subDays } from 'date-fns'
-import { useNavigate } from 'react-router-dom'
-import { Plus, Minus, Trash2, Timer, Flame, ChevronRight } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Plus, Minus, Trash2, Timer, Flame, ChevronRight, GlassWater } from 'lucide-react'
 import { getDiet, saveDiet, getConfig, getLatestWeight } from '../../api/client'
 import { calcDietScore, calcNutritionTotals, calcCalorieScore } from '../../services/scoring'
 import { dieteticsFromConfig } from '../../services/dietetics'
 import { weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../../services/scoreMeta'
 import { fastingWindow, fastingPoints, fmtHours } from '../../services/fasting'
 import { schedulePostDinnerWalk } from '../../services/reminders'
+import { DRINK_KINDS, formatLitres } from '../../services/hydration'
+import { useWater } from '../../hooks/useWater'
 import { itemScore } from '../../components/DayDetail'
 import AddMealFlow from '../../components/AddMealFlow'
 import { MEAL_META } from '../../constants/mealMeta'
@@ -132,6 +134,94 @@ function MacroRow({ label, value, range }) {
   )
 }
 
+const KIND_LABEL = Object.fromEntries(DRINK_KINDS.map(k => [k.id, k.label]))
+const VISIBLE_ENTRIES = 4
+
+// Drinks: everything logged today toward the estimated goal. Tap a type, then
+// an amount. The wording follows docs/water_intake_logic.md — the goal is an
+// estimate for all beverages, never a prescription.
+function DrinksBlock({ water, onSettings, sectionRef }) {
+  const { entries, totals, goal, targetMl, glassMl, add, remove } = water
+  const [kind, setKind]       = useState('water')
+  const [showAll, setShowAll] = useState(false)
+  const hasGoal = targetMl > 0
+  const pct     = hasGoal ? Math.min((totals.totalMl / targetMl) * 100, 100) : 0
+  const recent  = [...entries].reverse()
+  const shown   = showAll ? recent : recent.slice(0, VISIBLE_ENTRIES)
+
+  return (
+    <section ref={sectionRef} className="space-y-3 scroll-mt-20">
+      <div className="flex items-center gap-2.5 h-11">
+        <GlassWater size={18} className="text-text-secondary shrink-0" />
+        <h2 className="t-heading flex-1">Drinks</h2>
+        <p className="text-sm tabular-nums text-text-primary">
+          <span className="font-semibold">{formatLitres(totals.totalMl)}</span>
+          {hasGoal && <span className="text-text-muted"> of {formatLitres(targetMl)}</span>}
+        </p>
+      </div>
+
+      {hasGoal && (
+        <div className="progress-track">
+          <div className="progress-fill" style={{ width: `${pct}%`, background: 'rgb(var(--c-water))' }} />
+        </div>
+      )}
+
+      {totals.otherMl > 0 && (
+        <p className="text-sm text-text-secondary">
+          Water {formatLitres(totals.waterMl)} · other drinks {formatLitres(totals.otherMl)}
+        </p>
+      )}
+
+      <div className="flex gap-2 flex-wrap" role="radiogroup" aria-label="Type of drink">
+        {DRINK_KINDS.map(k => (
+          <button key={k.id} onClick={() => setKind(k.id)} role="radio" aria-checked={kind === k.id}
+            className={kind === k.id ? 'pill-option-active' : 'pill-option'} style={{ flex: '0 0 auto' }}>
+            {k.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        {[[glassMl, 'Glass'], [500, null], [1000, null]].map(([ml, name]) => (
+          <button key={`${ml}-${name}`} onClick={() => add(ml, kind)} className="btn-ghost flex-1 flex-col gap-0 py-2.5"
+            aria-label={`Add ${ml} mL of ${KIND_LABEL[kind].toLowerCase()}`}>
+            <span className="flex items-center gap-1"><Plus size={14} />{name || (ml >= 1000 ? `${ml / 1000} L` : `${ml} mL`)}</span>
+            {name && <span className="text-xs font-normal text-text-muted">{ml} mL</span>}
+          </button>
+        ))}
+      </div>
+
+      {shown.length > 0 && (
+        <div className="group-list">
+          {shown.map(e => (
+            <div key={e.id} className="flex items-center gap-3 py-2">
+              <span className="text-sm text-text-muted tabular-nums w-12 shrink-0">{e.time}</span>
+              <span className="text-base text-text-primary flex-1">{KIND_LABEL[e.kind] || 'Water'}</span>
+              <span className="text-sm text-text-secondary tabular-nums">{e.ml} mL</span>
+              <button onClick={() => remove(e.id)} aria-label={`Remove ${e.ml} mL at ${e.time}`}
+                className="w-9 h-9 text-text-muted flex items-center justify-center shrink-0"><Trash2 size={16} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      {recent.length > VISIBLE_ENTRIES && (
+        <button onClick={() => setShowAll(v => !v)} className="text-sm font-semibold text-brand-light py-1">
+          {showAll ? 'Show fewer' : `Show all ${recent.length}`}
+        </button>
+      )}
+
+      <p className="t-caption leading-relaxed">
+        {goal?.basis === 'weight' && 'The goal is a starting estimate from your body weight. '}
+        {goal?.basis === 'default' && 'The goal is the general 2 L guideline. Log a weight for an estimate based on yours. '}
+        {goal?.basis === 'custom' && 'You set this goal yourself. '}
+        {goal?.basis === 'off' && 'No daily goal is set. '}
+        {hasGoal && 'Needs change with activity, heat and illness, and only the drinks you log here are counted. Do not force fluids beyond thirst. '}
+        <button onClick={onSettings} className="font-semibold text-brand-light">Change goal or glass size</button>
+      </p>
+    </section>
+  )
+}
+
 // Calories eaten against the day's targets. The targets themselves (BMR,
 // maintenance, macro ranges) used to live on the Weight page.
 function CaloriesCard({ diet, dietetics, weights, onSetup }) {
@@ -208,6 +298,16 @@ export default function FoodSection({ afterSave }) {
   const [dietetics, setDietetics]         = useState(null)
   const [addOpen, setAddOpen]             = useState(false)
   const [addCategory, setAddCategory]     = useState(null)
+  const water     = useWater()
+  const drinksRef = useRef(null)
+  const [searchParams] = useSearchParams()
+
+  // Arriving from the Today card lands on the drinks block
+  useEffect(() => {
+    if (searchParams.get('focus') !== 'drinks') return
+    const t = setTimeout(() => drinksRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350)
+    return () => clearTimeout(t)
+  }, [])
 
   const loadDiet = async () => {
     const data = await getDiet(today)
@@ -274,6 +374,8 @@ export default function FoodSection({ afterSave }) {
         ))}
         <FastingLine diet={diet} yesterdayDiet={yesterdayDiet} weights={weights} />
       </div>
+
+      <DrinksBlock water={water} sectionRef={drinksRef} onSettings={() => navigate('/settings?section=water')} />
 
       <CaloriesCard diet={diet} dietetics={dietetics} weights={weights} onSetup={() => navigate('/settings?section=body')} />
 

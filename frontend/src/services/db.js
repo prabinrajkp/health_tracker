@@ -44,6 +44,21 @@ db.version(4).stores({
   meal_templates: '&fingerprint, category, recommendation_score, last_used',
 })
 
+// Water and other drinks: one row per day holding that day's entries and the
+// goal that was in force, kept out of scoring entirely.
+db.version(5).stores({
+  diet_logs:     '++id, &date',
+  workout_logs:  '++id, &date',
+  sleep_logs:    '++id, &date',
+  daily_scores:  '++id, &date',
+  tracker_config: '&key',
+  badges:        '&badge_id, unlock_timestamp',
+  weight_logs:   '++id, &date',
+  meals:         '++id, date, category, fingerprint, timestamp',
+  meal_templates: '&fingerprint, category, recommendation_score, last_used',
+  water_logs:    '++id, &date',
+})
+
 export const DEFAULT_WEIGHTS = {
   diet_max: 35, workout_max: 35, sleep_max: 30,
   diet: {

@@ -80,11 +80,14 @@ Four tabs, each with one job. Everything saves as you change it — there is no 
 - Score, grade (S/A/B/C/D/F) and the four category bars: Diet · Fasting · Workout · Sleep
 - One **Next** card: the most useful thing left to do today. Tapping it opens the place to do it
 - Any penalty already applied (late dinner, sleep after midnight) shown under it
+- A drinks card with a glass that fills: one tap adds a glass of water
+- A sleep timer button: start it at bedtime, stop it when you wake
 - Four log buttons with done-state: Meal · Move · Sleep · Weight
 - "Full detail" opens the day's radar, breakdown and optional AI health summary
 
 ### Log
 - **Food:** each meal lists its foods with portions and the meal time; **+ Add** opens Add Meal on that meal (search, Repeat Yesterday, frequent and recent meals, named meals, optional AI lookup). One fasting line and the calories and macro targets sit below
+- **Drinks** (inside Food): water, tea or coffee, milk and other drinks by the glass, 500 mL or 1 L, counted toward an estimated daily goal. The goal comes from body weight (30 mL per kg), can be set by hand or switched off, and is never part of the score
 - **Move:** steps synced from Health Connect or the phone sensor, or typed in (a typed count is kept for the day until you tap Sync); switches for post-dinner walk and exercise
 - **Sleep:** one timer button with automatic screen-time deduction; manual times, presets, quality and notes under Edit details
 
@@ -102,7 +105,7 @@ Four tabs, each with one job. Everything saves as you change it — there is no 
 - Daily weigh-in, 7-day average, change vs last week and since start, distance to target, 30d / 90d / 1y trend
 
 ### Settings
-- **You:** name, body & goal (height, age, activity, target weight, rate of loss), theme
+- **You:** name, body & goal (height, age, activity, target weight, rate of loss), water goal and glass size, theme
 - **Scoring:** one screen for category maximums, workout points and step targets, sleep, fasting and penalties, with Reset to defaults
 - **Food & AI:** custom foods with points, ideal portions and nutrition; optional AI key
 - **Reminders & data:** Quiet / Standard / Coach notification level, reminder times, Excel export, JSON backup and restore, tutorial
@@ -137,14 +140,14 @@ The script will:
 
 **Option A — USB (fastest):**
 ```bash
-adb install health-quest-v4.31-debug.apk
+adb install health-quest-v4.32-debug.apk
 ```
 
 **Option B — WiFi (same network):**
 ```bash
 python3 -m http.server 9999 --directory .
 ```
-Then open `http://<your-pc-ip>:9999/health-quest-v4.31-debug.apk` on your phone and tap to install.
+Then open `http://<your-pc-ip>:9999/health-quest-v4.32-debug.apk` on your phone and tap to install.
 
 > Settings → Apps → Install unknown apps → enable for your browser
 
@@ -194,6 +197,7 @@ All data is stored in `IndexedDB` via Dexie under the database name `HealthQuest
 | `workout_logs` | Steps, walk, exercise per day |
 | `sleep_logs` | Sleep/wake times, hours, screen time, quality |
 | `weight_logs` | Daily weigh-ins |
+| `water_logs` | Each day's drinks and the goal that applied that day |
 | `meals` | Each logged meal, used for Repeat Yesterday, frequent meals and Meal Insights |
 | `meal_templates` | Meals you repeat, learned automatically |
 | `badges` | Badge progress, unlock dates and earn counts |

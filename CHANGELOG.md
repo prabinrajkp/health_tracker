@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## [v4.32] — 2026-10-11
+
+Drinks tracking, following `docs/water_intake_logic.md`.
+
+### Added
+- **Drinks card on Today** — a glass that fills as you log, with one tap to add a glass of water and an undo button
+- **Drinks in Log → Food** — log water, tea or coffee, milk and other drinks by the glass, 500 mL or 1 L. Today's entries are listed and can be removed. Every drink counts toward the goal, and water is shown separately
+- **Estimated daily goal** — 30 mL per kg from your latest logged weight, rounded to 50 mL. With no weight logged it uses the general 2 L guideline. It is labelled as an estimate for all drinks, not a requirement
+- **Settings → Water goal** — keep the estimate, set your own goal, or turn the goal off (for anyone with a fluid limit from a doctor), and choose your glass size
+- **Eight Hydration badges** — for reaching the goal, including streaks and a repeatable Hydrated Week. None reward drinking past the goal, and they pause when the goal is off
+- **Export and backup** — drinks are included in the Excel export and the JSON backup. Older backups still restore
+
+### Changed
+- **Drinks never affect the score** — the 0–100 daily score is unchanged by anything logged here
+- **Calculated on the phone** — glasses, litres and the goal are worked out locally, with no network call
+- **Today layout** — the last-7-days strip is replaced by the drinks card so the screen still fits without scrolling. The week is on Progress
+- **Release protocol** — only the two newest APK files are kept on disk
+
+---
+
 ## [v4.31] — 2026-10-11
 
 ### Added

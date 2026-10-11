@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Save, RotateCcw, Minus, Plus, Trash2, Sparkles, Sun, Moon, Download, Upload, Bell,
   ChevronRight, User, Scale, Sliders, Utensils, Dumbbell, Clock, Timer,
-  AlertTriangle, ArrowLeft, Smartphone, BarChart2, Footprints, BookOpen, RefreshCw, Pencil, Check, X,
+  AlertTriangle, ArrowLeft, Smartphone, GlassWater, BarChart2, Footprints, BookOpen, RefreshCw, Pencil, Check, X,
   Copy, ChevronDown, Lock, HeartPulse, Flame, KeyRound, Eye, EyeOff,
 } from 'lucide-react'
 import { TutorialSlides } from './Onboarding'
@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { getConfig, saveConfig, getScoreForDate, getLatestWeight } from '../api/client'
+import { estimateWaterGoal, resolveWaterGoal, formatLitres, waterTotals, goalMet, GLASS_SIZES, GOAL_LIMITS, DEFAULT_GLASS_ML, DEFAULT_GOAL_ML } from '../services/hydration'
 import { scheduleFixedReminders, NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/reminders'
 import { version as APP_VERSION } from '../../package.json'
 import useStore from '../store/useStore'
@@ -119,6 +120,9 @@ export default function Settings() {
   const [dinnerReminderTime, setDinnerReminderTime] = useState('20:00')
   const [eveningLogTime, setEveningLogTime] = useState('22:00')
   const [notificationMode, setNotificationMode] = useState(DEFAULT_NOTIFICATION_MODE)
+  const [waterGoalMode, setWaterGoalMode]     = useState('auto')   // 'auto' | 'custom' | 'off'
+  const [waterGoalCustom, setWaterGoalCustom] = useState('')
+  const [waterGlassMl, setWaterGlassMl]       = useState(String(DEFAULT_GLASS_ML))
   const [activeSection, setActiveSection] = useState(() => resolveSection(searchParams.get('section')) || null)
   const versionTaps = useRef(0)
 
@@ -157,6 +161,9 @@ export default function Settings() {
       if (map.dinner_reminder_time)  setDinnerReminderTime(map.dinner_reminder_time)
       if (map.evening_log_time)      setEveningLogTime(map.evening_log_time)
       if (map.notification_mode)     setNotificationMode(map.notification_mode)
+      if (map.water_goal_mode)       setWaterGoalMode(map.water_goal_mode)
+      if (map.water_goal_custom_ml)  setWaterGoalCustom(map.water_goal_custom_ml)
+      if (map.water_glass_ml)        setWaterGlassMl(map.water_glass_ml)
     })
     // Weight has one source: the weight log
     getLatestWeight().then(w => { if (w) setCurrentWeight(String(w.weight_kg)) }).catch(() => {})
@@ -355,6 +362,9 @@ export default function Settings() {
         saveConfig({ key: 'dinner_reminder_time',  value: dinnerReminderTime }),
         saveConfig({ key: 'evening_log_time',      value: eveningLogTime }),
         saveConfig({ key: 'notification_mode',     value: notificationMode }),
+        saveConfig({ key: 'water_goal_mode',       value: waterGoalMode }),
+        saveConfig({ key: 'water_goal_custom_ml',  value: waterGoalCustom }),
+        saveConfig({ key: 'water_glass_ml',        value: waterGlassMl }),
       ])
       await fetchConfig()
       await scheduleFixedReminders({ requestPermission: true })
@@ -366,12 +376,13 @@ export default function Settings() {
   const handleExport = async () => {
     setExporting(true)
     try {
-      const [scores, dietLogs, workoutLogs, sleepLogs, weightLogs] = await Promise.all([
+      const [scores, dietLogs, workoutLogs, sleepLogs, weightLogs, waterLogs] = await Promise.all([
         db.daily_scores.orderBy('date').toArray(),
         db.diet_logs.orderBy('date').toArray(),
         db.workout_logs.orderBy('date').toArray(),
         db.sleep_logs.orderBy('date').toArray(),
         db.weight_logs.orderBy('date').toArray(),
+        db.water_logs.orderBy('date').toArray(),
       ])
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(scores.map(r => ({
@@ -400,6 +411,15 @@ export default function Settings() {
         'Effective Sleep (hrs)': Math.max(0, (r.sleep_hours || 0) - (r.screen_time_hours || 0)),
         Quality: r.quality || '',
       }))), 'Sleep')
+      if (waterLogs.length) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(waterLogs.map(r => {
+          const t = waterTotals(r.entries)
+          return {
+            Date: r.date, 'Total (mL)': t.totalMl, 'Water (mL)': t.waterMl, 'Other drinks (mL)': t.otherMl,
+            'Goal (mL)': r.goal_ml || '', 'Goal met': r.goal_ml ? (goalMet(r) ? 'Yes' : 'No') : '',
+          }
+        })), 'Drinks')
+      }
       const foodRows = []
       for (const d of dietLogs) {
         for (const item of (d.meal_items || [])) {
@@ -425,19 +445,20 @@ export default function Settings() {
   const handleJsonExport = async () => {
     setExporting(true)
     try {
-      const [config, dietLogs, workoutLogs, sleepLogs, scores, weightLogs] = await Promise.all([
+      const [config, dietLogs, workoutLogs, sleepLogs, scores, weightLogs, waterLogs] = await Promise.all([
         db.tracker_config.toArray(),
         db.diet_logs.orderBy('date').toArray(),
         db.workout_logs.orderBy('date').toArray(),
         db.sleep_logs.orderBy('date').toArray(),
         db.daily_scores.orderBy('date').toArray(),
         db.weight_logs.orderBy('date').toArray(),
+        db.water_logs.orderBy('date').toArray(),
       ])
       const backup = {
         // Stays at 1 — the import check is `!== 1`, so bumping would reject old backups.
         version: 1,
         exportedAt: format(new Date(), 'yyyy-MM-dd'),
-        data: { config, diet_logs: dietLogs, workout_logs: workoutLogs, sleep_logs: sleepLogs, daily_scores: scores, weight_logs: weightLogs },
+        data: { config, diet_logs: dietLogs, workout_logs: workoutLogs, sleep_logs: sleepLogs, daily_scores: scores, weight_logs: weightLogs, water_logs: waterLogs },
       }
       const json = JSON.stringify(backup, null, 2)
       const filename = `health-backup-${format(new Date(), 'yyyy-MM-dd')}.json`
@@ -465,7 +486,7 @@ export default function Settings() {
       const text = await file.text()
       const backup = JSON.parse(text)
       if (!backup?.data || backup?.version !== 1) return toast.error('Invalid backup file')
-      const { config, diet_logs, workout_logs, sleep_logs, daily_scores, weight_logs } = backup.data
+      const { config, diet_logs, workout_logs, sleep_logs, daily_scores, weight_logs, water_logs } = backup.data
       await Promise.all([
         config?.length       && db.tracker_config.bulkPut(config),
         diet_logs?.length    && db.diet_logs.bulkPut(diet_logs),
@@ -473,6 +494,7 @@ export default function Settings() {
         sleep_logs?.length   && db.sleep_logs.bulkPut(sleep_logs),
         daily_scores?.length && db.daily_scores.bulkPut(daily_scores),
         weight_logs?.length  && db.weight_logs.bulkPut(weight_logs),   // absent in pre-v4.20 backups
+        water_logs?.length   && db.water_logs.bulkPut(water_logs),     // absent in pre-v4.32 backups
       ].filter(Boolean))
       await fetchConfig()
       toast.success(`Imported — ${diet_logs?.length ?? 0} diet · ${workout_logs?.length ?? 0} workout · ${sleep_logs?.length ?? 0} sleep logs`)
@@ -495,10 +517,16 @@ export default function Settings() {
       })
     : null
   const modeLabel = NOTIFICATION_MODES.find(m => m.id === notificationMode)?.label ?? 'Standard'
+  const waterGoal = resolveWaterGoal(
+    { water_goal_mode: waterGoalMode, water_goal_custom_ml: waterGoalCustom },
+    currentWeight ? Number(currentWeight) : null,
+  )
+  const waterEstimate = estimateWaterGoal(currentWeight ? Number(currentWeight) : null)
   const MENU_GROUPS = [
     { title: 'You', items: [
       { key: 'profile',    Icon: User,       label: 'Name',        desc: playerName || 'Not set' },
       { key: 'body',       Icon: HeartPulse, label: 'Body & goal', desc: bodyComplete ? `${heightCm} cm · ${targetWeight || '—'} kg goal · ${LOSS_RATES.find(r => r.id === lossRate)?.label ?? 'Standard'}` : 'Set up calorie & macro targets' },
+      { key: 'water',      Icon: GlassWater, label: 'Water goal',  desc: waterGoal.targetMl ? `${formatLitres(waterGoal.targetMl)} a day · ${waterGlassMl} mL glass` : `No goal · ${waterGlassMl} mL glass` },
       { key: 'appearance', Icon: Sun,        label: 'Theme',       desc: theme === 'system' ? 'Follows your phone' : theme === 'dark' ? 'Dark' : 'Light' },
     ] },
     { title: 'Scoring', items: [
@@ -665,6 +693,75 @@ export default function Settings() {
               Log a weight on the Weight page to see your targets.
             </p>
           )}
+        </div>
+        <SaveBtn />
+      </div>
+    )
+
+    if (activeSection === 'water') return (
+      <div className="flex flex-col h-full">
+        <DetailHeader title="Water goal" onBack={back} />
+        <div className="overflow-y-auto flex-1 px-4 py-4 space-y-6">
+          <div>
+            <p className="section-label">Daily goal</p>
+            <div className="group-list" role="radiogroup" aria-label="Daily goal">
+              {[
+                { key: 'auto', label: 'Estimate it for me',
+                  desc: waterEstimate
+                    ? `${formatLitres(waterEstimate.targetMl)} a day, from your weight of ${currentWeight} kg`
+                    : `${formatLitres(DEFAULT_GOAL_ML)} a day, the general guideline. Log a weight for an estimate based on yours` },
+                { key: 'custom', label: 'Set my own', desc: 'For example, an amount your doctor has given you' },
+                { key: 'off', label: 'No goal', desc: 'Log drinks without a target. Water badges are paused' },
+              ].map(({ key, label, desc }) => (
+                <button key={key} onClick={() => setWaterGoalMode(key)} className="list-row w-full text-left" role="radio" aria-checked={waterGoalMode === key}>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-base text-text-primary">{label}</span>
+                    <span className="block text-sm text-text-secondary">{desc}</span>
+                  </span>
+                  {waterGoalMode === key && <Check size={20} className="text-brand-light shrink-0" />}
+                </button>
+              ))}
+            </div>
+            {waterGoalMode === 'custom' && (
+              <div className="mt-3">
+                <label className="section-label block mb-2">Your goal (mL a day)</label>
+                <input type="number" inputMode="numeric" step="50" min={GOAL_LIMITS.min} max={GOAL_LIMITS.max} className="input tabular-nums"
+                  placeholder="e.g. 2500" value={waterGoalCustom} onChange={e => setWaterGoalCustom(e.target.value)} />
+                {waterGoalCustom && waterGoal.basis !== 'custom' && (
+                  <p className="text-sm text-warning mt-1.5">Enter between {GOAL_LIMITS.min} and {GOAL_LIMITS.max} mL. Until then the estimate is used.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="section-label mb-2">Your glass</p>
+            <div className="flex gap-2 flex-wrap">
+              {GLASS_SIZES.map(ml => (
+                <button key={ml} onClick={() => setWaterGlassMl(String(ml))}
+                  className={Number(waterGlassMl) === ml ? 'pill-option-active' : 'pill-option'} style={{ flex: '0 0 auto' }}>
+                  {ml} mL
+                </button>
+              ))}
+            </div>
+            <p className="text-sm text-text-secondary mt-2">One tap on "Glass" adds this much.</p>
+          </div>
+
+          <div className="tile space-y-2">
+            <p className="text-sm font-semibold text-text-primary">About the estimate</p>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              It is a starting point for a healthy adult: 30 mL for each kg of body weight
+              {waterEstimate ? `, within a reference range of ${formatLitres(waterEstimate.lowMl)} to ${formatLitres(waterEstimate.highMl)} for your weight` : ''}.
+              It covers all drinks, not plain water alone, and it is not an exact requirement.
+            </p>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              Needs change with activity, hot weather, food and illness. Do not force fluids beyond thirst.
+            </p>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              Use "Set my own" or "No goal" if you have a fluid limit from a doctor, a kidney, heart or liver
+              condition, or are pregnant or breastfeeding. The estimate is not meant for children.
+            </p>
+          </div>
         </div>
         <SaveBtn />
       </div>

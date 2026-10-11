@@ -1,6 +1,7 @@
 import { format, startOfWeek, endOfWeek, parseISO } from 'date-fns'
 import db from './db'
 import { col } from './theme'
+import { waterBadgeMetrics } from './hydration'
 
 // Rarity shows only as the badge's colour, taken from the theme tokens.
 const tier = (tone, label) => ({ tone, label, color: col(tone), bg: col(tone, 0.12) })
@@ -17,6 +18,7 @@ export const CATEGORY_META = {
   fitness:     { label: 'Fitness',     emoji: '💪' },
   sleep:       { label: 'Sleep',       emoji: '🌙' },
   comeback:    { label: 'Comeback',    emoji: '🦅' },
+  hydration:   { label: 'Hydration',   emoji: '💧' },
   elite:       { label: 'Elite',       emoji: '👑' },
 }
 
@@ -657,6 +659,57 @@ export const BADGES = [
     lore: 'Five kilograms lighter. Months of small choices, made visible.',
     criterion: 'Lose 5 kg from your heaviest recorded weight',
     check: d => ({ unlocked: d.totalKgLost >= 5, progress: Math.min(d.totalKgLost / 5, 1) }) },
+
+  // ── Hydration (8) ───────────────────────────────────────────────────────
+  // These reward reaching the day's goal, never exceeding it: drinking far
+  // past the goal earns nothing extra (see docs/water_intake_logic.md §8).
+  { id: 'first_glass',
+    name: 'First Glass',       emoji: '💧', category: 'hydration', tier: 'common',
+    lore: 'The first one logged. The rest get easier.',
+    criterion: 'Log a drink for the first time',
+    check: d => ({ unlocked: d.waterDaysLogged >= 1, progress: Math.min(d.waterDaysLogged, 1) }) },
+
+  { id: 'well_watered',
+    name: 'Well Watered',      emoji: '🥛', category: 'hydration', tier: 'common',
+    lore: 'A full day at your goal. Your body noticed.',
+    criterion: 'Reach your daily drinks goal on 1 day',
+    check: d => ({ unlocked: d.waterGoalDays >= 1, progress: Math.min(d.waterGoalDays, 1) }) },
+
+  { id: 'early_glass',
+    name: 'Early Glass',       emoji: '🌤️', category: 'hydration', tier: 'common',
+    lore: 'A drink before nine. The day starts topped up.',
+    criterion: 'Log a drink before 9 AM on 7 days',
+    check: d => ({ unlocked: d.waterEarlyDays >= 7, progress: Math.min(d.waterEarlyDays / 7, 1) }) },
+
+  { id: 'three_day_flow',
+    name: 'Three-Day Flow',    emoji: '🌊', category: 'hydration', tier: 'common',
+    lore: 'Three days running. A rhythm is forming.',
+    criterion: 'Reach your drinks goal 3 days in a row',
+    check: d => ({ unlocked: d.waterBestStreak >= 3, progress: Math.min(d.waterBestStreak / 3, 1) }) },
+
+  { id: 'hydrated_week',
+    name: 'Hydrated Week',     emoji: '🚰', category: 'hydration', tier: 'rare',
+    lore: 'Five good days in one week. Earn it again next week.',
+    criterion: 'Reach your drinks goal on 5+ days in a week',
+    check: d => ({ unlocked: d.waterFullWeeks >= 1, progress: Math.min(d.waterBestWeek / 5, 1) }) },
+
+  { id: 'steady_flow',
+    name: 'Steady Flow',       emoji: '🏞️', category: 'hydration', tier: 'rare',
+    lore: 'A full week without missing. It is a habit now.',
+    criterion: 'Reach your drinks goal 7 days in a row',
+    check: d => ({ unlocked: d.waterBestStreak >= 7, progress: Math.min(d.waterBestStreak / 7, 1) }) },
+
+  { id: 'hydration_habit',
+    name: 'Hydration Habit',   emoji: '🫗', category: 'hydration', tier: 'rare',
+    lore: 'Fourteen days at goal. Not in a row — just kept up.',
+    criterion: 'Reach your drinks goal on 14 total days',
+    check: d => ({ unlocked: d.waterGoalDays >= 14, progress: Math.min(d.waterGoalDays / 14, 1) }) },
+
+  { id: 'deep_well',
+    name: 'Deep Well',         emoji: '⛲', category: 'hydration', tier: 'epic',
+    lore: 'Thirty days at goal. You no longer have to think about it.',
+    criterion: 'Reach your drinks goal on 30 total days',
+    check: d => ({ unlocked: d.waterGoalDays >= 30, progress: Math.min(d.waterGoalDays / 30, 1) }) },
 ]
 
 export function getEarnEvolutionTier(count) {
@@ -669,14 +722,16 @@ export function getEarnEvolutionTier(count) {
 
 async function buildAggregateData() {
   const today = format(new Date(), 'yyyy-MM-dd')
-  const [allScores, allDiet, allWorkout, allSleep, allWeight] = await Promise.all([
+  const [allScores, allDiet, allWorkout, allSleep, allWeight, allWater] = await Promise.all([
     db.daily_scores.where('date').belowOrEqual(today).sortBy('date'),
     db.diet_logs.toArray(),
     db.workout_logs.toArray(),
     db.sleep_logs.toArray(),
     db.weight_logs.toArray(),
+    db.water_logs.toArray(),
   ])
   if (allScores.length === 0) return null
+  const water = waterBadgeMetrics(allWater)
 
   const dietMap    = Object.fromEntries(allDiet.map(d => [d.date, d]))
   const workoutMap = Object.fromEntries(allWorkout.map(d => [d.date, d]))
@@ -952,6 +1007,15 @@ async function buildAggregateData() {
     immortal:             Math.min(1, bestHighScoreStreak >= 21 ? 1 : 0),
     double_titan:         Math.floor(peakHumanCount / 2),
     quad_titan:           Math.floor(peakHumanCount / 4),
+    // Hydration
+    first_glass:          Math.min(1, water.waterDaysLogged),
+    well_watered:         Math.min(1, water.waterGoalDays),
+    early_glass:          Math.floor(water.waterEarlyDays / 7),
+    three_day_flow:       Math.min(1, water.waterBestStreak >= 3 ? 1 : 0),
+    hydrated_week:        water.waterFullWeeks,
+    steady_flow:          Math.min(1, water.waterBestStreak >= 7 ? 1 : 0),
+    hydration_habit:      Math.min(1, water.waterGoalDays >= 14 ? 1 : 0),
+    deep_well:            Math.min(1, water.waterGoalDays >= 30 ? 1 : 0),
     aether_rank:          weekAetherCount,
     zenith:               Math.floor(weekAetherCount / 3),
   }
@@ -970,6 +1034,7 @@ async function buildAggregateData() {
     totalWorkoutSessions, totalStepsAllTime, deepSleepCount,
     earnCounts,
     ...buildWeightMetrics(allWeight),
+    ...water,
   }
 }
 

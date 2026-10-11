@@ -1,6 +1,6 @@
 # Health Quest — Release
 
-Perform a full versioned release: bump the version, update the changelog and every version reference, build the APK, then commit, tag the release and push it to GitHub.
+Perform a full versioned release: bump the version, update the changelog and every version reference, build the APK, then commit, tag the release and push it to GitHub. Only the two newest APK files are kept on disk.
 
 **User-provided changelog description (what changed in this release):**
 $ARGUMENTS
@@ -114,6 +114,7 @@ Every release gets a git tag on GitHub named exactly `NEW_VERSION` (e.g. `v2.16`
    ```bash
    git rm --cached --ignore-unmatch health-quest-CURRENT_VERSION-debug.apk
    ```
+   Do this before the cleanup in Step 8, and never delete an APK that git still tracks.
 3. **Stage and review.** Run `git add -A`, then `git status --short`. The new APK must be listed. If anything unexpected is listed (secrets, `.env` files, local databases, personal documents), stop and ask the user.
 4. **Commit**, with a conventional message and no co-author or attribution lines:
    ```bash
@@ -133,7 +134,26 @@ If the push fails (for example, missing credentials), do not retry or change the
 
 ---
 
-### Step 8 — Summary
+### Step 8 — Keep only the last two APKs
+
+Run this only after the push in Step 7 has been verified. If the build or the push failed, skip it, so an older working APK is never removed while the new one is in doubt.
+
+The project root keeps two APK files: the one just released (`NEW_VERSION`) and the one before it (`CURRENT_VERSION`), as a fallback to reinstall. Delete every older one. They are ignored by git, so this only frees local disk space and changes nothing on GitHub, where every release still has its tag.
+
+1. List what would be deleted, sorted by version so that `v4.9` comes before `v4.10`:
+   ```bash
+   ls health-quest-v*-debug.apk | sort -V | head -n -2
+   ```
+2. Check the list. It must not contain `NEW_VERSION` or `CURRENT_VERSION`. If it does, stop and tell the user.
+3. Delete exactly those files:
+   ```bash
+   ls health-quest-v*-debug.apk | sort -V | head -n -2 | xargs -r -d '\n' rm -v
+   ```
+4. Confirm with `ls health-quest-v*-debug.apk` that exactly two files remain (or one, on a first release), and that `git status --short` shows no deleted APK.
+
+---
+
+### Step 9 — Summary
 
 
 Print a short release summary:
@@ -150,6 +170,9 @@ Download page: https://prabinrajkp.github.io/health_tracker
 
 Install:
   adb install health-quest-NEW_VERSION-debug.apk
+
+Kept on disk: health-quest-NEW_VERSION-debug.apk, health-quest-CURRENT_VERSION-debug.apk
+Removed: [the older APK files deleted in Step 8, or "none"]
 ```
 
 If the push in Step 7 failed, say so in place of the Tag line.

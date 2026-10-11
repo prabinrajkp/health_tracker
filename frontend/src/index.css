@@ -53,6 +53,7 @@
   --c-cat-fasting: 217 160 91;
   --c-cat-workout: 90 169 230;
   --c-cat-sleep:   155 140 240;
+  --c-water:       86 168 226;     /* the fill of the water glass */
 
   --c-text-primary:   236 237 240;
   --c-text-secondary: 182 186 196;
@@ -92,6 +93,7 @@
   --c-cat-fasting: 183 121 31;
   --c-cat-workout: 43 123 191;
   --c-cat-sleep:   107 91 214;
+  --c-water:       38 126 196;
 
   --c-text-primary:   23 24 28;
   --c-text-secondary: 71 74 82;

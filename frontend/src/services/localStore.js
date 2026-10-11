@@ -7,6 +7,7 @@ import { format, subDays, addDays, parseISO } from 'date-fns'
 import db, { seedDefaults, DEFAULT_WEIGHTS } from './db'
 import { computeScore } from './scoring'
 import { dieteticsFromConfig } from './dietetics'
+import { resolveWaterGoal } from './hydration'
 import { computeFingerprint } from './mealFingerprint'
 import {
   computeHealthScore, computeNutritionSummary, rankFrequentMeals, rankRecentMeals,
@@ -190,6 +191,60 @@ export async function getWeightEntries(start = null, end = null) {
   return all
     .filter(r => (!start || r.date >= start) && (!end || r.date <= end))
     .sort((a, b) => a.date.localeCompare(b.date))
+}
+
+// ── Water and other drinks ───────────────────────────────────────────────────
+// Never part of the score: these do not call recomputeScore.
+async function currentWaterGoal() {
+  const rows = await db.tracker_config.toArray()
+  const config = {}
+  rows.forEach(r => { config[r.key] = r.value })
+  const latest = await getLatestWeight()
+  return resolveWaterGoal(config, latest?.weight_kg ?? null)
+}
+
+export async function getWaterGoal() {
+  return currentWaterGoal()
+}
+
+export async function getWaterDay(date) {
+  return (await db.water_logs.get({ date })) || null
+}
+
+export async function getAllWaterDays() {
+  return db.water_logs.orderBy('date').toArray()
+}
+
+// Adds one drink. The day's goal is stamped on the record each time so the
+// day is later judged against the goal that applied when it was logged.
+export async function addWaterEntry(date, { ml, kind = 'water' }) {
+  const amount = Math.round(Number(ml))
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 5000) throw new Error('Invalid amount')
+  const goal  = await currentWaterGoal()
+  const now   = new Date()
+  const entry = {
+    id: `${now.getTime()}-${Math.random().toString(36).slice(2, 6)}`,
+    ml: amount, kind,
+    time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+  }
+  const existing = await db.water_logs.get({ date })
+  if (existing) {
+    await db.water_logs.update(existing.id, {
+      entries: [...(existing.entries || []), entry], goal_ml: goal.targetMl, updated_at: now.toISOString(),
+    })
+  } else {
+    await db.water_logs.add({ date, entries: [entry], goal_ml: goal.targetMl, created_at: now.toISOString() })
+  }
+  return db.water_logs.get({ date })
+}
+
+export async function removeWaterEntry(date, entryId) {
+  const existing = await db.water_logs.get({ date })
+  if (!existing) return null
+  await db.water_logs.update(existing.id, {
+    entries: (existing.entries || []).filter(e => e.id !== entryId), updated_at: new Date().toISOString(),
+  })
+  return db.water_logs.get({ date })
 }
 
 export async function getLatestWeight() {

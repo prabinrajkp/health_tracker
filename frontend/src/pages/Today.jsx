@@ -3,18 +3,20 @@ import { useNavigate } from 'react-router-dom'
 import { format, subDays } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
-  Flame, ChevronRight, AlertTriangle, Check, Utensils, Footprints, Moon, Scale, Dumbbell, PersonStanding, Play, Square,
+  Flame, ChevronRight, AlertTriangle, Check, Utensils, Footprints, Moon, Scale, Dumbbell, PersonStanding, Play, Square, Plus, Undo2,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import BottomSheet from '../components/BottomSheet'
 import AddMealFlow from '../components/AddMealFlow'
 import { DayDetailPanel } from '../components/DayDetail'
-import { getDiet, getWorkout, getSleep, getWeightEntry, getScoresRange } from '../api/client'
+import { getDiet, getWorkout, getSleep, getWeightEntry } from '../api/client'
+import { useWater } from '../hooks/useWater'
+import { formatLitres } from '../services/hydration'
+import WaterGlass from '../components/WaterGlass'
 import { computeNextAction } from '../services/nextAction'
 import { scheduleSmartNotifications } from '../services/notificationEngine'
 import { scheduleTrendNotifications } from '../services/trendNotificationEngine'
 import { gradeFor, weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../services/scoreMeta'
-import { scoreColor } from '../services/theme'
 import { getSleepTimerStart, startSleepTimer, stopSleepTimer, hhmm, formatElapsed } from '../services/sleepTimer'
 
 const PERFECT_KEY = 'hq-perfect-day'
@@ -49,29 +51,37 @@ function LogButton({ Icon, label, status, done, onClick }) {
   )
 }
 
-// The last seven days at a glance; today is the last column.
-function WeekStrip({ days, onOpen }) {
+// Drinks: a glass that fills, and one tap to add a glass. Everything else
+// (other drink types, bigger amounts, removing an entry) is under Log → Food.
+function WaterCard({ water, onOpen }) {
+  const { totals, targetMl, glassMl, entries, add, undoLast } = water
+  const hasGoal = targetMl > 0
+  const reached = hasGoal && totals.totalMl >= targetMl
+  const glasses = Math.round((totals.totalMl / glassMl) * 10) / 10
+
   return (
-    <button onClick={onOpen} className="w-full card text-left active:opacity-70 transition-opacity">
-      <div className="flex items-center justify-between mb-2">
-        <p className="section-label">Last 7 days</p>
-        <ChevronRight size={16} className="text-text-muted" />
-      </div>
-      <div className="flex items-end gap-2">
-        {days.map(d => (
-          <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-            <span className="text-xs tabular-nums text-text-secondary leading-none">{d.score != null ? d.score : ''}</span>
-            <div className="w-2.5 rounded-full bg-surface-elevated flex items-end overflow-hidden" style={{ height: 28 }}>
-              <div className="w-full rounded-full" style={{
-                height: `${d.score != null ? Math.max(d.score, 6) : 0}%`,
-                background: d.score != null ? scoreColor(d.score) : 'transparent',
-              }} />
-            </div>
-            <span className={`text-xs leading-none ${d.today ? 'font-semibold text-text-primary' : 'text-text-muted'}`}>{d.label}</span>
-          </div>
-        ))}
-      </div>
-    </button>
+    <section className="card flex items-center gap-3">
+      <button onClick={onOpen} className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-70 transition-opacity"
+        aria-label="Open drinks in Log">
+        <WaterGlass fraction={hasGoal ? totals.totalMl / targetMl : 0} />
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold text-text-secondary">Drinks</span>
+          <span className="block text-base font-semibold text-text-primary tabular-nums">
+            {formatLitres(totals.totalMl)}{hasGoal && <span className="font-normal text-text-muted"> of {formatLitres(targetMl)}</span>}
+          </span>
+          <span className={`block text-sm ${reached ? 'text-success font-semibold' : 'text-text-secondary'}`}>
+            {reached ? 'Goal reached' : totals.totalMl === 0 ? 'Nothing logged yet' : `${glasses} glass${glasses === 1 ? '' : 'es'}`}
+          </span>
+        </span>
+      </button>
+      {entries.length > 0 && (
+        <button onClick={undoLast} aria-label="Undo last drink" className="icon-btn"><Undo2 size={17} /></button>
+      )}
+      <button onClick={() => add(glassMl, 'water')} aria-label={`Add a ${glassMl} mL glass of water`}
+        className={`${reached ? 'btn-ghost' : 'btn-primary'} shrink-0 px-4`}>
+        <Plus size={16} />Glass
+      </button>
+    </section>
   )
 }
 
@@ -108,7 +118,7 @@ export default function Today() {
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd')
 
   const [logs, setLogs] = useState({ diet: null, workout: null, sleep: null, yesterdayDiet: null, weight: null })
-  const [week, setWeek] = useState([])
+  const water = useWater()
   const [detailOpen, setDetailOpen]     = useState(false)
   const [mealCategory, setMealCategory] = useState(null)
   const [addMealOpen, setAddMealOpen]   = useState(false)
@@ -116,17 +126,11 @@ export default function Today() {
   const [stopping, setStopping]         = useState(false)
 
   const loadLogs = async () => {
-    const [diet, workout, sleep, yesterdayDiet, weight, range] = await Promise.all([
+    const [diet, workout, sleep, yesterdayDiet, weight] = await Promise.all([
       getDiet(today), getWorkout(today), getSleep(today), getDiet(yesterday),
       getWeightEntry(today).catch(() => null),
-      getScoresRange(format(subDays(new Date(), 6), 'yyyy-MM-dd'), today).catch(() => []),
     ])
     setLogs({ diet, workout, sleep, yesterdayDiet, weight })
-    const byDate = Object.fromEntries((range || []).map(r => [r.date, Math.round(r.total_score)]))
-    setWeek(Array.from({ length: 7 }, (_, i) => {
-      const d = subDays(new Date(), 6 - i), key = format(d, 'yyyy-MM-dd')
-      return { date: key, label: format(d, 'EEEEE'), score: byDate[key] ?? null, today: key === today }
-    }))
   }
 
   useEffect(() => {
@@ -278,12 +282,12 @@ export default function Today() {
           ))}
         </section>
 
-        {/* ── 3. Sleep timer — one button, so it is never forgotten ────────── */}
+        {/* ── 3. Drinks — the most frequent log of the day, one tap away ────── */}
+        <WaterCard water={water} onOpen={() => navigate('/log?tab=food&focus=drinks')} />
+
+        {/* ── 4. Sleep timer — one button, so it is never forgotten ────────── */}
         <SleepTimerButton startedAt={timerStart} busy={stopping}
           onStart={() => setTimerStart(startSleepTimer())} onStop={handleStopTimer} />
-
-        {/* ── 4. The week, to fill the screen with something useful ────────── */}
-        {week.some(d => d.score != null) && <WeekStrip days={week} onOpen={() => navigate('/progress')} />}
 
         {/* ── 5. Log — at the bottom, where the thumb is ───────────────────── */}
         <section className="mt-auto pb-3">
