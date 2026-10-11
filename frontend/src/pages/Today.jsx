@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { format, subDays } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
-  Flame, ChevronRight, AlertTriangle, Check, Utensils, Footprints, Moon, Scale, Dumbbell, PersonStanding,
+  Flame, ChevronRight, AlertTriangle, Check, Utensils, Footprints, Moon, Scale, Dumbbell, PersonStanding, Play, Square,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import BottomSheet from '../components/BottomSheet'
@@ -11,8 +11,11 @@ import AddMealFlow from '../components/AddMealFlow'
 import { DayDetailPanel } from '../components/DayDetail'
 import { getDiet, getWorkout, getSleep, getWeightEntry, getScoresRange } from '../api/client'
 import { computeNextAction } from '../services/nextAction'
+import { scheduleSmartNotifications } from '../services/notificationEngine'
+import { scheduleTrendNotifications } from '../services/trendNotificationEngine'
 import { gradeFor, weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../services/scoreMeta'
 import { scoreColor } from '../services/theme'
+import { getSleepTimerStart, startSleepTimer, stopSleepTimer, hhmm, formatElapsed } from '../services/sleepTimer'
 
 const PERFECT_KEY = 'hq-perfect-day'
 const ACTION_ICONS = { meal: Utensils, steps: Footprints, sleep: Moon, exercise: Dumbbell, walk: PersonStanding }
@@ -50,15 +53,15 @@ function LogButton({ Icon, label, status, done, onClick }) {
 function WeekStrip({ days, onOpen }) {
   return (
     <button onClick={onOpen} className="w-full card text-left active:opacity-70 transition-opacity">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <p className="section-label">Last 7 days</p>
         <ChevronRight size={16} className="text-text-muted" />
       </div>
-      <div className="flex items-end gap-2 h-20">
+      <div className="flex items-end gap-2">
         {days.map(d => (
           <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
             <span className="text-xs tabular-nums text-text-secondary leading-none">{d.score != null ? d.score : ''}</span>
-            <div className="w-2.5 rounded-full bg-surface-elevated flex items-end overflow-hidden" style={{ height: 40 }}>
+            <div className="w-2.5 rounded-full bg-surface-elevated flex items-end overflow-hidden" style={{ height: 28 }}>
               <div className="w-full rounded-full" style={{
                 height: `${d.score != null ? Math.max(d.score, 6) : 0}%`,
                 background: d.score != null ? scoreColor(d.score) : 'transparent',
@@ -68,6 +71,32 @@ function WeekStrip({ days, onOpen }) {
           </div>
         ))}
       </div>
+    </button>
+  )
+}
+
+// The sleep timer as one button: start it at bedtime, stop it on waking.
+// The full sleep screen (manual times, quality, notes) stays under Log → Sleep.
+function SleepTimerButton({ startedAt, onStart, onStop, busy }) {
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    if (!startedAt) return
+    const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+
+  if (startedAt) return (
+    <button onClick={onStop} disabled={busy} className="btn-primary w-full py-4 justify-between">
+      <span className="flex items-center gap-2"><Square size={16} />Wake up — stop timer</span>
+      <span className="font-normal tabular-nums">{formatElapsed(elapsed)} since {hhmm(startedAt)}</span>
+    </button>
+  )
+  return (
+    <button onClick={onStart} className="btn-ghost w-full py-4">
+      <Play size={16} />Going to sleep — start timer
     </button>
   )
 }
@@ -83,6 +112,8 @@ export default function Today() {
   const [detailOpen, setDetailOpen]     = useState(false)
   const [mealCategory, setMealCategory] = useState(null)
   const [addMealOpen, setAddMealOpen]   = useState(false)
+  const [timerStart, setTimerStart]     = useState(getSleepTimerStart)
+  const [stopping, setStopping]         = useState(false)
 
   const loadLogs = async () => {
     const [diet, workout, sleep, yesterdayDiet, weight, range] = await Promise.all([
@@ -127,7 +158,7 @@ export default function Today() {
   }, [mealsLogged, moveDone, sleepDone])
 
   const { next, penalties } = computeNextAction({
-    diet: logs.diet, workout: logs.workout, sleep: logs.sleep, weights,
+    diet: logs.diet, workout: logs.workout, sleep: logs.sleep, weights, sleepTimerRunning: !!timerStart,
   })
   const NextIcon = next ? (ACTION_ICONS[next.icon] || ChevronRight) : Check
 
@@ -139,6 +170,22 @@ export default function Today() {
   const handleMealLogged = async () => {
     await refreshAll()
     await loadLogs()
+  }
+
+  const handleStopTimer = async () => {
+    setStopping(true)
+    try {
+      const saved = await stopSleepTimer()
+      setTimerStart(null)
+      if (saved) {
+        await refreshAll()
+        await loadLogs()
+        scheduleSmartNotifications().catch(() => {})
+        scheduleTrendNotifications().catch(() => {})
+      }
+    } finally {
+      setStopping(false)
+    }
   }
 
   const playerName = config?.player_name || ''
@@ -231,12 +278,15 @@ export default function Today() {
           ))}
         </section>
 
-        {/* ── 3. The week, to fill the screen with something useful ────────── */}
+        {/* ── 3. Sleep timer — one button, so it is never forgotten ────────── */}
+        <SleepTimerButton startedAt={timerStart} busy={stopping}
+          onStart={() => setTimerStart(startSleepTimer())} onStop={handleStopTimer} />
+
+        {/* ── 4. The week, to fill the screen with something useful ────────── */}
         {week.some(d => d.score != null) && <WeekStrip days={week} onOpen={() => navigate('/progress')} />}
 
-        {/* ── 4. Log — at the bottom, where the thumb is ───────────────────── */}
-        <section className="mt-auto pb-4 pt-2">
-          <p className="section-label mb-2">Log</p>
+        {/* ── 5. Log — at the bottom, where the thumb is ───────────────────── */}
+        <section className="mt-auto pb-3">
           <div className="flex gap-2">
             <LogButton Icon={Utensils} label="Meal" status={`${mealsLogged} of 3`} done={mealsLogged === 3}
               onClick={() => openAddMeal()} />

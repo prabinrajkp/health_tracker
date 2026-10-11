@@ -43,13 +43,14 @@ function stepAction(workout, weights) {
   }
 }
 
-export function computeNextAction({ diet, workout, sleep, weights = DEFAULT_WEIGHTS, now = new Date() }) {
+export function computeNextAction({ diet, workout, sleep, weights = DEFAULT_WEIGHTS, now = new Date(), sleepTimerRunning = false }) {
   const mins = now.getHours() * 60 + now.getMinutes()
   const w = weights.workout || {}
   const candidates = []
 
   // Last night's sleep is the first thing worth logging in the morning.
-  if (!sleep?.sleep_time && mins < 12 * 60) {
+  // While the timer runs, the Wake up button on Today is the sleep action.
+  if (!sleepTimerRunning && !sleep?.sleep_time && mins < 12 * 60) {
     candidates.push({
       key: 'sleep', icon: 'sleep', label: "Log last night's sleep",
       impact: weights.sleep_max || 30, upTo: true, urgent: true,
@@ -98,7 +99,7 @@ export function computeNextAction({ diet, workout, sleep, weights = DEFAULT_WEIG
     }
   }
 
-  if (!sleep?.sleep_time && mins >= 22 * 60) {
+  if (!sleepTimerRunning && !sleep?.sleep_time && mins >= 22 * 60) {
     candidates.push({
       key: 'sleep_timer', icon: 'sleep', label: 'Start your sleep timer',
       note: 'Before 11:30 PM earns full bedtime points', impact: null, urgent: true,

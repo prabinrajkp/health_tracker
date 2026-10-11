@@ -1,18 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
-import toast from 'react-hot-toast'
 import { Play, Square, ChevronDown, Moon } from 'lucide-react'
-import { Capacitor, registerPlugin } from '@capacitor/core'
 import { getSleep, saveSleep, getConfig } from '../../api/client'
+import { getSleepTimerStart, startSleepTimer, stopSleepTimer, hhmm, formatElapsed } from '../../services/sleepTimer'
 import { calcSleepScore } from '../../services/scoring'
 import { weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../../services/scoreMeta'
-import { checkAndFireAppreciation } from '../../services/trendNotificationEngine'
 import { fmtHours } from '../../services/fasting'
 import { useAutoSave, SectionScore, NoteField, todayStr, TEXT_SAVE_MS } from './shared'
 
-const UsageStats = registerPlugin('UsageStats')
-
-const TIMER_KEY = 'hq-sleep-timer-start'
 const SLEEP_PRESETS = [
   { label: 'Perfect', sleep: '23:00', wake: '06:30' },
   { label: 'Target',  sleep: '23:30', wake: '07:00' },
@@ -29,15 +24,6 @@ function calcHours(st, wt) {
   if (w <= s) w += 24 * 60
   return Math.round(((w - s) / 60) * 10) / 10
 }
-const hhmm = (ts) => {
-  const d = new Date(ts)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-function formatElapsed(secs) {
-  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
 function TimeHint({ time, type }) {
   if (!time) return null
   const [h, m] = time.split(':').map(Number)
@@ -57,10 +43,7 @@ export default function SleepSection({ afterSave }) {
 
   const [form, setForm]       = useState({ ...EMPTY_SLEEP, date: today })
   const [weights, setWeights] = useState(weightsFromConfig(null))
-  const [timerStart, setTimerStart] = useState(() => {
-    const v = localStorage.getItem(TIMER_KEY)
-    return v ? parseInt(v, 10) : null
-  })
+  const [timerStart, setTimerStart] = useState(getSleepTimerStart)
   const [elapsed, setElapsed]         = useState(0)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const formRef = useRef(form)
@@ -98,53 +81,16 @@ export default function SleepSection({ afterSave }) {
     if (next.sleep_time && next.wake_time) save(next, delay)
   }
 
-  const startTimer = () => {
-    const now = Date.now()
-    localStorage.setItem(TIMER_KEY, String(now))
-    setTimerStart(now)
-    toast.success('Sleep timer started. Open the app when you wake up.')
-  }
+  const startTimer = () => setTimerStart(startSleepTimer())
 
   const stopTimer = async () => {
-    if (!timerStart) return
-    const now = Date.now()
-    let screenOnHours = 0
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const permResult = await UsageStats.hasPermission()
-        if (permResult.granted) {
-          const result = await UsageStats.getScreenOnTime({ startTime: timerStart, endTime: now })
-          if (!result.needsPermission) screenOnHours = result.screenOnHours ?? 0
-        }
-        // Without Usage Access the timer still stops; screen time just isn't deducted
-      } catch {}
-    }
-    const sleepHours = Math.round(((now - timerStart) / 3600000) * 10) / 10
-    const effective  = Math.max(0, Math.round((sleepHours - screenOnHours) * 10) / 10)
-    const logDate    = format(new Date(), 'yyyy-MM-dd')
-
-    localStorage.removeItem(TIMER_KEY)
     setTimerStart(null)
-
-    if (sleepHours < 1) {
-      toast(`Timer cleared — only ${fmtHours(sleepHours)} elapsed, nothing saved.`)
-      return
-    }
-    const next = {
-      ...formRef.current, date: logDate,
-      sleep_time: hhmm(timerStart), wake_time: hhmm(now),
-      sleep_hours: sleepHours, screen_time_hours: screenOnHours,
-    }
+    const record = await stopSleepTimer()
+    if (!record) return
+    const next = { ...EMPTY_SLEEP, ...record, date: today }
     formRef.current = next
     setForm(next)
-    try {
-      await saveSleep(next)
-      await afterSave()
-      checkAndFireAppreciation(logDate).catch(() => {})
-      toast.success(`Sleep saved — ${fmtHours(sleepHours)} total · ${fmtHours(screenOnHours)} screen · ${fmtHours(effective)} effective`)
-    } catch {
-      toast.error('Could not save your sleep — open Edit details and re-enter the times')
-    }
+    await afterSave()
   }
 
   const max      = categoryMaxes(weights)

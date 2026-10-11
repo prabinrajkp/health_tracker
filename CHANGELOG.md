@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [v4.31] — 2026-10-11
+
+### Added
+- **Sleep timer on Today** — one button on the home screen starts the timer at bedtime. While it runs it becomes a highlighted "Wake up — stop timer" button showing the elapsed time and when it started, so the timer is not forgotten. Stopping it saves the night the same way Log → Sleep does, including the automatic screen-time deduction, and keeps any quality rating or note already entered. The full sleep screen (manual times, quality, notes) stays under Log → Sleep, and both places control the same timer
+
+### Changed
+- **Next card while the timer runs** — Today no longer suggests logging sleep while the timer is running, since the Wake up button covers it
+- **Today still fits one screen** — the week strip is slightly shorter and the "Log" label above the log buttons is removed to make room for the timer button
+
+---
+
 ## [v4.30] — 2026-10-11
 
 A visual redesign. What each screen does is unchanged; how it looks is new. See `docs/ui_critic.md`.

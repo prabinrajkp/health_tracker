@@ -12,6 +12,14 @@ describe('computeNextAction', () => {
     expect(next.target).toEqual({ type: 'log', tab: 'sleep' })
   })
 
+  it('leaves sleep to the timer button while the timer is running', () => {
+    expect(computeNextAction({ now: at(7), sleepTimerRunning: true }).next.key).toBe('breakfast')
+    const done = { meal_items: [meal('breakfast'), meal('lunch'), meal('dinner')] }
+    const moved = { steps: 12000, exercise_done: true, post_dinner_walk: true }
+    expect(computeNextAction({ diet: done, workout: moved, now: at(23), sleepTimerRunning: true }).next).toBeNull()
+    expect(computeNextAction({ diet: done, workout: moved, now: at(23) }).next.key).toBe('sleep_timer')
+  })
+
   it('suggests the meal of the current window once sleep is logged', () => {
     const sleep = { sleep_time: '23:00', wake_time: '06:30' }
     expect(computeNextAction({ sleep, now: at(8) }).next.key).toBe('breakfast')
