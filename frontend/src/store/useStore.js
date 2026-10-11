@@ -4,11 +4,13 @@ import { getTodayScore, getStreak, getConfig } from '../api/client'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { weightsFromConfig, categoryMaxes } from '../services/scoreMeta'
+import { getThemePreference, applyTheme, saveThemePreference, watchSystemTheme } from '../services/theme'
 
 const today = () => format(new Date(), 'yyyy-MM-dd')
 
-const savedTheme = localStorage.getItem('hq-theme') || 'dark'
-document.documentElement.classList.add(savedTheme)
+// 'system' follows the phone's light/dark setting until the user picks one
+const savedTheme = getThemePreference()
+applyTheme(savedTheme)
 
 async function writeWidgetData(score, streak, config) {
   if (!Capacitor.isNativePlatform() || !score) return
@@ -44,9 +46,8 @@ const useStore = create((set, get) => ({
   setSelectedDate: (date) => set({ selectedDate: date }),
 
   setTheme: (t) => {
-    localStorage.setItem('hq-theme', t)
-    document.documentElement.classList.remove('dark', 'light')
-    document.documentElement.classList.add(t)
+    saveThemePreference(t)
+    applyTheme(t)
     set({ theme: t })
   },
 
@@ -89,5 +90,7 @@ const useStore = create((set, get) => ({
     writeWidgetData(todayScore, streak, config)
   },
 }))
+
+watchSystemTheme(() => { if (useStore.getState().theme === 'system') applyTheme('system') })
 
 export default useStore

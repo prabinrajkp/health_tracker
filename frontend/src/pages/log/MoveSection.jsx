@@ -127,8 +127,8 @@ export default function MoveSection({ afterSave }) {
       if (total === 0) {
         setHcNoData(true)
         const sensor = await readSensorSteps()
-        if (applySynced(sensor, 'sensor')) toast('No data in Health Connect — showing phone sensor steps', { icon: '📱' })
-        else toast('No step data found. Open Google Fit or Samsung Health, let it run, then try again.', { icon: '💡' })
+        if (applySynced(sensor, 'sensor')) toast('No data in Health Connect — showing phone sensor steps')
+        else toast('No step data found. Open Google Fit or Samsung Health, let it run, then try again.')
         return
       }
       setHcNoData(false)
@@ -153,7 +153,6 @@ export default function MoveSection({ afterSave }) {
   const w       = weights.workout || {}
   const pts     = calcWorkoutScore(form, weights)
   const steps   = form.steps || 0
-  const color   = steps >= t.bonusStart ? '#f59e0b' : steps >= t.full ? '#22c55e' : steps >= t.half ? '#f97316' : '#ef4444'
   const barMax  = Math.max(t.bonusStart, 1)
   const stepMsg = steps >= t.bonusStart ? 'Bonus zone — every extra step adds points'
     : steps >= t.full ? `Target hit · ${(t.bonusStart - steps).toLocaleString()} more for the bonus`
@@ -162,92 +161,95 @@ export default function MoveSection({ afterSave }) {
   const canSync = hcStatus === 'Available'
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <SectionScore label="Workout" pts={pts} max={max.workout} color={CATEGORY_COLORS.workout} />
 
       {/* ── Steps ── */}
-      <div className="card space-y-4">
-        <div className="text-center pt-1">
-          <p className="text-5xl font-bold tabular-nums" style={{ color }}>{steps.toLocaleString()}</p>
-          <p className="text-xs text-text-muted mt-1.5">
-            steps today{sourceLabel ? ` · ${sourceLabel}` : ''}{syncedAt && source !== 'manual' ? ` · ${hhmm(syncedAt)}` : ''}
-          </p>
+      <section className="card space-y-4">
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="t-display">{steps.toLocaleString()}</p>
+            <p className="text-sm text-text-secondary mt-1.5">
+              steps today{sourceLabel ? ` · ${sourceLabel}` : ''}{syncedAt && source !== 'manual' ? ` · ${hhmm(syncedAt)}` : ''}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {canSync && (
+              <button onClick={syncNow} disabled={syncing} aria-label="Sync steps" className="icon-btn">
+                <RefreshCw size={17} className={syncing ? 'animate-spin' : ''} />
+              </button>
+            )}
+            <button onClick={() => setEditing(e => !e)} aria-label="Edit steps"
+              className={`icon-btn ${editing ? 'text-brand-light' : ''}`}>
+              <Pencil size={17} />
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-1.5">
-          <div className="progress-track h-2">
-            <div className="progress-fill" style={{ width: `${Math.min((steps / barMax) * 100, 100)}%`, backgroundColor: color }} />
+        <div>
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${Math.min((steps / barMax) * 100, 100)}%`, background: CATEGORY_COLORS.workout }} />
           </div>
-          <div className="flex justify-between text-xs text-text-muted">
+          <div className="flex justify-between text-sm text-text-secondary mt-2">
             <span>{stepMsg}</span>
-            <span className="tabular-nums shrink-0 ml-2">{t.full.toLocaleString()} target</span>
+            <span className="tabular-nums shrink-0 ml-2 text-text-muted">Target {t.full.toLocaleString()}</span>
           </div>
         </div>
 
         {editing && (
-          <input type="number" inputMode="numeric" autoFocus className="input text-center text-lg font-semibold"
+          <input type="number" inputMode="numeric" autoFocus className="input text-center font-semibold tabular-nums"
             placeholder="Type today's steps" value={steps || ''} onChange={e => setManualSteps(e.target.value)} />
         )}
 
-        <div className="flex gap-2">
-          {canSync && (
-            <button onClick={syncNow} disabled={syncing} className="btn-ghost flex-1 text-xs py-2.5">
-              <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? 'Syncing…' : hcPermission === 'denied' ? 'Connect Health Connect' : 'Sync'}
-            </button>
-          )}
-          <button onClick={() => setEditing(e => !e)} className="btn-ghost flex-1 text-xs py-2.5">
-            <Pencil size={13} />{editing ? 'Done' : 'Edit'}
+        {canSync && hcPermission === 'denied' && (
+          <button onClick={syncNow} disabled={syncing} className="btn-ghost w-full">
+            {syncing ? 'Connecting…' : 'Connect Health Connect to sync steps'}
           </button>
-        </div>
-
+        )}
         {source === 'manual' && canSync && (
-          <p className="text-xs text-text-muted">Your typed count is kept for today. Tap Sync to replace it with the synced count.</p>
+          <p className="text-sm text-text-secondary">Your typed count is kept for today. Sync replaces it with the synced count.</p>
         )}
         {canSync && hcPermission === 'granted' && hcNoData && (
-          <p className="text-xs text-text-muted leading-relaxed">
+          <p className="text-sm text-text-secondary leading-relaxed">
             <span className="font-semibold text-warning">No step source connected.</span>{' '}
             Health Connect is ready but no app is writing steps to it. Open Google Fit or Samsung Health, let it run for a minute, then sync.
           </p>
         )}
         {hcStatus === 'NotInstalled' && (
-          <p className="text-xs text-text-muted leading-relaxed">
-            <span className="font-semibold text-info">Health Connect not installed.</span>{' '}
+          <p className="text-sm text-text-secondary leading-relaxed">
+            <span className="font-semibold text-text-primary">Health Connect is not installed.</span>{' '}
             Install it from the Play Store to sync steps automatically. Samsung users: also connect
             Samsung Health → Settings → Connected Services → Health Connect.
           </p>
         )}
-      </div>
+      </section>
 
-      {/* ── Post-dinner walk ── */}
-      <div className="card space-y-3">
-        <Toggle label="Post-dinner walk" sublabel="10 minutes or more for full points" points={w.post_dinner_walk}
-          checked={!!form.post_dinner_walk}
-          onChange={on => update({ post_dinner_walk: on, post_dinner_walk_minutes: on ? (form.post_dinner_walk_minutes || 10) : 0 })} />
-        {form.post_dinner_walk && (
-          <PillSelector options={WALK_DURATIONS} value={form.post_dinner_walk_minutes}
-            onChange={v => update({ post_dinner_walk_minutes: v })} formatter={v => `${v}m`} />
-        )}
-      </div>
-
-      {/* ── Exercise ── */}
-      <div className="card space-y-3">
-        <Toggle label="Exercise session" sublabel="45 minutes or more for full points" points={w.exercise_session}
-          checked={!!form.exercise_done}
-          onChange={on => update({ exercise_done: on, exercise_duration_minutes: on ? (form.exercise_duration_minutes || 30) : 0 })} />
-        {form.exercise_done && (
-          <>
-            <div className="grid grid-cols-3 gap-2">
-              {EXERCISE_TYPES.map(type => (
-                <button key={type} onClick={() => update({ exercise_type: type })}
-                  className={form.exercise_type === type ? 'pill-option-active' : 'pill-option'}>{type}</button>
-              ))}
+      {/* ── Walk and exercise: one group, two rows ── */}
+      <section className="group-list">
+        <div>
+          <Toggle label="Post-dinner walk" sublabel="10 minutes or more for full points" points={w.post_dinner_walk}
+            checked={!!form.post_dinner_walk}
+            onChange={on => update({ post_dinner_walk: on, post_dinner_walk_minutes: on ? (form.post_dinner_walk_minutes || 10) : 0 })} />
+          {form.post_dinner_walk && (
+            <div className="pb-4">
+              <PillSelector options={WALK_DURATIONS} value={form.post_dinner_walk_minutes}
+                onChange={v => update({ post_dinner_walk_minutes: v })} formatter={v => `${v} min`} />
             </div>
-            <PillSelector options={EXERCISE_DURATIONS} value={form.exercise_duration_minutes}
-              onChange={v => update({ exercise_duration_minutes: v })} formatter={v => `${v}m`} />
-          </>
-        )}
-      </div>
+          )}
+        </div>
+        <div>
+          <Toggle label="Exercise session" sublabel="45 minutes or more for full points" points={w.exercise_session}
+            checked={!!form.exercise_done}
+            onChange={on => update({ exercise_done: on, exercise_duration_minutes: on ? (form.exercise_duration_minutes || 30) : 0 })} />
+          {form.exercise_done && (
+            <div className="pb-4 space-y-3">
+              <PillSelector options={EXERCISE_TYPES} value={form.exercise_type} onChange={type => update({ exercise_type: type })} />
+              <PillSelector options={EXERCISE_DURATIONS} value={form.exercise_duration_minutes}
+                onChange={v => update({ exercise_duration_minutes: v })} formatter={v => `${v} min`} />
+            </div>
+          )}
+        </div>
+      </section>
 
       <NoteField value={form.notes} placeholder="How was today's workout?"
         onChange={notes => update({ notes }, TEXT_SAVE_MS)} />

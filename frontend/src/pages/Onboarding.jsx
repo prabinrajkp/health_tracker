@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
+import { Flame, Dumbbell, Activity, Moon, CalendarCheck, Zap, Footprints, Pizza, BedDouble, TrendingDown, TrendingUp, Trophy, PlusCircle } from 'lucide-react'
 import { saveConfig } from '../api/client'
 import toast from 'react-hot-toast'
 
 // ── Static data ────────────────────────────────────────────────────────────────
 const GOALS = [
-  { id: 'fat_loss',        icon: '🔥', label: 'Fat Loss',        desc: 'Burn fat through diet & movement' },
-  { id: 'muscle_gain',     icon: '💪', label: 'Muscle Gain',     desc: 'Build strength with protein & training' },
-  { id: 'general_fitness', icon: '⚡', label: 'General Fitness', desc: 'Stay active and balanced' },
-  { id: 'better_sleep',    icon: '🌙', label: 'Better Sleep',    desc: 'Improve rest and recovery' },
-  { id: 'consistency',     icon: '📅', label: 'Consistency',     desc: 'Build lasting daily habits' },
-  { id: 'energy',          icon: '✨', label: 'Energy Levels',   desc: 'Feel more energised every day' },
+  { id: 'fat_loss',        Icon: Flame, label: 'Fat Loss',        desc: 'Burn fat through diet & movement' },
+  { id: 'muscle_gain',     Icon: Dumbbell, label: 'Muscle Gain',     desc: 'Build strength with protein & training' },
+  { id: 'general_fitness', Icon: Activity, label: 'General Fitness', desc: 'Stay active and balanced' },
+  { id: 'better_sleep',    Icon: Moon, label: 'Better Sleep',    desc: 'Improve rest and recovery' },
+  { id: 'consistency',     Icon: CalendarCheck, label: 'Consistency',     desc: 'Build lasting daily habits' },
+  { id: 'energy',          Icon: Zap, label: 'Energy Levels',   desc: 'Feel more energised every day' },
 ]
 
 const GOAL_WEIGHTS = {
@@ -36,11 +37,11 @@ const ACTIVITY_STEPS = {
 }
 
 const STRUGGLES = [
-  { id: 'late_dinner',   label: 'Late-night eating',        icon: '🌙' },
-  { id: 'skip_workout',  label: 'Skipping workouts',        icon: '🏃' },
-  { id: 'junk_cravings', label: 'Snacking / junk cravings', icon: '🍕' },
-  { id: 'poor_sleep',    label: 'Poor sleep',               icon: '😴' },
-  { id: 'inconsistency', label: 'Inconsistency',            icon: '📉' },
+  { id: 'late_dinner',   label: 'Late-night eating',        Icon: Moon },
+  { id: 'skip_workout',  label: 'Skipping workouts',        Icon: Footprints },
+  { id: 'junk_cravings', label: 'Snacking / junk cravings', Icon: Pizza },
+  { id: 'poor_sleep',    label: 'Poor sleep',               Icon: BedDouble },
+  { id: 'inconsistency', label: 'Inconsistency',            Icon: TrendingDown },
 ]
 
 const BASE_WEIGHTS = {
@@ -72,7 +73,7 @@ function buildWeights(goals, activityLevel, primaryStruggle) {
 // ── Tutorial slides (exported for Settings reuse) ──────────────────────────────
 const TUTORIAL_SLIDES = [
   {
-    icon: '🏆',
+    Icon: Trophy,
     title: 'How the score works',
     bullets: [
       'Every day starts at 0 and builds to 100',
@@ -81,7 +82,7 @@ const TUTORIAL_SLIDES = [
     ],
   },
   {
-    icon: '➕',
+    Icon: PlusCircle,
     title: 'How to log',
     bullets: [
       'Today shows the one thing to do next — tap it',
@@ -90,7 +91,7 @@ const TUTORIAL_SLIDES = [
     ],
   },
   {
-    icon: '📈',
+    Icon: TrendingUp,
     title: 'Where to see progress',
     bullets: [
       'Progress → Week gives you one thing to fix',
@@ -121,8 +122,8 @@ export function TutorialSlides({ onDone, doneLabel = 'Show me Today' }) {
           startX.current = null
         }}
       >
-        <div className="text-6xl mb-6">{s.icon}</div>
-        <h2 className="text-xl font-bold text-text-primary mb-3">{s.title}</h2>
+        <span className="w-20 h-20 rounded-full bg-brand/15 flex items-center justify-center mb-6"><s.Icon size={34} className="text-brand-light" /></span>
+        <h2 className="t-title mb-3">{s.title}</h2>
         {s.body && <p className="text-sm text-text-secondary leading-relaxed max-w-xs">{s.body}</p>}
         {s.bullets && (
           <ul className="text-left space-y-2 mt-1">
@@ -151,12 +152,12 @@ export function TutorialSlides({ onDone, doneLabel = 'Show me Today' }) {
         )}
         {isLast ? (
           <button onClick={onDone}
-            className="flex-1 py-3 rounded-2xl bg-brand text-white text-sm font-semibold">
+            className="flex-1 py-3 rounded-2xl bg-brand text-onbrand text-sm font-semibold">
             {doneLabel}
           </button>
         ) : (
           <button onClick={() => goTo(slide + 1)}
-            className="flex-1 py-3 rounded-2xl bg-brand text-white text-sm font-semibold">
+            className="flex-1 py-3 rounded-2xl bg-brand text-onbrand text-sm font-semibold">
             Next
           </button>
         )}
@@ -178,11 +179,11 @@ function ProgressBar({ current, total }) {
   )
 }
 
-function OptionRow({ selected, onClick, label, desc, icon }) {
+function OptionRow({ selected, onClick, label, desc, Icon }) {
   return (
     <button onClick={onClick}
-      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${selected ? 'border-brand bg-brand/10' : 'border-surface-border bg-surface-card'}`}>
-      {icon && <span className="text-xl shrink-0">{icon}</span>}
+      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-colors ${selected ? 'border-brand bg-brand/10' : 'border-transparent bg-surface-card'}`}>
+      {Icon && <Icon size={20} className="text-text-secondary shrink-0" />}
       <div className="flex-1">
         <p className={`text-sm font-semibold ${selected ? 'text-brand-light' : 'text-text-primary'}`}>{label}</p>
         {desc && <p className="text-xs text-text-muted">{desc}</p>}
@@ -241,9 +242,9 @@ export default function Onboarding({ onComplete }) {
   if (step === 0) return (
     <div className="min-h-screen bg-surface-base flex flex-col items-center justify-center px-6 text-center">
       <div className="mb-10">
-        <img src="/logo.png" alt="Health Quest" className="w-20 h-20 rounded-2xl object-cover mx-auto mb-6 shadow-lg" />
+        <img src="/logo.png" alt="Health Quest" className="w-20 h-20 rounded-xl object-cover mx-auto mb-6" />
         <h1 className="text-2xl font-bold text-text-primary mb-1">Health Quest</h1>
-        <p className="text-2xl font-bold text-brand-light mb-5">Track less. Improve faster.</p>
+        <p className="text-base text-text-secondary mb-5">Track less. Improve faster.</p>
         <p className="text-sm text-text-muted max-w-xs mx-auto leading-relaxed">
           Three quick questions, and your scoring is set up around your goals.
         </p>
@@ -275,8 +276,8 @@ export default function Onboarding({ onComplete }) {
             const sel = goals.includes(g.id)
             return (
               <button key={g.id} onClick={() => toggleGoal(g.id)}
-                className={`flex flex-col items-center text-center p-4 rounded-2xl border-2 transition-all ${sel ? 'border-brand bg-brand/10' : 'border-surface-border bg-surface-card'}`}>
-                <span className="text-3xl mb-2">{g.icon}</span>
+                className={`flex flex-col items-center text-center p-4 rounded-2xl border transition-colors ${sel ? 'border-brand bg-brand/10' : 'border-transparent bg-surface-card'}`}>
+                <g.Icon size={26} className={`mb-2 ${sel ? 'text-brand-light' : 'text-text-secondary'}`} />
                 <span className={`text-sm font-semibold ${sel ? 'text-brand-light' : 'text-text-primary'}`}>{g.label}</span>
                 <span className="text-xs text-text-muted mt-0.5 leading-tight">{g.desc}</span>
               </button>
@@ -332,7 +333,7 @@ export default function Onboarding({ onComplete }) {
         </div>
         <div className="space-y-2">
           {STRUGGLES.map(s => (
-            <OptionRow key={s.id} selected={primaryStruggle === s.id} onClick={() => setPrimaryStruggle(s.id)} label={s.label} icon={s.icon} />
+            <OptionRow key={s.id} selected={primaryStruggle === s.id} onClick={() => setPrimaryStruggle(s.id)} label={s.label} Icon={s.Icon} />
           ))}
         </div>
       </div>

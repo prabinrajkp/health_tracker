@@ -1,11 +1,14 @@
 import { format, startOfWeek, endOfWeek, parseISO } from 'date-fns'
 import db from './db'
+import { col } from './theme'
 
+// Rarity shows only as the badge's colour, taken from the theme tokens.
+const tier = (tone, label) => ({ tone, label, color: col(tone), bg: col(tone, 0.12) })
 export const TIER_META = {
-  common:    { color: '#94a3b8', glow: '#94a3b840', bg: '#94a3b812', label: 'Common',    anim: 'none' },
-  rare:      { color: '#38bdf8', glow: '#38bdf850', bg: '#38bdf810', label: 'Rare',      anim: 'badgePulse 2.5s ease-in-out infinite' },
-  epic:      { color: '#a78bfa', glow: '#a78bfa55', bg: '#a78bfa12', label: 'Epic',      anim: 'badgeEpicShimmer 3s ease-in-out infinite' },
-  legendary: { color: '#f59e0b', glow: '#f59e0b65', bg: '#f59e0b12', label: 'Legendary', anim: 'badgeLegendaryAura 2.5s ease-in-out infinite' },
+  common:    tier('text-muted', 'Common'),
+  rare:      tier('brand',      'Rare'),
+  epic:      tier('cat-sleep',  'Epic'),
+  legendary: tier('warning',    'Legendary'),
 }
 
 export const CATEGORY_META = {
@@ -657,10 +660,10 @@ export const BADGES = [
 ]
 
 export function getEarnEvolutionTier(count) {
-  if (count >= 15) return { label: 'Neon Legendary', color: '#f59e0b', symbol: '✦' }
-  if (count >= 7)  return { label: 'Gold',            color: '#eab308', symbol: '⬟' }
-  if (count >= 3)  return { label: 'Silver',          color: '#94a3b8', symbol: '◆' }
-  if (count >= 1)  return { label: 'Bronze',          color: '#cd7f32', symbol: '●' }
+  if (count >= 15) return { label: 'Neon Legendary' }
+  if (count >= 7)  return { label: 'Gold' }
+  if (count >= 3)  return { label: 'Silver' }
+  if (count >= 1)  return { label: 'Bronze' }
   return null
 }
 

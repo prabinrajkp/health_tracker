@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Save, RotateCcw, Minus, Plus, Trash2, Sparkles, Sun, Moon, Download, Upload, Bell,
   ChevronRight, User, Scale, Sliders, Utensils, Dumbbell, Clock, Timer,
-  AlertTriangle, ArrowLeft, BarChart2, Footprints, BookOpen, RefreshCw, Pencil, Check, X,
+  AlertTriangle, ArrowLeft, Smartphone, BarChart2, Footprints, BookOpen, RefreshCw, Pencil, Check, X,
   Copy, ChevronDown, Lock, HeartPulse, Flame, KeyRound, Eye, EyeOff,
 } from 'lucide-react'
 import { TutorialSlides } from './Onboarding'
@@ -40,32 +40,25 @@ function Stepper({ label, sublabel, value, onChange, min = 0, max = 20 }) {
   return (
     <div className="list-row">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-text-primary">{label}</p>
-        {sublabel && <p className="text-xs text-text-muted mt-0.5">{sublabel}</p>}
+        <p className="text-base text-text-primary">{label}</p>
+        {sublabel && <p className="text-sm text-text-secondary">{sublabel}</p>}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <button onClick={() => onChange(Math.max(min, value - 1))}
-          className="w-8 h-8 rounded-xl border border-surface-border bg-surface-elevated flex items-center justify-center text-text-secondary">
-          <Minus size={12} />
-        </button>
-        <span className="w-8 text-center text-sm font-semibold text-text-primary tabular-nums">{value}</span>
-        <button onClick={() => onChange(Math.min(max, value + 1))}
-          className="w-8 h-8 rounded-xl border border-surface-border bg-surface-elevated flex items-center justify-center text-text-secondary">
-          <Plus size={12} />
-        </button>
+      <div className="flex items-center shrink-0 bg-surface-elevated rounded-full">
+        <button onClick={() => onChange(Math.max(min, value - 1))} aria-label={`Less: ${label}`}
+          className="w-9 h-9 flex items-center justify-center text-text-secondary"><Minus size={14} /></button>
+        <span className="w-8 text-center text-base font-semibold text-text-primary tabular-nums">{value}</span>
+        <button onClick={() => onChange(Math.min(max, value + 1))} aria-label={`More: ${label}`}
+          className="w-9 h-9 flex items-center justify-center text-text-secondary"><Plus size={14} /></button>
       </div>
     </div>
   )
 }
 
-function DetailHeader({ title, onBack, accent }) {
+function DetailHeader({ title, onBack }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-4 border-b border-surface-border shrink-0 bg-surface-card">
-      <button onClick={onBack}
-        className="w-9 h-9 rounded-xl bg-surface-elevated border border-surface-border flex items-center justify-center shrink-0">
-        <ArrowLeft size={16} className="text-text-secondary" />
-      </button>
-      <h2 className="text-base font-semibold text-text-primary flex-1">{title}</h2>
+    <div className="flex items-center gap-3 px-4 pt-5 pb-3 shrink-0">
+      <button onClick={onBack} aria-label="Back" className="icon-btn"><ArrowLeft size={18} /></button>
+      <h2 className="t-title flex-1">{title}</h2>
     </div>
   )
 }
@@ -504,21 +497,21 @@ export default function Settings() {
   const modeLabel = NOTIFICATION_MODES.find(m => m.id === notificationMode)?.label ?? 'Standard'
   const MENU_GROUPS = [
     { title: 'You', items: [
-      { key: 'profile',    Icon: User,       color: '#a78bfa', label: 'Name',        desc: playerName || 'Not set' },
-      { key: 'body',       Icon: HeartPulse, color: '#ec4899', label: 'Body & goal', desc: bodyComplete ? `${heightCm} cm · ${targetWeight || '—'} kg goal · ${LOSS_RATES.find(r => r.id === lossRate)?.label ?? 'Standard'}` : 'Set up calorie & macro targets' },
-      { key: 'appearance', Icon: Sun,        color: '#f59e0b', label: 'Theme',       desc: theme === 'dark' ? 'Dark' : 'Light' },
+      { key: 'profile',    Icon: User,       label: 'Name',        desc: playerName || 'Not set' },
+      { key: 'body',       Icon: HeartPulse, label: 'Body & goal', desc: bodyComplete ? `${heightCm} cm · ${targetWeight || '—'} kg goal · ${LOSS_RATES.find(r => r.id === lossRate)?.label ?? 'Standard'}` : 'Set up calorie & macro targets' },
+      { key: 'appearance', Icon: Sun,        label: 'Theme',       desc: theme === 'system' ? 'Follows your phone' : theme === 'dark' ? 'Dark' : 'Light' },
     ] },
     { title: 'Scoring', items: [
-      { key: 'scoring', Icon: Sliders, color: '#FBBC04', label: 'Scoring rules', desc: `Advanced · Diet ${weights.diet_max} · Workout ${weights.workout_max} · Sleep ${weights.sleep_max}` },
+      { key: 'scoring', Icon: Sliders, label: 'Scoring rules', desc: `Advanced · Diet ${weights.diet_max} · Workout ${weights.workout_max} · Sleep ${weights.sleep_max}` },
     ] },
     { title: 'Food & AI', items: [
-      { key: 'foods',       Icon: Sparkles, color: '#f97316', label: 'Custom foods', desc: `${customOptions.length} food${customOptions.length !== 1 ? 's' : ''}` },
-      { key: 'ai_provider', Icon: KeyRound, color: '#7c3aed', label: 'AI assistant', desc: hasLlmKey(aiConfig) ? 'Connected' : 'Not set up' },
+      { key: 'foods',       Icon: Sparkles, label: 'Custom foods', desc: `${customOptions.length} food${customOptions.length !== 1 ? 's' : ''}` },
+      { key: 'ai_provider', Icon: KeyRound, label: 'AI assistant', desc: hasLlmKey(aiConfig) ? 'Connected' : 'Not set up' },
     ] },
     { title: 'Reminders & data', items: [
-      { key: 'reminders', Icon: Bell,     color: '#38bdf8', label: 'Reminders',        desc: `${modeLabel} · bed ${bedTime}` },
-      { key: 'export',    Icon: Download, color: '#34A853', label: 'Export & backup',  desc: 'Excel · JSON backup · restore' },
-      { key: 'tutorial',  Icon: BookOpen, color: '#38bdf8', label: 'How scoring works', desc: 'A three-step tour' },
+      { key: 'reminders', Icon: Bell,     label: 'Reminders',        desc: `${modeLabel} · bed ${bedTime}` },
+      { key: 'export',    Icon: Download, label: 'Export & backup',  desc: 'Excel · JSON backup · restore' },
+      { key: 'tutorial',  Icon: BookOpen, label: 'How scoring works', desc: 'A three-step tour' },
     ] },
   ]
 
@@ -539,9 +532,9 @@ export default function Settings() {
       }
     }
     const SaveBtn = () => (
-      <div className="px-4 pt-4 pb-8 border-t border-surface-border bg-surface-card shrink-0">
-        <button onClick={handleSave} disabled={saving} className="btn-primary w-full py-4 rounded-2xl text-sm font-semibold">
-          <Save size={14} />{saving ? 'Saving…' : 'Save Settings'}
+      <div className="px-4 pt-3 pb-24 shrink-0">
+        <button onClick={handleSave} disabled={saving} className="btn-primary w-full py-4">
+          {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
     )
@@ -588,7 +581,7 @@ export default function Settings() {
                 <button key={g.id} onClick={() => setGender(g.id)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
                     gender === g.id
-                      ? 'bg-brand text-white border-transparent'
+                      ? 'bg-brand text-onbrand border-transparent'
                       : 'border-surface-border text-text-muted bg-surface-elevated'
                   }`}>
                   {g.label}
@@ -680,18 +673,24 @@ export default function Settings() {
     if (activeSection === 'appearance') return (
       <div className="flex flex-col h-full">
         <DetailHeader title="Theme" onBack={back} />
-        <div className="overflow-y-auto flex-1 px-4 py-6">
-          <p className="section-label mb-3">Theme</p>
-          <div className="grid grid-cols-2 gap-3">
-            {[{ key: 'dark', Icon: Moon, label: 'Dark' }, { key: 'light', Icon: Sun, label: 'Light' }].map(({ key, Icon, label }) => (
-              <button key={key} onClick={() => setTheme(key)}
-                className={`flex items-center justify-center gap-2 py-5 rounded-2xl border-2 text-sm font-semibold transition-all ${theme === key ? 'border-brand bg-brand/10 text-brand-light' : 'border-surface-border bg-surface-elevated text-text-muted'}`}>
-                <Icon size={16} />{label}
+        <div className="overflow-y-auto flex-1 px-4 py-4">
+          <div className="group-list">
+            {[
+              { key: 'system', Icon: Smartphone, label: 'Follow my phone', desc: 'Light or dark, matching the system setting' },
+              { key: 'light',  Icon: Sun,        label: 'Light' },
+              { key: 'dark',   Icon: Moon,       label: 'Dark' },
+            ].map(({ key, Icon, label, desc }) => (
+              <button key={key} onClick={() => setTheme(key)} className="list-row w-full text-left" role="radio" aria-checked={theme === key}>
+                <Icon size={20} strokeWidth={1.75} className="text-text-secondary shrink-0" />
+                <span className="flex-1 min-w-0">
+                  <span className="block text-base text-text-primary">{label}</span>
+                  {desc && <span className="block text-sm text-text-secondary">{desc}</span>}
+                </span>
+                {theme === key && <Check size={20} className="text-brand-light shrink-0" />}
               </button>
             ))}
           </div>
         </div>
-        <SaveBtn />
       </div>
     )
 
@@ -704,8 +703,8 @@ export default function Settings() {
           </p>
 
           <div>
-            <p className="section-label mb-2 px-1">Category maximums</p>
-            <div className="card space-y-0">
+            <p className="section-label">Category maximums</p>
+            <div className="group-list">
               <Stepper label="Diet max points"    value={weights.diet_max}    onChange={v => setWeights(w => ({ ...w, diet_max: v }))}    max={50} />
               <Stepper label="Workout max points" value={weights.workout_max} onChange={v => setWeights(w => ({ ...w, workout_max: v }))} max={50} />
               <Stepper label="Sleep max points"   value={weights.sleep_max}   onChange={v => setWeights(w => ({ ...w, sleep_max: v }))}   max={50} />
@@ -717,8 +716,8 @@ export default function Settings() {
           </div>
 
           <div>
-            <p className="section-label mb-2 px-1">Workout</p>
-            <div className="card space-y-0">
+            <p className="section-label">Workout</p>
+            <div className="group-list">
               <Stepper label="Steps at the full-credit target" sublabel="Half earned at the partial target" value={weights.workout?.steps_8000 ?? 15} onChange={v => setW('workout', 'steps_8000', v)} max={20} />
               <Stepper label="Extra at the bonus start"         sublabel="Then up to +10 more by the bonus end" value={weights.workout?.steps_10000_bonus ?? 3} onChange={v => setW('workout', 'steps_10000_bonus', v)} />
               <Stepper label="Post-dinner walk"                 value={weights.workout?.post_dinner_walk ?? 10} onChange={v => setW('workout', 'post_dinner_walk', v)} />
@@ -745,8 +744,8 @@ export default function Settings() {
           </div>
 
           <div>
-            <p className="section-label mb-2 px-1">Sleep</p>
-            <div className="card space-y-0">
+            <p className="section-label">Sleep</p>
+            <div className="group-list">
               <Stepper label="Asleep before 11:30 PM"                                               value={weights.sleep?.sleep_before_1130 ?? 10} onChange={v => setW('sleep', 'sleep_before_1130', v)} />
               <Stepper label="7+ hours of sleep" sublabel="Effective hours, after screen time"      value={weights.sleep?.seven_plus_hours   ?? 12} onChange={v => setW('sleep', 'seven_plus_hours', v)} />
               <Stepper label="Awake by 8 AM"     sublabel="Full by 8 AM · half until 9 · none after" value={weights.sleep?.wake_by_7          ?? 8}  onChange={v => setW('sleep', 'wake_by_7', v)} />
@@ -754,8 +753,8 @@ export default function Settings() {
           </div>
 
           <div>
-            <p className="section-label mb-2 px-1">Fasting</p>
-            <div className="card space-y-0">
+            <p className="section-label">Fasting</p>
+            <div className="group-list">
               <Stepper label="Target hours"   sublabel="Full points at this length" value={weights.fasting?.target_hours ?? 16} onChange={v => setWeights(w => ({ ...w, fasting: { ...(w.fasting||{}), target_hours: v } }))} min={8} max={24} />
               <Stepper label="Minimum hours"  sublabel="No points below this"       value={weights.fasting?.min_hours    ?? 12} onChange={v => setWeights(w => ({ ...w, fasting: { ...(w.fasting||{}), min_hours: v } }))}    min={4} max={20} />
               <Stepper label="Max fasting points"                                   value={weights.fasting?.max_points   ?? 10} onChange={v => setWeights(w => ({ ...w, fasting: { ...(w.fasting||{}), max_points: v } }))}   max={20} />
@@ -764,15 +763,15 @@ export default function Settings() {
           </div>
 
           <div>
-            <p className="section-label mb-2 px-1">Penalties</p>
-            <div className="card space-y-0">
+            <p className="section-label">Penalties</p>
+            <div className="group-list">
               <Stepper label="Dinner after 9 PM"    value={Math.abs(weights.penalties?.dinner_after_9pm   ?? 5)} onChange={v => setWeights(w => ({ ...w, penalties: { ...w.penalties, dinner_after_9pm: -v } }))} />
               <Stepper label="Sleep after midnight" value={Math.abs(weights.penalties?.sleep_after_midnight ?? 8)} onChange={v => setWeights(w => ({ ...w, penalties: { ...w.penalties, sleep_after_midnight: -v } }))} />
             </div>
             <p className="text-xs text-text-muted mt-2 px-1">Taken off the diet and sleep scores. Food points are set per food under Custom foods.</p>
           </div>
 
-          <button onClick={() => { setWeights(DEFAULT_WEIGHTS); toast('Reset to defaults — save to apply', { icon: '↩' }) }}
+          <button onClick={() => { setWeights(DEFAULT_WEIGHTS); toast('Reset to defaults — save to apply') }}
             className="btn-ghost w-full"><RotateCcw size={13} />Reset to defaults</button>
         </div>
         <SaveBtn />
@@ -785,12 +784,9 @@ export default function Settings() {
         <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3">
           <div className="card space-y-3">
             <div className="flex items-center gap-2">
-              <KeyRound size={14} style={{ color: '#7c3aed' }} />
-              <p className="section-label flex-1">AI Provider (free tier)</p>
-              {hasLlmKey(aiConfig) && (
-                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-                  style={{ background: '#22c55e20', color: '#22c55e' }}>Connected</span>
-              )}
+              <KeyRound size={18} className="text-text-secondary" />
+              <p className="t-heading flex-1">AI provider (free tier)</p>
+              {hasLlmKey(aiConfig) && <span className="badge-success">Connected</span>}
             </div>
             <p className="text-xs text-text-muted leading-relaxed">
               Paste a free API key once and "Ask AI" (in Custom Meal Options) fills points +
@@ -804,18 +800,14 @@ export default function Settings() {
             <div className="space-y-2">
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <p className="text-[11px] text-text-muted">OpenRouter API key</p>
-                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-                    style={{ background: '#7c3aed20', color: '#7c3aed' }}>PRIMARY</span>
+                  <p className="text-sm text-text-secondary">OpenRouter API key · used first</p>
                 </div>
                 <input type={showKeys ? 'text' : 'password'} className="input text-xs font-mono" placeholder="sk-or-v1-…"
                   value={openrouterKey} onChange={e => setOpenrouterKey(e.target.value)} autoComplete="off" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <p className="text-[11px] text-text-muted">Groq API key</p>
-                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-                    style={{ background: '#64748b20', color: '#94a3b8' }}>BACKUP</span>
+                  <p className="text-sm text-text-secondary">Groq API key · backup</p>
                 </div>
                 <input type={showKeys ? 'text' : 'password'} className="input text-xs font-mono" placeholder="gsk_…"
                   value={groqKey} onChange={e => setGroqKey(e.target.value)} autoComplete="off" />
@@ -862,8 +854,7 @@ export default function Settings() {
                 onKeyDown={e => e.key === 'Enter' && addCustomOption()} />
               {newOption.label.trim() && (
                 <button onClick={startAskAI}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-brand/30 bg-brand/8 text-sm font-medium"
-                  style={{ color: '#7c3aed', background: '#7c3aed10' }}>
+                  className="btn-ghost w-full text-brand-light">
                   <Sparkles size={14} />
                   Ask AI to fill details
                 </button>
@@ -871,7 +862,7 @@ export default function Settings() {
               <div className="flex gap-2">
                 {[['good', 'Good', 'bg-success'], ['bad', 'Bad', 'bg-danger']].map(([cat, lbl, bg]) => (
                   <button key={cat} onClick={() => setNewOption(o => ({ ...o, category: cat }))}
-                    className={`flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${newOption.category === cat ? `${bg} text-white border-transparent` : 'border-surface-border text-text-muted bg-surface-elevated'}`}>
+                    className={`flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${newOption.category === cat ? `${bg} text-onbrand border-transparent` : 'border-surface-border text-text-muted bg-surface-elevated'}`}>
                     {lbl}
                   </button>
                 ))}
@@ -905,7 +896,7 @@ export default function Settings() {
                         placeholder="—"
                         value={newOption[key] ?? ''}
                         onChange={e => setNewOption(o => ({ ...o, [key]: e.target.value === '' ? null : Number(e.target.value) }))} />
-                      <p className="text-[11px] text-text-muted text-center mt-0.5">{label}</p>
+                      <p className="text-xs text-text-muted text-center mt-0.5">{label}</p>
                     </div>
                   ))}
                 </div>
@@ -917,16 +908,15 @@ export default function Settings() {
             {customOptions.length > 0 && (
               <div className="card space-y-3">
                 <div className="flex items-center gap-2">
-                  <Flame size={14} style={{ color: '#f97316' }} />
-                  <p className="section-label flex-1">Nutrition data</p>
+                  <Flame size={18} className="text-text-secondary" />
+                  <p className="t-heading flex-1">Nutrition data</p>
                   <span className="text-xs font-semibold tabular-nums text-text-primary">
                     {customOptions.length - missingNutrition.length} / {customOptions.length}
                   </span>
                 </div>
                 <div className="progress-track">
-                  <div className="progress-fill" style={{
+                  <div className="progress-fill bg-brand" style={{
                     width: `${((customOptions.length - missingNutrition.length) / customOptions.length) * 100}%`,
-                    background: '#f97316',
                   }} />
                 </div>
                 <p className="text-xs text-text-muted">
@@ -936,8 +926,7 @@ export default function Settings() {
                 </p>
                 {missingNutrition.length > 0 && (
                   <button onClick={startBulkAI} disabled={bulkAiLoading}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border text-sm font-medium disabled:opacity-60"
-                    style={{ color: '#f97316', background: '#f9731610', borderColor: '#f9731640' }}>
+                    className="btn-ghost w-full text-brand-light">
                     {bulkAiLoading
                       ? <><RefreshCw size={14} className="animate-spin" /> Analyzing {bulkAiProgress?.done ?? 0}/{bulkAiProgress?.total ?? missingNutrition.length}…</>
                       : <><Sparkles size={14} /> Fill all {missingNutrition.length} with AI</>}
@@ -974,7 +963,7 @@ export default function Settings() {
                           </button>
                         )}
                         <button onClick={() => isEditing ? cancelEdit() : removeCustomOption(opt.id)}
-                          className="w-7 h-7 rounded-lg border border-surface-border bg-surface-elevated hover:border-danger/40 hover:text-danger text-text-muted flex items-center justify-center shrink-0">
+                          className="w-7 h-7 rounded-lg border border-surface-border bg-surface-elevated text-text-muted flex items-center justify-center shrink-0">
                           {isEditing ? <X size={11} /> : <Trash2 size={11} />}
                         </button>
                       </div>
@@ -1012,7 +1001,7 @@ export default function Settings() {
                                   placeholder="—"
                                   value={editDraft[key] ?? ''}
                                   onChange={e => setEditDraft(d => ({ ...d, [key]: e.target.value === '' ? null : Number(e.target.value) }))} />
-                                <p className="text-[11px] text-text-muted text-center mt-0.5">{label}</p>
+                                <p className="text-xs text-text-muted text-center mt-0.5">{label}</p>
                               </div>
                             ))}
                           </div>
@@ -1021,7 +1010,7 @@ export default function Settings() {
                       {!isEditing && (
                         <p className="text-xs text-text-muted pl-5">
                           {opt.idealPortions ? `ideal: ${opt.idealPortions} portion${opt.idealPortions !== 1 ? 's' : ''}` : ''}
-                          {opt.idealPortions && hasNutrition(opt) ? ' · ' : ''}
+                          {opt.idealPortions ? ' · ' : ''}
                           {hasNutrition(opt)
                             ? `${opt.kcal} kcal · P${opt.protein ?? 0} C${opt.carbs ?? 0} F${opt.fat ?? 0}`
                             : <span className="text-warning">no calorie data</span>}
@@ -1048,7 +1037,7 @@ export default function Settings() {
           )}
 
           <div>
-            <p className="section-label mb-2 px-1">How much should the app remind you?</p>
+            <p className="section-label">How much should the app remind you?</p>
             <div className="space-y-2">
               {NOTIFICATION_MODES.map(m => (
                 <button key={m.id} onClick={() => setNotificationMode(m.id)}
@@ -1168,7 +1157,7 @@ export default function Settings() {
         <div className="flex flex-col h-full">
           <DetailHeader title="Developer Tools" onBack={devBack} />
           <div className="flex-1 flex flex-col items-center justify-center px-8 space-y-5">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#1e293b' }}>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-surface-elevated">
               <Lock size={26} className="text-text-muted" />
             </div>
             <div className="text-center space-y-1">
@@ -1298,7 +1287,7 @@ export default function Settings() {
                       </div>
                     </div>
                     <button onClick={() => setDevSleep(null)}
-                      className="flex items-center gap-1 text-xs text-danger opacity-60 hover:opacity-100">
+                      className="flex items-center gap-1 text-xs text-danger opacity-60">
                       <Trash2 size={11} />Remove record
                     </button>
                   </div>
@@ -1334,7 +1323,7 @@ export default function Settings() {
                       </button>
                     </div>
                     <button onClick={() => setDevWorkout(null)}
-                      className="flex items-center gap-1 text-xs text-danger opacity-60 hover:opacity-100">
+                      className="flex items-center gap-1 text-xs text-danger opacity-60">
                       <Trash2 size={11} />Remove record
                     </button>
                   </div>
@@ -1379,8 +1368,7 @@ export default function Settings() {
                       ))}
                     </div>
                     <button onClick={overrideScore} disabled={devSaving}
-                      className="btn-ghost w-full py-3 rounded-2xl text-sm font-semibold"
-                      style={{ borderColor: '#f59e0b40', color: '#f59e0b' }}>
+                      className="btn-ghost w-full text-warning">
                       <Pencil size={13} />{devSaving ? 'Saving…' : 'Write score directly (bypass recompute)'}
                     </button>
                   </div>
@@ -1398,7 +1386,7 @@ export default function Settings() {
 
   // ── Main menu ─────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-surface-base pb-28 animate-fade-in flex flex-col" style={{ position: 'relative' }}>
+    <div className="min-h-screen bg-surface-base pb-nav animate-fade-in flex flex-col" style={{ position: 'relative' }}>
       {activeSection ? (
         <div className="flex flex-col flex-1 h-screen">
           {renderDetail()}
@@ -1407,43 +1395,39 @@ export default function Settings() {
         <>
           {/* Header */}
           <div className="page-header">
-            <button onClick={() => navigate('/profile')} aria-label="Back to Profile"
-              className="w-10 h-10 rounded-2xl bg-surface-elevated border border-surface-border flex items-center justify-center shrink-0">
-              <ArrowLeft size={17} className="text-text-secondary" />
+            <button onClick={() => navigate('/profile')} aria-label="Back to Profile" className="icon-btn">
+              <ArrowLeft size={18} />
             </button>
-            <h1 className="text-base font-semibold text-text-primary flex-1">Settings</h1>
+            <h1 className="t-title flex-1">Settings</h1>
           </div>
 
-          {/* Menu, in four groups */}
-          <div className="max-w-lg mx-auto w-full px-4 pb-4 space-y-4">
+          {/* Menu, in four groups — plain lists, no boxes */}
+          <div className="max-w-lg mx-auto w-full px-4 pb-6 space-y-6">
             {MENU_GROUPS.map(group => (
-              <div key={group.title}>
-                <p className="section-label mb-2 px-1">{group.title}</p>
-                <div className="card py-1 space-y-0 divide-y divide-surface-border">
-                  {group.items.map(({ key, Icon, color, label, desc }) => (
+              <section key={group.title}>
+                <h2 className="section-label">{group.title}</h2>
+                <div className="group-list">
+                  {group.items.map(({ key, Icon, label, desc }) => (
                     <button key={key} onClick={() => setActiveSection(key)}
-                      className="list-row w-full text-left py-3.5 active:opacity-70">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ background: `${color}18` }}>
-                        <Icon size={16} style={{ color }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-text-primary">{label}</p>
-                        <p className="text-xs text-text-muted truncate mt-0.5">{desc}</p>
-                      </div>
-                      <ChevronRight size={15} className="text-text-muted shrink-0" />
+                      className="list-row w-full text-left active:opacity-70">
+                      <Icon size={20} strokeWidth={1.75} className="text-text-secondary shrink-0" />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-base text-text-primary">{label}</span>
+                        <span className="block text-sm text-text-secondary truncate">{desc}</span>
+                      </span>
+                      <ChevronRight size={18} className="text-text-muted shrink-0" />
                     </button>
                   ))}
                 </div>
-              </div>
+              </section>
             ))}
 
             {/* About */}
             <div className="text-center pt-2 space-y-2">
-              <button onClick={() => setActiveSection('reset_onboarding')} className="text-xs font-semibold text-text-muted underline underline-offset-2">
+              <button onClick={() => setActiveSection('reset_onboarding')} className="text-sm font-semibold text-brand-light py-1">
                 Replay setup
               </button>
-              <p onClick={tapVersion} className="text-xs text-text-muted select-none">
+              <p onClick={tapVersion} className="text-sm text-text-muted select-none">
                 Health Quest v{APP_VERSION}
               </p>
             </div>
@@ -1454,22 +1438,20 @@ export default function Settings() {
       {/* ── Ask AI overlay ──────────────────────────────────────────────── */}
       {aiMode && (
         <div className="fixed inset-0 z-[90] flex flex-col">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={resetAI} />
-          <div className="absolute bottom-0 left-0 right-0 bg-surface-card rounded-t-3xl max-h-[88vh] flex flex-col">
+          <div className="absolute inset-0 bg-black/60" onClick={resetAI} />
+          <div className="absolute bottom-0 left-0 right-0 bg-surface-card rounded-t-xl max-h-[88vh] flex flex-col">
             {/* drag handle */}
             <div className="flex justify-center pt-3 pb-1 shrink-0">
               <div className="w-10 h-1 rounded-full bg-surface-border" />
             </div>
             {/* header */}
             <div className="flex items-center gap-3 px-5 py-3 border-b border-surface-border shrink-0">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#7c3aed20' }}>
-                <Sparkles size={15} style={{ color: '#7c3aed' }} />
-              </div>
+              <Sparkles size={20} className="text-text-secondary shrink-0" />
               <div className="flex-1">
                 <h2 className="text-sm font-semibold text-text-primary">Let AI do this for you</h2>
                 {newOption.label && <p className="text-xs text-text-muted truncate">{newOption.label}</p>}
               </div>
-              <button onClick={resetAI} className="p-1.5 rounded-lg text-text-muted hover:bg-surface-elevated"><X size={16} /></button>
+              <button onClick={resetAI} className="p-1.5 rounded-lg text-text-muted"><X size={16} /></button>
             </div>
 
             <div className="overflow-y-auto flex-1 px-5 py-5 space-y-4">
@@ -1502,8 +1484,7 @@ export default function Settings() {
                 </div>
 
                 <button onClick={handleCopyPrompt}
-                  className="btn w-full font-semibold py-4 rounded-2xl text-white text-sm"
-                  style={{ background: aiCopied ? '#22c55e' : '#7c3aed' }}>
+                  className="btn-primary w-full py-4">
                   {aiCopied ? <><Check size={15} /> Copied!</> : <><Copy size={15} /> Copy Prompt</>}
                 </button>
                 <button onClick={() => setAiMode('paste')}
@@ -1523,8 +1504,7 @@ export default function Settings() {
                   autoFocus
                 />
                 <button onClick={handleAnalyse}
-                  className="btn w-full font-semibold py-4 rounded-2xl text-white text-sm"
-                  style={{ background: '#7c3aed' }}>
+                  className="btn-primary w-full py-4">
                   <Sparkles size={15} /> Analyse
                 </button>
                 <button onClick={() => setAiMode('prompt')}
@@ -1534,8 +1514,8 @@ export default function Settings() {
               {/* ── Step: loading ── */}
               {aiMode === 'loading' && (
                 <div className="flex flex-col items-center justify-center py-16 gap-4">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: '#7c3aed20' }}>
-                    <RefreshCw size={22} style={{ color: '#7c3aed' }} className="animate-spin" />
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center bg-surface-elevated">
+                    <RefreshCw size={22} className="animate-spin text-brand-light" />
                   </div>
                   <p className="text-sm font-semibold text-text-primary">Understanding your food…</p>
                   <p className="text-xs text-text-muted">Just a moment</p>
@@ -1544,8 +1524,7 @@ export default function Settings() {
 
               {/* ── Step: result ── */}
               {aiMode === 'result' && aiResult && <>
-                <div className="rounded-2xl border-2 p-4 space-y-3"
-                  style={{ borderColor: aiResult.category === 'good' ? '#22c55e40' : '#ef444440', background: aiResult.category === 'good' ? '#22c55e08' : '#ef444408' }}>
+                <div className="tile p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-xs text-text-muted mb-0.5">Auto-detected</p>
@@ -1559,7 +1538,7 @@ export default function Settings() {
                     <span>Ideal: {aiResult.idealPortions} portion{aiResult.idealPortions !== 1 ? 's' : ''}</span>
                     <span>·</span>
                     <span className={aiResult.category === 'good' ? 'text-success' : 'text-danger'}>
-                      {aiResult.category === 'good' ? '⚖️ Balanced' : '⚠ Occasional'}
+                      {aiResult.category === 'good' ? 'Balanced' : 'Occasional'}
                     </span>
                   </div>
                   {aiResult.kcal != null && (
@@ -1575,8 +1554,7 @@ export default function Settings() {
                   )}
                 </div>
                 <button onClick={handleUseResult}
-                  className="btn w-full font-semibold py-4 rounded-2xl text-white text-sm"
-                  style={{ background: '#22c55e' }}>
+                  className="btn-primary w-full py-4">
                   <Check size={15} /> Use this
                 </button>
                 <button onClick={() => setAiMode('paste')}
@@ -1591,20 +1569,18 @@ export default function Settings() {
       {/* ── Bulk nutrition fill sheet ─────────────────────────────────────── */}
       {bulkMode && (
         <div className="fixed inset-0 z-[90] flex flex-col">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBulkMode(null)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-surface-card rounded-t-3xl max-h-[88vh] flex flex-col">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setBulkMode(null)} />
+          <div className="absolute bottom-0 left-0 right-0 bg-surface-card rounded-t-xl max-h-[88vh] flex flex-col">
             <div className="flex justify-center pt-3 pb-1 shrink-0">
               <div className="w-10 h-1 rounded-full bg-surface-border" />
             </div>
             <div className="flex items-center gap-3 px-5 py-3 border-b border-surface-border shrink-0">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#f9731620' }}>
-                <Flame size={15} style={{ color: '#f97316' }} />
-              </div>
+              <Flame size={20} className="text-text-secondary shrink-0" />
               <div className="flex-1">
                 <h2 className="text-sm font-semibold text-text-primary">Fill nutrition with AI</h2>
                 <p className="text-xs text-text-muted">{missingNutrition.length} food{missingNutrition.length !== 1 ? 's' : ''} in one go</p>
               </div>
-              <button onClick={() => setBulkMode(null)} className="p-1.5 rounded-lg text-text-muted hover:bg-surface-elevated"><X size={16} /></button>
+              <button onClick={() => setBulkMode(null)} className="p-1.5 rounded-lg text-text-muted"><X size={16} /></button>
             </div>
 
             <div className="overflow-y-auto flex-1 px-5 py-5 space-y-4">
@@ -1625,8 +1601,7 @@ export default function Settings() {
                       toast.success('Prompt copied')
                     } catch { toast.error('Could not copy — select the text above') }
                   }}
-                  className="btn w-full font-semibold py-4 rounded-2xl text-white text-sm"
-                  style={{ background: '#f97316' }}>
+                  className="btn-primary w-full py-4">
                   <Copy size={15} /> Copy Prompt
                 </button>
                 <button onClick={() => setBulkMode('paste')}
@@ -1648,8 +1623,7 @@ export default function Settings() {
                   autoFocus
                 />
                 <button onClick={applyBulkNutrition}
-                  className="btn w-full font-semibold py-4 rounded-2xl text-white text-sm"
-                  style={{ background: '#f97316' }}>
+                  className="btn-primary w-full py-4">
                   <Check size={15} /> Apply nutrition
                 </button>
                 <button onClick={() => setBulkMode('prompt')}

@@ -2,76 +2,106 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Purple Dream — Dark Theme (default) ────────────────────────────────── */
-:root {
-  /* Surfaces — deep space purple */
-  --c-surface-base:     10 8 28;
-  --c-surface-card:     20 13 50;
-  --c-surface-elevated: 32 20 72;
-  --c-surface-border:   52 34 105;
-  --c-surface-muted:    88 68 145;
-
-  /* Brand — vivid violet */
-  --c-brand:       124 58 237;
-  --c-brand-light: 167 139 250;
-  --c-brand-dark:  109 40 217;
-
-  /* Semantic */
-  --c-success:       52 168 83;
-  --c-success-light: 129 201 149;
-  --c-warning:       251 188 4;
-  --c-warning-light: 253 225 128;
-  --c-danger:        234 67 53;
-  --c-danger-light:  242 139 130;
-  --c-info:          56 189 248;
-  --c-info-light:    125 211 252;
-
-  /* Text */
-  --c-text-primary:   240 237 255;
-  --c-text-secondary: 180 165 230;
-  --c-text-muted:     110 92 165;
-
-  /* Shadows */
-  --shadow-card:      0 4px 24px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.3);
-  --shadow-card-hover:0 8px 32px rgba(124,58,237,0.35);
-  --shadow-glow:      0 4px 24px rgba(124,58,237,0.45);
-  --shadow-nav:       0 -2px 24px rgba(0,0,0,0.5), 0 8px 32px rgba(0,0,0,0.3);
-
-  /* Scrollbar */
-  --scrollbar-thumb: 52 34 105;
+/* Inter ships inside the app — it is fully offline, so nothing may load from the network. */
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* ── Purple Dream — Light Theme ─────────────────────────────────────────── */
+/* ── Design tokens ─────────────────────────────────────────────────────────
+   Surfaces and text are near-neutral greys so that colour always means
+   something. There is one accent (brand), three status colours with one
+   meaning each (good / caution / cost), and four category colours that are
+   used only for bars and charts. Every text colour is ≥ 4.5:1 on card and
+   on the raised tile, in both modes. See docs/ui_critic.md.               */
+
+/* Dark (default) */
+:root {
+  --c-surface-base:     15 16 20;
+  --c-surface-card:     24 26 32;
+  --c-surface-elevated: 34 37 45;
+  --c-surface-border:   48 52 62;
+  --c-surface-muted:    84 89 102;
+
+  --c-brand:       124 140 248;
+  --c-brand-light: 124 140 248;   /* accent used as text */
+  --c-brand-dark:  104 120 232;
+  --c-on-brand:    15 16 20;      /* text on an accent fill */
+
+  --c-success:       76 195 138;  /* good */
+  --c-success-light: 76 195 138;
+  --c-warning:       229 180 84;  /* caution */
+  --c-warning-light: 229 180 84;
+  --c-danger:        242 118 107; /* cost */
+  --c-danger-light:  242 118 107;
+  --c-info:          124 140 248;
+  --c-info-light:    124 140 248;
+
+  --c-cat-diet:    93 185 139;
+  --c-cat-fasting: 217 160 91;
+  --c-cat-workout: 90 169 230;
+  --c-cat-sleep:   155 140 240;
+
+  --c-text-primary:   236 237 240;
+  --c-text-secondary: 182 186 196;
+  --c-text-muted:     142 147 160;
+
+  /* Dark surfaces are separated by brightness alone — no borders, no shadows */
+  --card-border: transparent;
+  --shadow-card: none;
+
+  --scrollbar-thumb: 48 52 62;
+  color-scheme: dark;
+}
+
+/* Light */
 .light {
-  --c-surface-base:     248 246 255;
+  --c-surface-base:     245 245 242;
   --c-surface-card:     255 255 255;
-  --c-surface-elevated: 237 233 254;
-  --c-surface-border:   221 214 254;
-  --c-surface-muted:    167 139 250;
+  --c-surface-elevated: 237 237 233;
+  --c-surface-border:   220 220 214;
+  --c-surface-muted:    160 163 170;
 
-  --c-brand:       124 58 237;
-  --c-brand-light: 109 40 217;
-  --c-brand-dark:  91 33 182;
+  --c-brand:       67 83 214;
+  --c-brand-light: 67 83 214;
+  --c-brand-dark:  52 66 184;
+  --c-on-brand:    255 255 255;
 
-  --c-success:       22 163 74;
-  --c-success-light: 52 168 83;
-  --c-warning:       217 119 6;
-  --c-warning-light: 251 188 4;
-  --c-danger:        220 38 38;
-  --c-danger-light:  234 67 53;
-  --c-info:          2 132 199;
-  --c-info-light:    56 189 248;
+  --c-success:       18 104 58;
+  --c-success-light: 18 104 58;
+  --c-warning:       138 70 6;
+  --c-warning-light: 138 70 6;
+  --c-danger:        192 38 31;
+  --c-danger-light:  192 38 31;
+  --c-info:          67 83 214;
+  --c-info-light:    67 83 214;
 
-  --c-text-primary:   15 7 40;
-  --c-text-secondary: 79 56 140;
-  --c-text-muted:     147 127 200;
+  --c-cat-diet:    46 139 91;
+  --c-cat-fasting: 183 121 31;
+  --c-cat-workout: 43 123 191;
+  --c-cat-sleep:   107 91 214;
 
-  --shadow-card:       0 2px 16px rgba(124,58,237,0.08), 0 1px 3px rgba(0,0,0,0.05);
-  --shadow-card-hover: 0 8px 32px rgba(124,58,237,0.18);
-  --shadow-glow:       0 4px 20px rgba(124,58,237,0.3);
-  --shadow-nav:        0 -2px 20px rgba(124,58,237,0.1), 0 4px 24px rgba(0,0,0,0.08);
+  --c-text-primary:   23 24 28;
+  --c-text-secondary: 71 74 82;
+  --c-text-muted:     103 107 117;
 
-  --scrollbar-thumb: 221 214 254;
+  --card-border: rgb(var(--c-surface-border));
+  --shadow-card: none;
+
+  --scrollbar-thumb: 220 220 214;
+  color-scheme: light;
 }
 
 @layer base {
@@ -83,7 +113,7 @@
     min-height: 100%;
     background-color: rgb(var(--c-surface-base));
     color: rgb(var(--c-text-primary));
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Inter Variable', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.25s ease, color 0.25s ease;
@@ -105,76 +135,50 @@
 }
 
 @layer components {
-  /* ── Cards ─────────────────────────────────────────────────────────────── */
+  /* ── Containers ─────────────────────────────────────────────────────────
+     hero   the one thing a screen is about — no box, larger type
+     card   a filled surface for a self-contained block
+     group  a plain list with hairline dividers, no surrounding box
+     tile   a small filled block for a single stat
+     Containers are never nested inside the same kind.                    */
   .card {
-    @apply bg-surface-card border border-surface-border rounded-3xl p-5;
-    box-shadow: var(--shadow-card);
+    @apply bg-surface-card rounded-xl p-4;
+    border: 1px solid var(--card-border);
   }
-  .card-sm {
-    @apply bg-surface-card border border-surface-border rounded-2xl p-4;
-    box-shadow: var(--shadow-card);
-  }
-  /* Gradient hero card — purple */
-  .card-gradient {
-    @apply rounded-3xl p-5 text-white relative overflow-hidden;
-    background: linear-gradient(135deg, rgb(var(--c-brand)) 0%, rgb(var(--c-brand-dark)) 100%);
-    box-shadow: var(--shadow-glow);
-  }
-  /* Gradient card variant — for quest cards */
-  .card-gradient-green {
-    @apply rounded-3xl p-5 text-white relative overflow-hidden;
-    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-    box-shadow: 0 4px 20px rgba(22,163,74,0.4);
-  }
-  .card-gradient-blue {
-    @apply rounded-3xl p-5 text-white relative overflow-hidden;
-    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-    box-shadow: 0 4px 20px rgba(2,132,199,0.4);
-  }
-  .card-gradient-violet {
-    @apply rounded-3xl p-5 text-white relative overflow-hidden;
-    background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
-    box-shadow: 0 4px 20px rgba(124,58,237,0.4);
-  }
+  .card-sm { @apply card; }
+  .group-list > * + * { border-top: 1px solid rgb(var(--c-surface-border)); }
+  .tile { @apply bg-surface-elevated rounded-xl px-3 py-2.5; }
 
-  /* ── Buttons ────────────────────────────────────────────────────────────── */
+  /* ── Type roles ─────────────────────────────────────────────────────── */
+  .t-display { @apply text-4xl font-bold tabular-nums leading-none text-text-primary; }
+  .t-number  { @apply text-3xl font-bold tabular-nums leading-none text-text-primary; }
+  .t-title   { @apply text-xl font-semibold text-text-primary; }
+  .t-heading { @apply text-base font-semibold text-text-primary; }
+  .t-caption { @apply text-xs text-text-muted; }
+
+  /* ── Buttons ────────────────────────────────────────────────────────── */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl font-medium text-sm
-           transition-all duration-150 active:scale-[0.97] cursor-pointer select-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm
+           transition-opacity duration-150 active:opacity-70 cursor-pointer select-none disabled:opacity-50;
   }
-  .btn-primary {
-    @apply btn text-white;
-    background: linear-gradient(135deg, rgb(var(--c-brand)) 0%, rgb(var(--c-brand-dark)) 100%);
-    box-shadow: 0 4px 16px rgb(var(--c-brand) / 0.4);
-  }
-  .btn-primary:hover {
-    box-shadow: 0 6px 20px rgb(var(--c-brand) / 0.55);
-    transform: translateY(-1px);
-  }
-  .btn-success {
-    @apply btn bg-success text-white;
-    box-shadow: 0 4px 14px rgb(var(--c-success) / 0.35);
-  }
-  .btn-ghost {
-    @apply btn bg-surface-elevated text-text-secondary hover:text-text-primary hover:bg-surface-border;
-    border: 1px solid rgb(var(--c-surface-border));
-  }
-  .btn-danger {
-    @apply btn bg-danger/10 text-danger border border-danger/30 hover:bg-danger hover:text-white;
-  }
-  .btn-outline {
-    @apply btn bg-transparent border border-surface-border text-text-secondary hover:border-brand hover:text-brand-light;
+  .btn-primary { @apply btn bg-brand text-onbrand; }
+  .btn-success { @apply btn bg-success text-onbrand; }
+  .btn-ghost   { @apply btn bg-surface-elevated text-text-primary; }
+  .btn-danger  { @apply btn bg-danger/10 text-danger; }
+  .btn-outline { @apply btn bg-transparent border border-surface-border text-text-secondary; }
+  .icon-btn {
+    @apply w-10 h-10 rounded-xl bg-surface-elevated flex items-center justify-center shrink-0
+           text-text-secondary active:opacity-70 transition-opacity;
   }
 
-  /* ── Inputs ─────────────────────────────────────────────────────────────── */
+  /* ── Inputs ─────────────────────────────────────────────────────────── */
   .input {
-    @apply w-full bg-surface-elevated border border-surface-border rounded-2xl px-4 py-3
-           text-text-primary text-sm placeholder:text-text-muted
-           outline-none focus:border-brand focus:ring-2 focus:ring-brand/20
-           transition-all duration-150;
+    @apply w-full bg-surface-elevated border border-transparent rounded-xl px-4 py-3
+           text-text-primary text-base placeholder:text-text-muted
+           outline-none focus:border-brand transition-colors duration-150;
   }
 
-  /* ── Badges ─────────────────────────────────────────────────────────────── */
+  /* ── Chips ──────────────────────────────────────────────────────────── */
   .badge {
     @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold;
   }
@@ -184,85 +188,41 @@
   .badge-brand   { @apply badge bg-brand/15 text-brand-light; }
   .badge-muted   { @apply badge bg-surface-elevated text-text-secondary; }
 
-  /* ── Section label ───────────────────────────────────────────────────────── */
-  .section-label {
-    @apply text-xs font-bold uppercase tracking-widest text-text-muted;
-  }
+  /* ── Section heading (sentence case, not a shouted micro-label) ─────── */
+  .section-label { @apply text-sm font-semibold text-text-secondary; }
 
-  /* ── Metric card ─────────────────────────────────────────────────────────── */
-  .metric-card {
-    @apply card-sm flex flex-col gap-1;
-  }
-  .metric-value {
-    @apply text-2xl font-bold text-text-primary;
-  }
-  .metric-label {
-    @apply text-xs text-text-muted font-medium;
-  }
+  /* ── Stat ───────────────────────────────────────────────────────────── */
+  .metric-card  { @apply tile flex flex-col gap-0.5; }
+  .metric-value { @apply text-xl font-bold text-text-primary tabular-nums; }
+  .metric-label { @apply text-xs text-text-muted; }
 
-  /* ── Progress bar ────────────────────────────────────────────────────────── */
-  .progress-track {
-    @apply h-2 bg-surface-elevated rounded-full overflow-hidden;
-  }
-  .progress-fill {
-    @apply h-full rounded-full transition-all duration-700 ease-out;
-  }
+  /* ── Progress bar ───────────────────────────────────────────────────── */
+  .progress-track { @apply h-2 bg-surface-elevated rounded-full overflow-hidden; }
+  .progress-fill  { @apply h-full rounded-full transition-all duration-700 ease-out; }
 
-  /* ── Pill selector ───────────────────────────────────────────────────────── */
+  /* ── Pill selector ──────────────────────────────────────────────────── */
   .pill-option {
-    @apply flex-1 py-2 text-sm font-semibold rounded-xl border transition-all duration-150 cursor-pointer text-center;
-    border-color: rgb(var(--c-surface-border));
-    color: rgb(var(--c-text-muted));
+    @apply flex-1 py-2 px-3 text-sm font-medium rounded-full bg-surface-elevated text-text-secondary
+           transition-colors duration-150 cursor-pointer text-center;
   }
-  .pill-option:hover {
-    border-color: rgb(var(--c-brand) / 0.5);
-    color: rgb(var(--c-text-secondary));
-  }
-  .pill-option-active {
-    @apply pill-option;
-    border-color: transparent;
-    background: linear-gradient(135deg, rgb(var(--c-brand)), rgb(var(--c-brand-dark)));
-    color: white;
-    box-shadow: 0 4px 12px rgb(var(--c-brand) / 0.35);
-  }
-  .pill-option-inactive {
-    @apply pill-option;
-  }
+  .pill-option-active   { @apply pill-option bg-brand text-onbrand font-semibold; }
+  .pill-option-inactive { @apply pill-option; }
 
-  /* ── Row item ────────────────────────────────────────────────────────────── */
-  .list-row {
-    @apply flex items-center justify-between py-3.5 border-b border-surface-border/40 last:border-0 gap-3;
-  }
+  /* ── Row item ───────────────────────────────────────────────────────── */
+  .list-row { @apply flex items-center justify-between py-3.5 gap-3; }
 
-  /* ── Page header ─────────────────────────────────────────────────────────── */
+  /* Room for the fixed tab bar (56px) plus the phone's home indicator */
+  .pb-nav { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+
+  /* ── Page header ────────────────────────────────────────────────────── */
   .page-header {
-    @apply sticky top-0 z-40 px-5 pt-5 pb-4 flex items-center gap-3;
-    background: rgb(var(--c-surface-base) / 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
-
-  /* ── Tag chip ────────────────────────────────────────────────────────────── */
-  .tag {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
-    background: rgb(var(--c-brand) / 0.15);
-    color: rgb(var(--c-brand-light));
+    @apply sticky top-0 z-40 px-4 pt-5 pb-3 flex items-center gap-3 bg-surface-base;
   }
 
   /* ── Animations ──────────────────────────────────────────────────────────── */
   @keyframes fadeIn    { 0%   { opacity: 0 }                              100% { opacity: 1 } }
   @keyframes slideUp   { 0%   { transform: translateY(14px); opacity: 0 } 100% { transform: translateY(0); opacity: 1 } }
-  @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 8px rgb(var(--c-brand) / 0.4) } 50% { box-shadow: 0 0 20px rgb(var(--c-brand) / 0.8) } }
-  @keyframes breatheRing { 0%, 100% { opacity: 0.7; transform: scale(1) } 50% { opacity: 1; transform: scale(1.04) } }
-  @keyframes floatOrb    { 0%, 100% { transform: translateY(0px) translateX(0px) } 33% { transform: translateY(-18px) translateX(8px) } 66% { transform: translateY(10px) translateX(-6px) } }
-  @keyframes heroPulse   { 0%, 100% { box-shadow: 0 6px 30px rgba(124,58,237,0.55) } 50% { box-shadow: 0 8px 40px rgba(124,58,237,0.75), 0 0 60px rgba(124,58,237,0.2) } }
-  /* Badge tier animations */
-  @keyframes badgePulse         { 0%, 100% { box-shadow: 0 0 8px #38bdf840 }  50% { box-shadow: 0 0 18px #38bdf870, 0 0 32px #38bdf830 } }
-  @keyframes badgeEpicShimmer   { 0%, 100% { box-shadow: 0 0 10px #a78bfa45 } 50% { box-shadow: 0 0 22px #a78bfa75, 0 0 44px #a78bfa30 } }
-  @keyframes badgeLegendaryAura { 0%, 100% { box-shadow: 0 0 18px #f59e0b60, 0 0 36px #f59e0b30; transform: scale(1) }   50% { box-shadow: 0 0 30px #f59e0b80, 0 0 60px #f59e0b45; transform: scale(1.025) } }
   @keyframes badgeUnlockScale   { 0% { opacity: 0; transform: scale(0.45) translateY(24px) } 100% { opacity: 1; transform: scale(1) translateY(0) } }
-  @keyframes auraBreath         { 0%, 100% { opacity: 0.7; transform: scale(1) } 50% { opacity: 1; transform: scale(1.06) } }
   .animate-fade-in    { animation: fadeIn 0.3s ease-out; }
   .animate-slide-up   { animation: slideUp 0.3s ease-out; }
-  .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 }

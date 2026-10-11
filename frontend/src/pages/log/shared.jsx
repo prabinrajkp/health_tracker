@@ -37,17 +37,21 @@ export function useAutoSave(saveFn) {
   return { save, flush }
 }
 
+// The section's own score: a number with its bar, no box around it.
 export function SectionScore({ label, pts, max, color }) {
   const pct = max > 0 ? Math.min((pts / max) * 100, 100) : 0
   return (
-    <div className="flex items-center gap-3 px-1">
-      <span className="text-xs font-semibold text-text-secondary shrink-0">{label}</span>
-      <div className="flex-1 h-2 rounded-full overflow-hidden bg-surface-elevated">
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <p className="flex items-baseline gap-1.5">
+          <span className="t-number">{Math.round(pts * 10) / 10}</span>
+          <span className="text-sm text-text-muted">/ {max} pts</span>
+        </p>
+        <span className="text-sm text-text-secondary">{label}</span>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden bg-surface-elevated">
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
       </div>
-      <span className="text-xs font-semibold tabular-nums shrink-0" style={{ color }}>
-        {Math.round(pts * 10) / 10}<span className="text-text-muted font-normal"> / {max} pts</span>
-      </span>
     </div>
   )
 }
@@ -55,18 +59,15 @@ export function SectionScore({ label, pts, max, color }) {
 export function Toggle({ checked, onChange, label, sublabel, points }) {
   return (
     <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}
-      className="w-full flex items-center gap-3 text-left">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-text-primary">{label}</p>
-        {sublabel && <p className="text-xs text-text-muted mt-0.5">{sublabel}</p>}
-      </div>
+      className="w-full flex items-center gap-3 text-left py-3.5">
+      <span className="flex-1 min-w-0">
+        <span className="block text-base font-medium text-text-primary">{label}</span>
+        {sublabel && <span className="block text-sm text-text-secondary">{sublabel}</span>}
+      </span>
       {points != null && (
-        <span className={`text-xs font-semibold tabular-nums px-2 py-0.5 rounded-full shrink-0 ${checked ? 'bg-success/15 text-success' : 'bg-surface-elevated text-text-muted'}`}>
-          +{points} pts
-        </span>
+        <span className={`text-sm tabular-nums shrink-0 ${checked ? 'text-success font-semibold' : 'text-text-muted'}`}>+{points} pts</span>
       )}
-      <span className="relative w-11 h-6 rounded-full shrink-0 transition-colors"
-        style={{ background: checked ? '#22c55e' : 'rgb(var(--c-surface-border))' }}>
+      <span className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${checked ? 'bg-brand' : 'bg-surface-border'}`}>
         <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: checked ? 22 : 2 }} />
       </span>
     </button>
@@ -79,7 +80,7 @@ export function PillSelector({ options, value, onChange, formatter }) {
       {options.map(o => (
         <button key={o} onClick={() => onChange(o)}
           className={value === o ? 'pill-option-active' : 'pill-option'}
-          style={{ flex: '0 0 auto', minWidth: 52 }}>
+          style={{ flex: '0 0 auto', minWidth: 56 }}>
           {formatter ? formatter(o) : o}
         </button>
       ))}
@@ -90,10 +91,10 @@ export function PillSelector({ options, value, onChange, formatter }) {
 export function NoteField({ value, onChange, placeholder }) {
   const [open, setOpen] = useState(false)
   if (!open && !value) return (
-    <button onClick={() => setOpen(true)} className="text-xs font-semibold text-text-muted px-1 py-1">+ Add note</button>
+    <button onClick={() => setOpen(true)} className="text-sm font-semibold text-brand-light py-2">Add a note</button>
   )
   return (
-    <div className="card">
+    <div>
       <label className="section-label block mb-2">Note</label>
       <textarea className="input resize-none" rows={2} placeholder={placeholder}
         value={value || ''} onChange={e => onChange(e.target.value)} />

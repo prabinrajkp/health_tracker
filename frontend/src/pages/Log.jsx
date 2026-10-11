@@ -7,15 +7,14 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import useStore from '../store/useStore'
 import { scheduleSmartNotifications } from '../services/notificationEngine'
 import { scheduleTrendNotifications } from '../services/trendNotificationEngine'
-import { CATEGORY_COLORS } from '../services/scoreMeta'
 import FoodSection from './log/FoodSection'
 import MoveSection from './log/MoveSection'
 import SleepSection from './log/SleepSection'
 
 const TABS = [
-  { id: 'food',  label: 'Food',  Icon: Utensils,   color: CATEGORY_COLORS.diet },
-  { id: 'move',  label: 'Move',  Icon: Footprints, color: CATEGORY_COLORS.workout },
-  { id: 'sleep', label: 'Sleep', Icon: Moon,       color: CATEGORY_COLORS.sleep },
+  { id: 'food',  label: 'Food',  Icon: Utensils },
+  { id: 'move',  label: 'Move',  Icon: Footprints },
+  { id: 'sleep', label: 'Sleep', Icon: Moon },
 ]
 // Names the tabs had before the rename — old links still land in the right place.
 const TAB_ALIAS = { diet: 'food', workout: 'move' }
@@ -56,30 +55,30 @@ export default function Log() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-base pb-28 animate-fade-in">
+    <div className="min-h-screen bg-surface-base pb-nav animate-fade-in">
       <div className="page-header">
         <div className="flex-1">
-          <h1 className="text-base font-semibold text-text-primary">Log</h1>
-          <p className="text-xs text-text-muted">{format(new Date(), 'EEEE, MMM d')}</p>
+          <h1 className="t-title">Log</h1>
+          <p className="text-sm text-text-muted">{format(new Date(), 'EEEE, MMM d')}</p>
         </div>
-        <span className={`flex items-center gap-1 text-xs font-semibold text-success transition-opacity duration-300 ${saved ? 'opacity-100' : 'opacity-0'}`}
+        <span className={`flex items-center gap-1 text-sm font-semibold text-success transition-opacity duration-300 ${saved ? 'opacity-100' : 'opacity-0'}`}
           aria-live="polite">
-          <Check size={13} strokeWidth={3} />Saved
+          <Check size={15} strokeWidth={3} />Saved
         </span>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 pb-4 space-y-4"
+      <div className="max-w-lg mx-auto px-4 pb-6 space-y-6"
         onTouchStart={e => { touchStartX.current = e.touches[0].clientX }}
         onTouchEnd={handleTouchEnd}>
 
-        <div className="grid grid-cols-3 gap-1 bg-surface-elevated rounded-2xl p-1">
-          {TABS.map(({ id, label, Icon, color }) => {
+        <div className="flex gap-1 bg-surface-elevated rounded-full p-1">
+          {TABS.map(({ id, label, Icon }) => {
             const active = tab === id
             return (
               <button key={id} onClick={() => setTab(id)}
-                className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${active ? 'bg-surface-card shadow-sm' : ''}`}
-                style={{ color: active ? color : 'rgb(var(--c-text-muted))' }}>
-                <Icon size={15} strokeWidth={active ? 2.5 : 1.75} />
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-sm transition-colors duration-200 ${
+                  active ? 'bg-surface-card text-text-primary font-semibold' : 'text-text-secondary font-medium'}`}>
+                <Icon size={16} strokeWidth={active ? 2.25 : 1.75} />
                 {label}
               </button>
             )

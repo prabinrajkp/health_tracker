@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
-import { Play, Square, CheckCircle2, ChevronDown } from 'lucide-react'
+import { Play, Square, ChevronDown, Moon } from 'lucide-react'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { getSleep, saveSleep, getConfig } from '../../api/client'
 import { calcSleepScore } from '../../services/scoring'
@@ -13,20 +13,13 @@ import { useAutoSave, SectionScore, NoteField, todayStr, TEXT_SAVE_MS } from './
 const UsageStats = registerPlugin('UsageStats')
 
 const TIMER_KEY = 'hq-sleep-timer-start'
-const VIOLET    = CATEGORY_COLORS.sleep
 const SLEEP_PRESETS = [
   { label: 'Perfect', sleep: '23:00', wake: '06:30' },
   { label: 'Target',  sleep: '23:30', wake: '07:00' },
   { label: 'Late',    sleep: '00:00', wake: '07:30' },
   { label: 'Weekend', sleep: '00:30', wake: '08:00' },
 ]
-const QUALITY_META = {
-  1: { label: 'Terrible',  color: '#ef4444' },
-  2: { label: 'Poor',      color: '#f97316' },
-  3: { label: 'Okay',      color: '#f59e0b' },
-  4: { label: 'Good',      color: '#38bdf8' },
-  5: { label: 'Excellent', color: '#22c55e' },
-}
+const QUALITY_LABELS = { 1: 'Terrible', 2: 'Poor', 3: 'Okay', 4: 'Good', 5: 'Excellent' }
 const EMPTY_SLEEP = { sleep_time: '', wake_time: '', sleep_hours: 0, quality: 3, notes: '', screen_time_hours: 0 }
 
 function calcHours(st, wt) {
@@ -49,14 +42,14 @@ function TimeHint({ time, type }) {
   if (!time) return null
   const [h, m] = time.split(':').map(Number)
   if (type === 'sleep') {
-    if (h <= 5)             return <p className="text-xs text-danger mt-1.5">After midnight — penalty applies</p>
-    if (h === 23 && m > 30) return <p className="text-xs text-warning mt-1.5">Just past 11:30 — partial points</p>
-    if (h >= 22)            return <p className="text-xs text-success mt-1.5">On time — full points</p>
+    if (h <= 5)             return <p className="text-sm text-danger mt-1.5">After midnight — penalty applies</p>
+    if (h === 23 && m > 30) return <p className="text-sm text-warning mt-1.5">Just past 11:30 — partial points</p>
+    if (h >= 22)            return <p className="text-sm text-success mt-1.5">On time — full points</p>
     return null
   }
-  if (h < 8 || (h === 8 && m === 0)) return <p className="text-xs text-success mt-1.5">Wake time on target</p>
-  if (h === 8 || (h === 9 && m === 0)) return <p className="text-xs text-warning mt-1.5">A little late — partial points</p>
-  return <p className="text-xs text-danger mt-1.5">Late wake-up — no points</p>
+  if (h < 8 || (h === 8 && m === 0)) return <p className="text-sm text-success mt-1.5">Wake time on target</p>
+  if (h === 8 || (h === 9 && m === 0)) return <p className="text-sm text-warning mt-1.5">A little late — partial points</p>
+  return <p className="text-sm text-danger mt-1.5">Late wake-up — no points</p>
 }
 
 export default function SleepSection({ afterSave }) {
@@ -134,7 +127,7 @@ export default function SleepSection({ afterSave }) {
     setTimerStart(null)
 
     if (sleepHours < 1) {
-      toast(`Timer cleared — only ${fmtHours(sleepHours)} elapsed, nothing saved.`, { icon: '⏱' })
+      toast(`Timer cleared — only ${fmtHours(sleepHours)} elapsed, nothing saved.`)
       return
     }
     const next = {
@@ -159,85 +152,85 @@ export default function SleepSection({ afterSave }) {
   const screenH  = form.screen_time_hours || 0
   const effHours = Math.max(0, (form.sleep_hours || 0) - screenH)
   const dispH    = effHours > 0 ? effHours : (form.sleep_hours || 0)
-  const hoursColor = dispH >= 7 ? '#22c55e' : dispH >= 6 ? '#f59e0b' : dispH > 0 ? '#ef4444' : 'rgb(var(--c-text-muted))'
   const lateSleep  = form.sleep_time && Number(form.sleep_time.split(':')[0]) <= 5
   const pts = Math.max(0, calcSleepScore(form, weights) + (lateSleep ? (weights.penalties?.sleep_after_midnight || 0) : 0))
 
   return (
-    <div className="space-y-3">
-      <SectionScore label="Sleep" pts={pts} max={max.sleep} color={VIOLET} />
+    <div className="space-y-6">
+      <SectionScore label="Sleep" pts={pts} max={max.sleep} color={CATEGORY_COLORS.sleep} />
 
       {/* ── Status ── */}
       {timerStart ? (
-        <div className="card text-center py-6">
-          <p className="text-4xl font-bold tabular-nums mb-1" style={{ color: VIOLET }}>{formatElapsed(elapsed)}</p>
-          <p className="text-xs text-text-muted">Fell asleep at {hhmm(timerStart)} · {format(new Date(timerStart), 'MMM d')}</p>
-          <p className="text-xs text-text-muted mt-1">Screen time is deducted automatically when you wake up</p>
-        </div>
+        <section className="text-center py-6">
+          <p className="t-display">{formatElapsed(elapsed)}</p>
+          <p className="text-sm text-text-secondary mt-3">Asleep since {hhmm(timerStart)} · {format(new Date(timerStart), 'MMM d')}</p>
+          <p className="text-sm text-text-muted mt-1">Screen time is deducted automatically when you wake up</p>
+        </section>
       ) : logged ? (
-        <div className="card space-y-3">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={15} className="text-success" />
-            <span className="text-sm font-semibold text-text-primary">Last night</span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold tabular-nums" style={{ color: hoursColor }}>{fmtHours(form.sleep_hours)}</span>
-            <span className="text-sm text-text-muted">total sleep</span>
+        <section className="card space-y-4">
+          <div>
+            <p className="t-display">{fmtHours(form.sleep_hours)}</p>
+            <p className="text-sm text-text-secondary mt-1.5">
+              last night ·{' '}
+              <span className={dispH >= 7 ? 'text-success font-semibold' : 'text-warning font-semibold'}>
+                {dispH >= 7 ? '7-hour target met' : `${fmtHours(Math.max(0, 7 - dispH))} short of 7 hours`}
+              </span>
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {[
-              ['🌙 Fell asleep', form.sleep_time],
-              ['🌅 Woke up', form.wake_time || '—'],
-              ...(screenH > 0 ? [['📱 Screen time', fmtHours(screenH)], ['😴 Effective', fmtHours(effHours)]] : []),
+              ['Fell asleep', form.sleep_time],
+              ['Woke up', form.wake_time || '—'],
+              ...(screenH > 0 ? [['Screen time', fmtHours(screenH)], ['Effective sleep', fmtHours(effHours)]] : []),
             ].map(([label, value]) => (
-              <div key={label} className="bg-surface-elevated rounded-xl px-3 py-2">
-                <p className="text-xs text-text-muted">{label}</p>
-                <p className="text-sm font-semibold text-text-primary">{value}</p>
+              <div key={label} className="tile">
+                <p className="t-caption">{label}</p>
+                <p className="text-base font-semibold text-text-primary tabular-nums">{value}</p>
               </div>
             ))}
           </div>
-          <p className="text-xs font-medium" style={{ color: dispH >= 7 ? '#22c55e' : '#f97316' }}>
-            {dispH >= 7 ? '7+ hour target met' : `${fmtHours(Math.max(0, 7 - dispH))} short of the 7-hour target`}
-          </p>
-        </div>
+        </section>
       ) : (
-        <div className="card text-center py-7">
-          <p className="text-4xl mb-2">😴</p>
-          <p className="text-sm font-semibold text-text-primary">No sleep logged for today</p>
-          <p className="text-xs text-text-muted mt-1">Start the timer at bedtime, or enter the times under Edit details</p>
-        </div>
+        <section className="text-center py-10">
+          <span className="w-14 h-14 rounded-full bg-surface-elevated inline-flex items-center justify-center mb-4">
+            <Moon size={24} className="text-text-secondary" />
+          </span>
+          <p className="t-heading">No sleep logged for today</p>
+          <p className="text-sm text-text-secondary mt-1 max-w-[17rem] mx-auto">
+            Start the timer when you go to bed and stop it when you wake. Or enter last night's times below.
+          </p>
+        </section>
       )}
 
       {/* ── One primary action ── */}
       {timerStart ? (
-        <button onClick={stopTimer} className="btn w-full text-white font-semibold text-sm py-4 rounded-2xl" style={{ background: '#22c55e' }}>
+        <button onClick={stopTimer} className="btn-primary w-full py-4">
           <Square size={16} /> Wake up — stop timer
         </button>
       ) : (
-        <button onClick={startTimer} className="btn w-full text-white font-semibold text-sm py-4 rounded-2xl" style={{ background: VIOLET }}>
+        <button onClick={startTimer} className={`${logged ? 'btn-ghost' : 'btn-primary'} w-full py-4`}>
           <Play size={16} /> {logged ? 'Start a new sleep timer' : 'Going to sleep — start timer'}
         </button>
       )}
 
       {/* ── Everything else ── */}
       {!timerStart && (
-        <div className="card">
-          <button onClick={() => setDetailsOpen(o => !o)} className="w-full flex items-center gap-2 text-left">
-            <span className="text-sm font-semibold text-text-primary flex-1">Edit details</span>
-            <span className="text-xs text-text-muted">Times, screen time, quality</span>
-            <ChevronDown size={15} className={`text-text-muted transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+        <section>
+          <button onClick={() => setDetailsOpen(o => !o)} className="w-full flex items-center gap-2 text-left h-11">
+            <span className="t-heading flex-1">{logged ? 'Edit details' : 'Enter times by hand'}</span>
+            <ChevronDown size={18} className={`text-text-muted transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {detailsOpen && (
-            <div className="space-y-5 mt-4 pt-4 border-t border-surface-border">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-6 pt-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="section-label block mb-1.5">Fell asleep</label>
+                  <label className="section-label block mb-2">Fell asleep</label>
                   <input type="time" className="input" value={form.sleep_time || ''} onChange={e => update({ sleep_time: e.target.value })} />
                   <TimeHint time={form.sleep_time} type="sleep" />
                 </div>
                 <div>
-                  <label className="section-label block mb-1.5">Woke up</label>
+                  <label className="section-label block mb-2">Woke up</label>
                   <input type="time" className="input" value={form.wake_time || ''} onChange={e => update({ wake_time: e.target.value })} />
                   <TimeHint time={form.wake_time} type="wake" />
                 </div>
@@ -245,52 +238,42 @@ export default function SleepSection({ afterSave }) {
 
               <div>
                 <p className="section-label mb-2">Quick fill</p>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="flex gap-2">
                   {SLEEP_PRESETS.map(p => (
                     <button key={p.label} onClick={() => update({ sleep_time: p.sleep, wake_time: p.wake })}
-                      className="btn-outline text-xs py-2 px-0">{p.label}</button>
+                      className="pill-option">{p.label}</button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <p className="section-label mb-1">Screen time during the night</p>
-                <p className="text-xs text-text-muted mb-2">Deducted from your sleep to give effective hours</p>
+                <p className="section-label">Screen time during the night</p>
+                <p className="text-sm text-text-secondary mb-3">Taken off your sleep to give effective hours</p>
                 <div className="flex items-center gap-3">
                   <button onClick={() => update({ screen_time_hours: Math.max(0, screenH - 0.5) })} aria-label="Less screen time"
-                    className="w-10 h-10 rounded-xl border border-surface-border bg-surface-elevated text-text-secondary flex items-center justify-center text-lg">−</button>
-                  <p className="flex-1 text-center text-xl font-bold tabular-nums text-text-primary">{fmtHours(screenH)}</p>
+                    className="icon-btn text-xl">−</button>
+                  <p className="flex-1 text-center text-xl font-semibold tabular-nums text-text-primary">{fmtHours(screenH)}</p>
                   <button onClick={() => update({ screen_time_hours: Math.min(12, screenH + 0.5) })} aria-label="More screen time"
-                    className="w-10 h-10 rounded-xl border border-surface-border bg-surface-elevated text-text-secondary flex items-center justify-center text-lg">+</button>
+                    className="icon-btn text-xl">+</button>
                 </div>
               </div>
 
               <div>
-                <p className="section-label mb-2">Sleep quality{QUALITY_META[form.quality] ? ` · ${QUALITY_META[form.quality].label}` : ''}</p>
+                <p className="section-label mb-2">Sleep quality{QUALITY_LABELS[form.quality] ? ` · ${QUALITY_LABELS[form.quality]}` : ''}</p>
                 <div className="flex gap-2">
-                  {[1, 2, 3, 4, 5].map(q => {
-                    const meta = QUALITY_META[q], on = form.quality === q
-                    return (
-                      <button key={q} onClick={() => update({ quality: q })}
-                        className="flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all"
-                        style={{
-                          borderColor: on ? meta.color : 'rgb(var(--c-surface-border))',
-                          color: on ? meta.color : 'rgb(var(--c-text-muted))',
-                          background: on ? `${meta.color}15` : 'transparent',
-                        }}>
-                        {q}
-                      </button>
-                    )
-                  })}
+                  {[1, 2, 3, 4, 5].map(q => (
+                    <button key={q} onClick={() => update({ quality: q })}
+                      className={form.quality === q ? 'pill-option-active' : 'pill-option'}>{q}</button>
+                  ))}
                 </div>
               </div>
 
               {!(form.sleep_time && form.wake_time) && (
-                <p className="text-xs text-text-muted">Enter both times to save this night.</p>
+                <p className="text-sm text-text-secondary">Enter both times to save this night.</p>
               )}
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {logged && (

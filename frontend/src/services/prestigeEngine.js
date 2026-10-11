@@ -60,14 +60,6 @@ export async function computePrestige() {
   }
 }
 
-export function getAuraStyle(level = 1) {
-  if (level >= 20) return { color: '#f59e0b', shadow: '0 0 32px #f59e0b90, 0 0 64px #f59e0b40', label: 'Legendary Aura' }
-  if (level >= 15) return { color: '#a78bfa', shadow: '0 0 28px #a78bfa80, 0 0 56px #a78bfa35', label: 'Epic Aura' }
-  if (level >= 10) return { color: '#22c55e', shadow: '0 0 20px #22c55e70, 0 0 40px #22c55e30', label: 'Rare Aura' }
-  if (level >= 5)  return { color: '#38bdf8', shadow: '0 0 16px #38bdf860, 0 0 32px #38bdf825', label: 'Rising Aura' }
-  return { color: '#94a3b8', shadow: '0 0 10px #94a3b840', label: 'Starter Aura' }
-}
-
 export function computeActiveTitle(prestige, badgeStates = []) {
   const unlocked = badgeStates.filter(b => b.unlocked)
   const hasLegendary = unlocked.some(b => b.tier === 'legendary')

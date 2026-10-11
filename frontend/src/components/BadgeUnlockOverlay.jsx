@@ -19,59 +19,24 @@ export default function BadgeUnlockOverlay({ badge, remaining, onDismiss }) {
   }, [badge.id])
 
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center"
-      onClick={onDismiss}
-      style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)' }}
-    >
-      {/* ambient radial glow */}
-      <div className="absolute pointer-events-none rounded-full"
-        style={{
-          width: 360, height: 360,
-          background: `radial-gradient(circle, ${t.color}35 0%, transparent 70%)`,
-          animation: 'badgeLegendaryAura 2s ease-in-out infinite',
-        }} />
-
-      <div className="text-center px-8 relative"
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95" onClick={onDismiss}>
+      <div className="text-center px-8"
         style={{ animation: 'badgeUnlockScale 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
 
-        <p className="text-[11px] font-black uppercase tracking-[0.35em] text-white/40 mb-8">
-          Badge Unlocked
-        </p>
+        <p className="text-sm font-semibold text-white/70 mb-6">Badge earned</p>
 
-        {/* Badge icon */}
-        <div className="relative inline-flex mb-6">
-          <div className="w-32 h-32 rounded-[28px] flex items-center justify-center text-7xl"
-            style={{
-              background: `${t.color}22`,
-              border: `3px solid ${t.color}`,
-              boxShadow: `0 0 40px ${t.color}70, 0 0 80px ${t.color}35, inset 0 0 24px ${t.color}15`,
-              animation: t.anim,
-            }}>
-            {badge.emoji}
-          </div>
+        <div className="w-28 h-28 rounded-xl inline-flex items-center justify-center text-6xl mb-6"
+          style={{ background: t.bg, border: `2px solid ${t.color}` }}>
+          {badge.emoji}
         </div>
 
-        {/* Name */}
-        <h1 className="text-4xl font-black uppercase tracking-wider mb-3"
-          style={{ color: t.color, textShadow: `0 0 20px ${t.color}80` }}>
-          {badge.name}
-        </h1>
+        <h1 className="text-3xl font-bold text-white mb-2">{badge.name}</h1>
+        <p className="text-sm text-white/70 capitalize mb-5">{t.label} · {badge.category}</p>
 
-        {/* Tier chip */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5"
-          style={{ background: `${t.color}20`, border: `1px solid ${t.color}55` }}>
-          <span className="text-sm font-bold" style={{ color: t.color }}>{t.label} Badge</span>
-          <span className="text-xs text-white/40 capitalize">· {badge.category}</span>
-        </div>
+        <p className="text-base text-white/80 leading-relaxed max-w-[280px] mx-auto mb-8">{badge.lore}</p>
 
-        {/* Lore */}
-        <p className="text-sm text-white/55 italic leading-relaxed max-w-[260px] mx-auto mb-8">
-          "{badge.lore}"
-        </p>
-
-        <p className="text-xs text-white/25">
-          {remaining > 1 ? `${remaining - 1} more badge${remaining > 2 ? 's' : ''} to reveal` : 'Tap to continue'}
+        <p className="text-sm text-white/60">
+          {remaining > 1 ? `${remaining - 1} more badge${remaining > 2 ? 's' : ''} to see` : 'Tap to continue'}
         </p>
       </div>
     </div>

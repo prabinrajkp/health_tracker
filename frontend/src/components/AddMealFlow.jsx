@@ -38,22 +38,23 @@ function ptsLabel(item) {
 // one tap away always so a late breakfast or backdated entry is never blocked ──
 function CategoryPicker({ category, open, onToggle, onSelect }) {
   const meta = MEAL_META[category]
+  const MetaIcon = meta.Icon
   return (
     <div className="relative">
       <button onClick={onToggle}
-        className="flex items-center gap-1 rounded-full pl-2.5 pr-2 py-1 bg-surface-elevated border border-surface-border text-xs font-semibold text-text-primary active:scale-[0.97] transition-transform">
-        <span>{meta.icon}</span><span>{meta.label}</span><ChevronDown size={12} className="text-text-muted" />
+        className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-2 bg-surface-elevated text-base font-medium text-text-primary active:opacity-70">
+        <MetaIcon size={15} /><span>{meta.label}</span><ChevronDown size={14} className="text-text-muted" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-44 rounded-2xl border border-surface-border bg-surface-card shadow-lg py-1.5 z-10">
-          {MEAL_TYPES.map(mt => (
+        <div className="absolute right-0 top-full mt-2 w-44 rounded-xl border border-surface-border bg-surface-elevated py-1.5 z-10">
+          {MEAL_TYPES.map(mt => { const Icon = MEAL_META[mt].Icon; return (
             <button key={mt} onClick={() => onSelect(mt)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-elevated">
-              <span>{MEAL_META[mt].icon}</span>
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-base">
+              <Icon size={16} className="text-text-secondary" />
               <span className={mt === category ? 'font-semibold text-text-primary' : 'text-text-secondary'}>{MEAL_META[mt].label}</span>
-              {mt === category && <Check size={13} className="ml-auto text-brand" />}
+              {mt === category && <Check size={15} className="ml-auto text-brand-light" />}
             </button>
-          ))}
+          ) })}
         </div>
       )}
     </div>
@@ -106,19 +107,19 @@ function BrowseStep({
 
       {showRecs && yesterdayMeal && (
         <button onClick={() => onLogWholeMeal(yesterdayMeal)}
-          className="w-full text-left rounded-2xl px-4 py-3.5 border-2 border-brand/40 bg-brand/5 active:scale-[0.98] transition-transform">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-brand flex items-center gap-1"><RotateCcw size={11} /> Repeat Yesterday</p>
-          <p className="text-sm font-semibold text-text-primary mt-1">{mealDisplayName(yesterdayMeal, mealNames)}</p>
-          {yesterdayMeal.nutritionSummary?.kcal > 0 && <p className="text-xs text-text-muted mt-0.5">{yesterdayMeal.nutritionSummary.kcal} kcal</p>}
+          className="w-full text-left rounded-2xl px-4 py-3.5 bg-brand/10 active:opacity-70 transition-opacity">
+          <p className="text-xs font-semibold text-brand-light flex items-center gap-1"><RotateCcw size={12} /> Repeat yesterday</p>
+          <p className="text-base font-medium text-text-primary mt-1">{mealDisplayName(yesterdayMeal, mealNames)}</p>
+          {yesterdayMeal.nutritionSummary?.kcal > 0 && <p className="text-sm text-text-secondary mt-0.5">{yesterdayMeal.nutritionSummary.kcal} kcal</p>}
         </button>
       )}
 
       {showRecs && frequentMeals.length > 0 && (
         <div className="space-y-2">
-          <p className="section-label flex items-center gap-1.5"><Star size={11} /> Frequently Logged Meals</p>
+          <p className="section-label">Meals you log often</p>
           {frequentMeals.map(({ fingerprint, count, latest }) => (
             <div key={fingerprint} onClick={() => renaming !== fingerprint && onLogWholeMeal(latest)}
-              className="w-full text-left rounded-2xl px-4 py-3 border border-surface-border bg-surface-elevated active:scale-[0.98] transition-transform cursor-pointer">
+              className="w-full text-left rounded-xl px-4 py-3 bg-surface-elevated active:opacity-70 transition-opacity cursor-pointer">
               {renaming === fingerprint ? (
                 <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                   <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)}
@@ -128,7 +129,7 @@ function BrowseStep({
               ) : (
                 <>
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-text-primary">{mealDisplayName(latest, mealNames)}</p>
+                    <p className="text-base font-medium text-text-primary">{mealDisplayName(latest, mealNames)}</p>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
                       <button onClick={(e) => startRename(e, fingerprint)}><Pencil size={12} className="text-text-muted" /></button>
                       <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(fingerprint) }}>
@@ -136,7 +137,7 @@ function BrowseStep({
                       </button>
                     </div>
                   </div>
-                  <p className="text-xs text-text-muted mt-0.5">Logged {count}× · one tap to log again</p>
+                  <p className="text-sm text-text-secondary mt-0.5">Logged {count}× · one tap to log again</p>
                 </>
               )}
             </div>
@@ -146,12 +147,12 @@ function BrowseStep({
 
       {showRecs && recentMeals.length > 0 && (
         <div className="space-y-2">
-          <p className="section-label flex items-center gap-1.5"><Clock size={11} /> Recent Meals</p>
+          <p className="section-label">Recent meals</p>
           {recentMeals.map(m => (
             <button key={m.id} onClick={() => onLogWholeMeal(m)}
-              className="w-full text-left rounded-2xl px-4 py-3 border border-surface-border bg-surface-elevated active:scale-[0.98] transition-transform">
-              <p className="text-sm font-semibold text-text-primary">{mealDisplayName(m, mealNames)}</p>
-              <p className="text-xs text-text-muted mt-0.5">{format(new Date(m.timestamp), 'MMM d, h:mm a')}</p>
+              className="w-full text-left rounded-xl px-4 py-3 bg-surface-elevated active:opacity-70 transition-opacity">
+              <p className="text-base font-medium text-text-primary">{mealDisplayName(m, mealNames)}</p>
+              <p className="text-sm text-text-secondary mt-0.5">{format(new Date(m.timestamp), 'MMM d, h:mm a')}</p>
             </button>
           ))}
         </div>
@@ -159,7 +160,7 @@ function BrowseStep({
 
       {showRecs && recentFoods.length > 0 && (
         <div className="space-y-2">
-          <p className="section-label">Recent Foods</p>
+          <p className="section-label">Recent foods</p>
           <div className="flex flex-wrap gap-2">
             {recentFoods.map(item => (
               <button key={item.foodId || item.label} onClick={() => onPickFood({ id: item.foodId, label: item.label, category: item.category, points: item.pointsPerPortion, idealPortions: item.idealPortions, kcal: item.kcalPerPortion, protein: item.proteinPerPortion, carbs: item.carbsPerPortion, fat: item.fatPerPortion })}
@@ -175,16 +176,15 @@ function BrowseStep({
         <div className="space-y-2">
           {results.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-2xl mb-2">🍽️</p>
               <p className="text-sm text-text-muted">No matches in your food list</p>
             </div>
           )}
           {results.length > 0 && <p className="section-label">Closest matches</p>}
           {results.map(({ food }) => (
             <button key={food.id} onClick={() => onPickFood(food)}
-              className="w-full flex items-center gap-3 text-left rounded-2xl px-4 py-3 border border-surface-border bg-surface-elevated active:scale-[0.98] transition-transform">
+              className="w-full flex items-center gap-3 text-left rounded-xl px-4 py-3 bg-surface-elevated active:opacity-70 transition-opacity">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-text-primary">{food.label}</p>
+                <p className="text-base font-medium text-text-primary">{food.label}</p>
               </div>
               <span className={`text-sm font-bold shrink-0 tabular-nums ${food.category === 'good' ? 'text-success' : 'text-danger'}`}>
                 {food.category === 'good' ? '+' : '-'}{food.points} pts
@@ -195,8 +195,8 @@ function BrowseStep({
           {/* Always reachable — never gated behind match confidence, so a wrong
               or unwanted suggestion never traps the user with no way out. */}
           <div className="rounded-2xl border border-brand/30 bg-brand/5 p-4 text-center space-y-2">
-            <p className="text-sm font-semibold text-text-primary">{results.length ? "Not what you're looking for?" : "Not in your food list yet?"}</p>
-            <p className="text-xs text-text-muted">We'll find it for you</p>
+            <p className="text-base font-medium text-text-primary">{results.length ? "Not what you're looking for?" : "Not in your food list yet?"}</p>
+            <p className="text-sm text-text-secondary">We'll find it for you</p>
             {aiLoading ? (
               <div className="flex items-center justify-center gap-2 text-xs text-brand py-2">
                 <Loader2 size={14} className="animate-spin" /> Finding your food…
@@ -208,7 +208,7 @@ function BrowseStep({
               </button>
             )}
             {!aiConfigured && (
-              <p className="text-xs text-text-muted">Add a free API key in Settings → AI Assistant to enable this</p>
+              <p className="text-sm text-text-secondary">Add a free API key in Settings → AI assistant to enable this</p>
             )}
           </div>
         </div>
@@ -229,14 +229,14 @@ function BuilderStep({ category, items, onChangePortion, onRemove, onAddMore, su
           <div key={idx} className="flex items-center gap-2 rounded-xl px-3 py-2.5 bg-surface-elevated">
             <div className="flex-1 min-w-0">
               <p className="text-sm text-text-primary truncate">{item.label}</p>
-              <p className="text-xs text-text-muted">{ptsLabel(item)}</p>
+              <p className="text-sm text-text-secondary">{ptsLabel(item)}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <button onClick={() => onChangePortion(idx, -0.5)} className="w-7 h-7 rounded-lg border border-surface-border flex items-center justify-center"><Minus size={11} /></button>
+              <button onClick={() => onChangePortion(idx, -0.5)} className="w-9 h-9 rounded-full bg-surface-card flex items-center justify-center text-text-secondary"><Minus size={11} /></button>
               <span className="w-9 text-center text-xs font-semibold tabular-nums text-text-primary">×{item.portions}</span>
-              <button onClick={() => onChangePortion(idx, 0.5)} className="w-7 h-7 rounded-lg border border-surface-border flex items-center justify-center"><Plus size={11} /></button>
+              <button onClick={() => onChangePortion(idx, 0.5)} className="w-9 h-9 rounded-full bg-surface-card flex items-center justify-center text-text-secondary"><Plus size={11} /></button>
             </div>
-            <button onClick={() => onRemove(idx)} className="w-7 h-7 rounded-lg text-text-muted hover:text-danger flex items-center justify-center"><X size={13} /></button>
+            <button onClick={() => onRemove(idx)} className="w-7 h-7 rounded-lg text-text-muted flex items-center justify-center"><X size={13} /></button>
           </div>
         ))}
 
@@ -253,13 +253,13 @@ function BuilderStep({ category, items, onChangePortion, onRemove, onAddMore, su
           </div>
         )}
 
-        <button onClick={onAddMore} className="flex items-center gap-1.5 text-xs font-medium py-1" style={{ color: meta.color }}>
-          <Plus size={13} />Add another item
+        <button onClick={onAddMore} className="flex items-center gap-1.5 text-sm font-semibold text-brand-light py-2">
+          <Plus size={15} />Add another item
         </button>
       </div>
 
       <div className="px-4 pt-4 pb-6 border-t border-surface-border shrink-0">
-        <button onClick={onFinish} className="btn w-full font-semibold py-4 rounded-2xl text-white text-sm" style={{ background: meta.color }}>
+        <button onClick={onFinish} className="btn-primary w-full py-4">
           Finish Meal
         </button>
       </div>
@@ -270,8 +270,7 @@ function BuilderStep({ category, items, onChangePortion, onRemove, onAddMore, su
 function DuplicateStep({ onUpdate, onLogAnyway }) {
   return (
     <div className="px-4 py-6 space-y-4 text-center">
-      <p className="text-3xl">🤔</p>
-      <p className="text-sm font-semibold text-text-primary">It looks like you recently logged a similar meal.</p>
+      <p className="text-base font-medium text-text-primary">It looks like you recently logged a similar meal.</p>
       <div className="space-y-2 pt-2">
         <button onClick={onUpdate} className="btn-outline w-full py-3 rounded-xl text-sm justify-center">Update previous meal</button>
         <button onClick={onLogAnyway} className="btn-primary w-full py-3 rounded-xl text-sm justify-center">Log anyway</button>
@@ -289,7 +288,7 @@ function ConfirmationStep({ category, nutrition, healthScore, onDone }) {
       </div>
       <div>
         <p className="text-base font-bold text-text-primary">Meal Logged!</p>
-        <p className="text-xs text-text-muted">Great choice</p>
+        <p className="text-sm text-text-secondary">Great choice</p>
       </div>
       {nutrition && (
         <div className="rounded-2xl bg-surface-elevated p-4 space-y-2 text-left">
@@ -297,7 +296,7 @@ function ConfirmationStep({ category, nutrition, healthScore, onDone }) {
           <div className="flex justify-between text-sm"><span className="text-text-muted">Protein</span><span className="font-semibold text-text-primary">{nutrition.protein} g</span></div>
           <div className="flex justify-between text-sm"><span className="text-text-muted">Carbs</span><span className="font-semibold text-text-primary">{nutrition.carbs} g</span></div>
           <div className="flex justify-between text-sm"><span className="text-text-muted">Fat</span><span className="font-semibold text-text-primary">{nutrition.fat} g</span></div>
-          <div className="flex justify-between text-sm pt-2 border-t border-surface-border"><span className="text-text-muted">Health Score</span><span className="font-semibold" style={{ color: meta.color }}>{healthScore}/100</span></div>
+          <div className="flex justify-between text-sm pt-2 border-t border-surface-border"><span className="text-text-muted">Health Score</span><span className="font-semibold text-text-primary">{healthScore}/100</span></div>
         </div>
       )}
       <button onClick={onDone} className="btn-primary w-full py-3.5 rounded-2xl text-sm justify-center">Done</button>
@@ -478,7 +477,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
 
   const done = () => { onClose(); }
 
-  const title = step === 'confirmation' ? null : `${MEAL_META[category].icon} ${MEAL_META[category].label}`
+  const title = step === 'confirmation' ? null : `Add to ${MEAL_META[category].label.toLowerCase()}`
 
   return (
     <BottomSheet open={open} onClose={onClose} title={title} zIndex={80}

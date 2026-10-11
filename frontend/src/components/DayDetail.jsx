@@ -5,17 +5,11 @@ import { useEffect, useState } from 'react'
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
 } from 'recharts'
-import { BrainCircuit, Loader2, RefreshCw } from 'lucide-react'
+import { Sparkles, Loader2, RefreshCw } from 'lucide-react'
 import { getConfig } from '../api/client'
 import { generateHealthSummary } from '../services/llmApi'
-import { weightsFromConfig, categoryMaxes } from '../services/scoreMeta'
-
-export const MEAL_COLORS = {
-  breakfast: '#f59e0b',
-  lunch: '#22c55e',
-  dinner: '#a78bfa',
-  snacks: '#f97316',
-}
+import { weightsFromConfig, categoryMaxes, gradeFor, CATEGORY_COLORS } from '../services/scoreMeta'
+import { col } from '../services/theme'
 
 export function fmtHours(h) {
   if (!h || h <= 0) return '0 min'
@@ -59,8 +53,8 @@ function StatBarSimple({ label, value, max, color }) {
   const pct = Math.min((value / max) * 100, 100)
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-xs">
-        <span className="text-text-secondary font-medium">{label}</span>
+      <div className="flex justify-between text-sm">
+        <span className="text-text-secondary">{label}</span>
         <span className="font-semibold tabular-nums" style={{ color }}>
           {Math.round(value)}<span className="text-text-muted font-normal">/{max}</span>
         </span>
@@ -68,116 +62,6 @@ function StatBarSimple({ label, value, max, color }) {
       <div className="progress-track">
         <div className="progress-fill" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
-    </div>
-  )
-}
-
-function scoreColor(s) {
-  if (s >= 80) return '#34A853'
-  if (s >= 60) return '#FBBC04'
-  if (s >= 40) return '#F29900'
-  return '#EA4335'
-}
-
-function scoreGrade(s) {
-  if (s >= 90) return { letter: 'S', label: 'Outstanding' }
-  if (s >= 80) return { letter: 'A', label: 'Excellent' }
-  if (s >= 70) return { letter: 'B', label: 'Great' }
-  if (s >= 60) return { letter: 'C', label: 'Good' }
-  if (s >= 40) return { letter: 'D', label: 'Below target' }
-  return { letter: 'F', label: 'Needs work' }
-}
-
-export function DayComments({ diet, workout, sleep, yesterdayDiet }) {
-  const comments = []
-
-  const mt = diet?.meal_times || {}
-  if (mt.breakfast) comments.push({ icon: '🌅', label: 'Breakfast', text: `at ${mt.breakfast}` })
-  if (mt.lunch)     comments.push({ icon: '☀️', label: 'Lunch',     text: `at ${mt.lunch}` })
-  if (mt.dinner)    comments.push({ icon: '🌙', label: 'Dinner',    text: `at ${mt.dinner}` })
-
-  if (diet?.breakfast_notes) comments.push({ icon: '🌅', label: 'Breakfast notes', text: diet.breakfast_notes })
-  if (diet?.lunch_notes)     comments.push({ icon: '☀️', label: 'Lunch notes',     text: diet.lunch_notes })
-  if (diet?.notes)           comments.push({ icon: '🥗', label: 'Diet notes',      text: diet.notes })
-
-  if (workout) {
-    if (workout.exercise_type) comments.push({ icon: '⚡', label: 'Exercise', text: `${workout.exercise_type}${workout.exercise_duration_minutes ? ` — ${workout.exercise_duration_minutes} min` : ''}` })
-    if (workout.notes) comments.push({ icon: '💪', label: 'Workout notes', text: workout.notes })
-  }
-  if (sleep) {
-    if (sleep.sleep_time) comments.push({ icon: '🌙', label: 'Fell asleep', text: `at ${sleep.sleep_time}` })
-    if (sleep.wake_time)  comments.push({ icon: '🌅', label: 'Woke up',    text: `at ${sleep.wake_time}` })
-    if (sleep.sleep_hours > 0) {
-      const screenH   = sleep.screen_time_hours || 0
-      const effective = Math.max(0, sleep.sleep_hours - screenH)
-      comments.push({ icon: '😴', label: 'Total sleep', text: fmtHours(sleep.sleep_hours) })
-      if (screenH > 0) {
-        comments.push({ icon: '📱', label: 'Screen time', text: `${fmtHours(screenH)} deducted — effective: ${fmtHours(effective)}` })
-      }
-    }
-    const qualityLabel = { 1: 'Terrible', 2: 'Poor', 3: 'Okay', 4: 'Good', 5: 'Excellent' }
-    if (sleep.quality) comments.push({ icon: '⭐', label: 'Sleep quality', text: qualityLabel[sleep.quality] || '' })
-    if (sleep.notes) comments.push({ icon: '💤', label: 'Sleep notes', text: sleep.notes })
-  }
-
-  const fastH = calcFastingHours(diet, yesterdayDiet)
-  if (fastH !== null) comments.push({ icon: '⏱', label: 'Fasting window', text: fmtHours(fastH) })
-
-  const mealItems = diet?.meal_items || []
-  const mealGroups = ['breakfast', 'lunch', 'dinner', 'snacks']
-    .map(t => ({ type: t, items: mealItems.filter(i => i.mealType === t) }))
-    .filter(g => g.items.length > 0)
-
-  const hasContent = comments.length > 0 || mealGroups.length > 0
-
-  if (!hasContent) return (
-    <p className="text-xs text-text-muted text-center py-2">No notes recorded for this day</p>
-  )
-
-  return (
-    <div className="space-y-3">
-      {comments.map((c, i) => (
-        <div key={i} className="flex items-start gap-2 text-xs">
-          <span className="shrink-0 mt-0.5">{c.icon}</span>
-          <div>
-            <span className="text-text-muted font-medium">{c.label}: </span>
-            <span className="text-text-secondary">{c.text}</span>
-          </div>
-        </div>
-      ))}
-
-      {mealGroups.length > 0 && (
-        <div className="border-t border-surface-border pt-2 space-y-2">
-          <p className="text-xs font-semibold text-text-muted">Foods logged</p>
-          {mealGroups.map(({ type, items }) => (
-            <div key={type}>
-              <p className="text-xs font-semibold mb-1 capitalize" style={{ color: MEAL_COLORS[type] }}>
-                {type}
-              </p>
-              {items.map((item, i) => {
-                const pts    = Math.round(itemScore(item) * 10) / 10
-                const isOver = item.idealPortions && item.portions > item.idealPortions
-                return (
-                  <div key={i} className="flex items-center justify-between text-xs py-0.5">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <span className="text-text-secondary truncate">
-                        {item.label} ×{item.portions}
-                        {isOver && <span className="text-warning ml-1">(over ideal)</span>}
-                      </span>
-                      {item.time && (
-                        <span className="text-text-muted shrink-0">· {item.time}</span>
-                      )}
-                    </div>
-                    <span className={`shrink-0 ml-2 font-semibold ${pts >= 0 ? 'text-success' : 'text-danger'}`}>
-                      {pts >= 0 ? '+' : ''}{pts} pts
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -256,8 +140,7 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
   const hasAi = !!aiConfig
 
   const total    = Math.round(score.total_score ?? 0)
-  const color    = scoreColor(total)
-  const grade    = scoreGrade(total)
+  const grade    = gradeFor(total)
 
   const radarData = [
     { subject: 'Diet',    value: Math.round((score.diet_score    / max.diet) * 100), fullMark: 100 },
@@ -268,26 +151,25 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
   return (
     <div className="space-y-4">
       {/* Score header */}
-      <div className="flex items-center justify-between bg-surface-elevated rounded-xl px-4 py-3">
-        <div>
-          <p className="text-3xl font-bold tabular-nums" style={{ color }}>{total}</p>
-          <p className="text-xs text-text-muted">out of 100 pts</p>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold" style={{ color }}>{grade.letter}</div>
-          <div className="text-xs text-text-muted">{grade.label}</div>
-        </div>
+      <div className="flex items-end justify-between">
+        <p className="flex items-baseline gap-1.5">
+          <span className="t-number">{total}</span>
+          <span className="text-sm text-text-muted">/ 100</span>
+        </p>
+        <span className="px-3 py-1 rounded-full text-sm font-semibold" style={{ color: grade.color, background: grade.bg }}>
+          {grade.letter} · {grade.label}
+        </span>
       </div>
 
       {/* Radar */}
       <div>
-        <p className="section-label mb-2">Performance Radar</p>
+        <p className="section-label mb-2">Balance</p>
         <ResponsiveContainer width="100%" height={200}>
           <RadarChart data={radarData} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
             <PolarGrid stroke="rgb(var(--c-surface-border))" />
             <PolarAngleAxis
               dataKey="subject"
-              tick={{ fill: 'rgb(var(--c-text-secondary))', fontSize: 11, fontFamily: 'Inter' }}
+              tick={{ fill: 'rgb(var(--c-text-secondary))', fontSize: 11, fontFamily: 'Inter Variable' }}
             />
             <PolarRadiusAxis
               angle={90} domain={[0, 100]}
@@ -295,8 +177,8 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
               tickCount={4} axisLine={false}
             />
             <Radar
-              dataKey="value" stroke="#1A73E8" fill="#1A73E8" fillOpacity={0.25}
-              strokeWidth={2} dot={{ fill: '#1A73E8', r: 3 }}
+              dataKey="value" stroke={col('brand')} fill={col('brand')} fillOpacity={0.25}
+              strokeWidth={2} dot={{ fill: col('brand'), r: 3 }}
             />
           </RadarChart>
         </ResponsiveContainer>
@@ -304,13 +186,13 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
 
       {/* Score breakdown */}
       <div className="space-y-3">
-        <p className="section-label">Score Breakdown</p>
-        <StatBarSimple label="Diet"    value={score.diet_score    ?? 0} max={max.diet} color="#34A853" />
+        <p className="section-label">Score breakdown</p>
+        <StatBarSimple label="Diet"    value={score.diet_score    ?? 0} max={max.diet} color={CATEGORY_COLORS.diet} />
         {(score.fasting_score > 0) && (
-          <StatBarSimple label="Fasting" value={score.fasting_score} max={max.fasting} color="#f97316" />
+          <StatBarSimple label="Fasting" value={score.fasting_score} max={max.fasting} color={CATEGORY_COLORS.fasting} />
         )}
-        <StatBarSimple label="Workout" value={score.workout_score ?? 0} max={max.workout} color="#1A73E8" />
-        <StatBarSimple label="Sleep"   value={score.sleep_score   ?? 0} max={max.sleep} color="#a78bfa" />
+        <StatBarSimple label="Workout" value={score.workout_score ?? 0} max={max.workout} color={CATEGORY_COLORS.workout} />
+        <StatBarSimple label="Sleep"   value={score.sleep_score   ?? 0} max={max.sleep} color={CATEGORY_COLORS.sleep} />
         {(score.bonus_points ?? 0) > 0 && (
           <div className="flex items-center justify-between text-xs">
             <span className="text-text-muted">Bonus</span>
@@ -323,11 +205,11 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
-            <BrainCircuit size={12} className="text-text-muted" />
-            <p className="section-label">Health Summary</p>
+            <Sparkles size={12} className="text-text-muted" />
+            <p className="section-label">Health summary</p>
           </div>
           {hasAi && !summaryLoading && (summary || summaryError) && (
-            <button onClick={runSummary} className="flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary">
+            <button onClick={runSummary} className="flex items-center gap-1 text-xs text-text-muted">
               <RefreshCw size={11} />Regenerate
             </button>
           )}
@@ -353,9 +235,9 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
           )}
           {!summaryLoading && !summary && !summaryError && hasAi && (
             <button onClick={runSummary}
-              className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-brand border border-brand/30 rounded-xl hover:bg-brand/5 active:scale-[0.98] transition-all">
-              <BrainCircuit size={15} />
-              Generate Health Summary
+              className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-brand border border-brand/30 rounded-xl active:opacity-70 transition-all">
+              <Sparkles size={15} />
+              Generate health summary
             </button>
           )}
         </div>

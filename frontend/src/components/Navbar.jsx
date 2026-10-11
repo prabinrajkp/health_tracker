@@ -8,44 +8,21 @@ const links = [
   { to: '/profile',  icon: User,            label: 'Profile'  },
 ]
 
+// Standard bottom tab bar: full width, attached to the edge. Pages leave
+// room for it with the `pb-nav` padding below.
 export default function Navbar() {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-5 pt-1 pointer-events-none">
-      <div className="flex justify-around items-center h-[62px] max-w-sm mx-auto rounded-3xl border border-surface-border px-3 pointer-events-auto"
-        style={{
-          background: 'rgb(var(--c-surface-card) / 0.92)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          boxShadow: 'var(--shadow-nav)',
-        }}>
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-card border-t border-surface-border"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="flex max-w-lg mx-auto h-14">
         {links.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className="flex flex-col items-center gap-0.5 flex-1 py-1"
-          >
+          <NavLink key={to} to={to} end={to === '/'}
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center justify-center gap-1 ${isActive ? 'text-brand-light' : 'text-text-muted'}`}>
             {({ isActive }) => (
               <>
-                <div
-                  className="flex items-center justify-center w-10 h-9 rounded-2xl transition-all duration-200"
-                  style={isActive ? {
-                    background: 'linear-gradient(135deg, rgb(var(--c-brand)), rgb(var(--c-brand-dark)))',
-                    boxShadow: '0 4px 14px rgb(var(--c-brand) / 0.5)',
-                  } : {}}
-                >
-                  <Icon
-                    size={18}
-                    strokeWidth={isActive ? 2.2 : 1.6}
-                    style={{ color: isActive ? '#fff' : 'rgb(var(--c-text-muted))' }}
-                  />
-                </div>
-                <span
-                  className="text-[11px] font-semibold leading-none transition-colors duration-200"
-                  style={{ color: isActive ? 'rgb(var(--c-brand-light))' : 'rgb(var(--c-text-muted))' }}
-                >
-                  {label}
-                </span>
+                <Icon size={20} strokeWidth={isActive ? 2.25 : 1.75} />
+                <span className={`text-xs leading-none ${isActive ? 'font-semibold' : 'font-medium'}`}>{label}</span>
               </>
             )}
           </NavLink>

@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented here.
 
+## [v4.30] — 2026-10-11
+
+A visual redesign. What each screen does is unchanged; how it looks is new. See `docs/ui_critic.md`.
+
+### Added
+- **Theme follows your phone** — the app now starts in light or dark to match the phone's system setting. Light and Dark can still be chosen in Settings → Theme
+
+### Changed
+- **Calmer colours in both modes** — neutral grey surfaces replace the all-purple theme, with one indigo accent. Green means good, amber means caution and red means a cost, and nothing else uses them. Every piece of text now meets the 4.5:1 contrast minimum in dark and light
+- **Neutral numbers** — the score, step count and sleep duration are shown in plain text; the grade pill next to them carries the judgement, so a normal day no longer looks like a warning
+- **Three kinds of container** — instead of one bordered card for everything, there is a hero block, plain lists with dividers (meals, goals, settings rows) and small stat tiles. Nothing is nested inside the same kind
+- **Clearer type** — six text sizes with fixed jobs, sentence-case headings in place of small uppercase labels, and far less semibold
+- **Simpler shapes** — two corner radii, and no gradients, glows or blur
+- **One icon style** — line icons replace emoji used as icons. Emoji remain only as badge artwork
+- **Standard tab bar** — full width and attached to the bottom edge, so it is shorter and no longer floats over content
+- **Today uses the whole screen** — the log buttons sit at the bottom where the thumb is, and a last-7-days strip fills the middle
+- **Shorter badges page** — each category shows one row and opens on tap; the page is about a third of its old length
+- **Calendar** — each logged day shows its score as a coloured dot, with icons for the best day and exercise days
+
+### Fixed
+- **Font ships with the app** — Inter was loaded from the internet, so an offline phone silently showed a different font. It is now bundled
+- **Toasts and shared images follow the theme** — both were always dark slate, even in light mode
+- **Mixed palettes removed** — 116 hard-coded colours from two different colour families are replaced by theme tokens, so the same thing is the same colour on every screen
+- **Page title** — was still "Health Dashboard"
+
+---
+
 ## [v4.29] — 2026-10-09
 
 The app revamp: fewer things on every screen, one name for each number, and no Save button in logging. Scores, logs, badges and backups are untouched. See `docs/revamp_plan.md`.

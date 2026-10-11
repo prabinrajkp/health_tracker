@@ -1,16 +1,20 @@
 import { DEFAULT_WEIGHTS } from './db'
+import { col, CATEGORY_COLORS } from './theme'
 
 // One place for the things every screen needs to describe a score: the grade
 // ladder and the category maximums. Maximums come from the user's settings so
 // no screen prints a number the scoring engine doesn't agree with.
 
+// A grade carries the judgement on a score, so the number itself can stay
+// neutral. tone is a colour token: good, accent (fine), caution or cost.
 export function gradeFor(score) {
-  if (score >= 90) return { letter: 'S', label: 'Outstanding',  color: '#a78bfa' }
-  if (score >= 80) return { letter: 'A', label: 'Excellent',    color: '#22c55e' }
-  if (score >= 70) return { letter: 'B', label: 'Great',        color: '#38bdf8' }
-  if (score >= 60) return { letter: 'C', label: 'Good',         color: '#f59e0b' }
-  if (score >= 40) return { letter: 'D', label: 'Below target', color: '#f97316' }
-  return               { letter: 'F', label: 'Needs work',   color: '#ef4444' }
+  const g = (letter, label, tone) => ({ letter, label, tone, color: col(tone), bg: col(tone, 0.14) })
+  if (score >= 90) return g('S', 'Outstanding',  'success')
+  if (score >= 80) return g('A', 'Excellent',    'success')
+  if (score >= 70) return g('B', 'Great',        'brand')
+  if (score >= 60) return g('C', 'Good',         'brand')
+  if (score >= 40) return g('D', 'Below target', 'warning')
+  return             g('F', 'Needs work',   'danger')
 }
 
 // Accepts the config as either the rows getConfig() returns or a {key: value} map.
@@ -53,6 +57,4 @@ export function stepTargets(weights) {
   }
 }
 
-export const CATEGORY_COLORS = {
-  diet: '#22c55e', fasting: '#f97316', workout: '#38bdf8', sleep: '#a78bfa',
-}
+export { CATEGORY_COLORS }

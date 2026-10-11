@@ -13,18 +13,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         position="top-center"
         toastOptions={{
           style: {
-            background: '#1e293b',
-            color: '#f1f5f9',
-            border: '1px solid #334155',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            fontSize: '13px',
+            background: 'rgb(var(--c-surface-elevated))',
+            color: 'rgb(var(--c-text-primary))',
+            border: '1px solid rgb(var(--c-surface-border))',
+            fontFamily: "'Inter Variable', system-ui, sans-serif",
+            fontSize: '14px',
             borderRadius: '12px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
           },
-          success: { iconTheme: { primary: '#22c55e', secondary: '#1e293b' } },
+          success: { iconTheme: { primary: 'rgb(var(--c-success))', secondary: 'rgb(var(--c-surface-elevated))' } },
           error: {
-            iconTheme: { primary: '#ef4444', secondary: '#1e293b' },
-            style: { borderColor: '#ef444440' },
+            iconTheme: { primary: 'rgb(var(--c-danger))', secondary: 'rgb(var(--c-surface-elevated))' },
           },
         }}
       />

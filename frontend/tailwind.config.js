@@ -1,76 +1,60 @@
 /** @type {import('tailwindcss').Config} */
+const token = (name) => `rgb(var(--c-${name}) / <alpha-value>)`
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
+    // The whole type scale. Larger utility names are kept as aliases so there
+    // are only six sizes in the app: 12 caption · 14 secondary · 16 body ·
+    // 20 title · 28 number · 40 the one hero number on a screen.
+    fontSize: {
+      xs:   ['0.75rem',  { lineHeight: '1rem' }],
+      sm:   ['0.875rem', { lineHeight: '1.25rem' }],
+      base: ['1rem',     { lineHeight: '1.5rem' }],
+      lg:   ['1.25rem',  { lineHeight: '1.75rem' }],
+      xl:   ['1.25rem',  { lineHeight: '1.75rem' }],
+      '2xl': ['1.75rem', { lineHeight: '2.125rem' }],
+      '3xl': ['1.75rem', { lineHeight: '2.125rem' }],
+      '4xl': ['2.5rem',  { lineHeight: '2.75rem' }],
+      '5xl': ['2.5rem',  { lineHeight: '2.75rem' }],
+      '6xl': ['2.5rem',  { lineHeight: '2.75rem' }],
+    },
+    // Two radii: 12px for every container, input and button; full for chips,
+    // pills and toggles.
+    borderRadius: {
+      none: '0', sm: '0.75rem', DEFAULT: '0.75rem', md: '0.75rem', lg: '0.75rem',
+      xl: '0.75rem', '2xl': '0.75rem', '3xl': '0.75rem', full: '9999px',
+    },
     extend: {
       colors: {
         surface: {
-          base:     'rgb(var(--c-surface-base) / <alpha-value>)',
-          card:     'rgb(var(--c-surface-card) / <alpha-value>)',
-          elevated: 'rgb(var(--c-surface-elevated) / <alpha-value>)',
-          border:   'rgb(var(--c-surface-border) / <alpha-value>)',
-          muted:    'rgb(var(--c-surface-muted) / <alpha-value>)',
+          base: token('surface-base'), card: token('surface-card'), elevated: token('surface-elevated'),
+          border: token('surface-border'), muted: token('surface-muted'),
         },
-        brand: {
-          DEFAULT: 'rgb(var(--c-brand) / <alpha-value>)',
-          light:   'rgb(var(--c-brand-light) / <alpha-value>)',
-          dark:    'rgb(var(--c-brand-dark) / <alpha-value>)',
-          muted:   'rgb(var(--c-brand) / 0.13)',
-        },
-        success: {
-          DEFAULT: 'rgb(var(--c-success) / <alpha-value>)',
-          light:   'rgb(var(--c-success-light) / <alpha-value>)',
-          muted:   'rgb(var(--c-success) / 0.13)',
-        },
-        warning: {
-          DEFAULT: 'rgb(var(--c-warning) / <alpha-value>)',
-          light:   'rgb(var(--c-warning-light) / <alpha-value>)',
-          muted:   'rgb(var(--c-warning) / 0.13)',
-        },
-        danger: {
-          DEFAULT: 'rgb(var(--c-danger) / <alpha-value>)',
-          light:   'rgb(var(--c-danger-light) / <alpha-value>)',
-          muted:   'rgb(var(--c-danger) / 0.13)',
-        },
-        info: {
-          DEFAULT: 'rgb(var(--c-info) / <alpha-value>)',
-          light:   'rgb(var(--c-info-light) / <alpha-value>)',
-          muted:   'rgb(var(--c-info) / 0.13)',
+        brand:   { DEFAULT: token('brand'), light: token('brand-light'), dark: token('brand-dark') },
+        onbrand: token('on-brand'),
+        success: { DEFAULT: token('success'), light: token('success-light') },
+        warning: { DEFAULT: token('warning'), light: token('warning-light') },
+        danger:  { DEFAULT: token('danger'),  light: token('danger-light') },
+        info:    { DEFAULT: token('info'),    light: token('info-light') },
+        cat: {
+          diet: token('cat-diet'), fasting: token('cat-fasting'),
+          workout: token('cat-workout'), sleep: token('cat-sleep'),
         },
         text: {
-          primary:   'rgb(var(--c-text-primary) / <alpha-value>)',
-          secondary: 'rgb(var(--c-text-secondary) / <alpha-value>)',
-          muted:     'rgb(var(--c-text-muted) / <alpha-value>)',
+          primary: token('text-primary'), secondary: token('text-secondary'), muted: token('text-muted'),
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-      },
-      borderRadius: {
-        '2xl': '1rem',
-        '3xl': '1.5rem',
-        '4xl': '2rem',
-      },
-      boxShadow: {
-        card:           'var(--shadow-card)',
-        'card-hover':   'var(--shadow-card-hover)',
-        glow:           'var(--shadow-glow)',
-        nav:            'var(--shadow-nav)',
-        'glow-success': '0 4px 20px rgba(52,168,83,0.35)',
-        'glow-brand':   '0 4px 20px rgba(124,58,237,0.45)',
+        sans: ['Inter Variable', 'system-ui', 'sans-serif'],
       },
       animation: {
-        'fade-in':    'fadeIn 0.3s ease-out',
-        'slide-up':   'slideUp 0.3s ease-out',
-        'bar-fill':   'barFill 0.8s ease-out',
-        'count-up':   'fadeIn 0.6s ease-out',
-        'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+        'fade-in':  'fadeIn 0.3s ease-out',
+        'slide-up': 'slideUp 0.3s ease-out',
       },
       keyframes: {
-        fadeIn:    { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
-        slideUp:   { '0%': { transform: 'translateY(12px)', opacity: 0 }, '100%': { transform: 'translateY(0)', opacity: 1 } },
-        barFill:   { '0%': { width: '0%' }, '100%': { width: 'var(--bar-width)' } },
-        pulseGlow: { '0%, 100%': { boxShadow: '0 0 8px rgba(124,58,237,0.4)' }, '50%': { boxShadow: '0 0 22px rgba(124,58,237,0.8)' } },
+        fadeIn:  { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+        slideUp: { '0%': { transform: 'translateY(12px)', opacity: 0 }, '100%': { transform: 'translateY(0)', opacity: 1 } },
       },
     },
   },

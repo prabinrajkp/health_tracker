@@ -1,33 +1,6 @@
 import { format, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns'
 import { gradeFor } from './scoreMeta'
 
-const IDENTITIES = [
-  { key: 'momentum_elite',     label: 'Momentum Elite',     emoji: '👑', color: '#f59e0b',
-    grad: 'linear-gradient(135deg,#92400e,#78350f,#451a03)',
-    check: d => d.avgScore >= 75 && d.trend !== null && d.trend >= 5 },
-  { key: 'peak_performer',     label: 'Peak Performer',     emoji: '✨', color: '#a78bfa',
-    grad: 'linear-gradient(135deg,#4c1d95,#5b21b6,#2e1065)',
-    check: d => d.avgScore >= 78 && d.daysLogged >= 18 },
-  { key: 'rising_force',       label: 'Rising Force',       emoji: '🚀', color: '#38bdf8',
-    grad: 'linear-gradient(135deg,#0c4a6e,#075985,#0369a1)',
-    check: d => d.trend !== null && d.trend >= 8 },
-  { key: 'discipline_builder', label: 'Discipline Builder', emoji: '🎯', color: '#22c55e',
-    grad: 'linear-gradient(135deg,#14532d,#15803d,#166534)',
-    check: d => d.daysLogged >= 22 },
-  { key: 'recovery_master',    label: 'Recovery Master',    emoji: '🌙', color: '#818cf8',
-    grad: 'linear-gradient(135deg,#312e81,#4338ca,#1e1b4b)',
-    check: d => d.avgSleep >= 7.5 },
-  { key: 'comeback_mode',      label: 'Comeback Mode',      emoji: '🦅', color: '#fb923c',
-    grad: 'linear-gradient(135deg,#7c2d12,#9a3412,#431407)',
-    check: d => d.trend !== null && d.trend <= -8 },
-  { key: 'energy_stabilizer',  label: 'Energy Stabilizer',  emoji: '⚡', color: '#22d3ee',
-    grad: 'linear-gradient(135deg,#164e63,#0e7490,#083344)',
-    check: d => d.avgScore >= 58 && d.avgScore < 76 },
-  { key: 'foundation_builder', label: 'Foundation Builder', emoji: '📋', color: '#94a3b8',
-    grad: 'linear-gradient(135deg,#1e293b,#334155,#0f172a)',
-    check: () => true },
-]
-
 function buildNarrative({ avgScore, trend, daysLogged, monthName, avgSleep, workoutSessions, junkFoodDays, lateDinnerDays }) {
   const parts = []
   if (trend !== null && trend > 5)
@@ -133,8 +106,6 @@ export function computeMonthlyInsights({ scores, prevScores, dietLogs, workoutLo
   const breakfastDays = dates.filter(d => (dietMap[d]?.meal_items || []).some(i => i.mealType === 'breakfast')).length
 
   const grade    = gradeFor(avgScore)
-  const identityData = { avgScore, trend, avgSleep, workoutSessions, daysLogged }
-  const identity = IDENTITIES.find(id => id.check(identityData)) || IDENTITIES[IDENTITIES.length - 1]
   const narrative = buildNarrative({ avgScore, trend, daysLogged, monthName, avgSleep, workoutSessions, junkFoodDays, lateDinnerDays })
   const storyArc  = buildStoryArc({ pastScores, workoutMap, sleepMap, year, month })
   const trajectory = buildTrajectory({ pastScores, prevAvgScore })
@@ -165,7 +136,7 @@ export function computeMonthlyInsights({ scores, prevScores, dietLogs, workoutLo
 
   return {
     avgScore, grade, trend, prevAvgScore, daysLogged,
-    identity, narrative, storyArc, trajectory,
+    narrative, storyArc, trajectory,
     positives: positives.slice(0, 3), risks: risks.slice(0, 3), nearMiss: nearMiss.slice(0, 2),
     stats: { avgSteps, avgSleep, workoutSessions, lateDinnerDays, junkFoodDays, breakfastDays },
     workoutMap, sleepMap, bestDate,
