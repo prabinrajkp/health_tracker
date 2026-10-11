@@ -107,7 +107,7 @@ Four tabs, each with one job. Everything saves as you change it — there is no 
 ### Settings
 - **You:** name, body & goal (height, age, activity, target weight, rate of loss), water goal and glass size, theme
 - **Scoring:** one screen for category maximums, workout points and step targets, sleep, fasting and penalties, with Reset to defaults
-- **Food & AI:** custom foods with points, ideal portions and nutrition; optional AI key
+- **Food & AI:** custom foods with points, ideal portions and nutrition; optional AI key. Foods not logged for more than 7 days move to an archive to keep the list short. They can be restored, still appear in Add Meal search, and come back by themselves when logged
 - **Reminders & data:** Quiet / Standard / Coach notification level, reminder times, Excel export, JSON backup and restore, tutorial
 
 ---
@@ -140,14 +140,14 @@ The script will:
 
 **Option A — USB (fastest):**
 ```bash
-adb install health-quest-v4.32-debug.apk
+adb install health-quest-v4.33-debug.apk
 ```
 
 **Option B — WiFi (same network):**
 ```bash
 python3 -m http.server 9999 --directory .
 ```
-Then open `http://<your-pc-ip>:9999/health-quest-v4.32-debug.apk` on your phone and tap to install.
+Then open `http://<your-pc-ip>:9999/health-quest-v4.33-debug.apk` on your phone and tap to install.
 
 > Settings → Apps → Install unknown apps → enable for your browser
 

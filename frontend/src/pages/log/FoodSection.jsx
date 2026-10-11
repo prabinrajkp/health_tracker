@@ -34,7 +34,7 @@ function MealGroup({ mealType, diet, onItems, onTime, onAdd, latePenalty }) {
 
   return (
     <section>
-      <div className="flex items-center gap-2.5 h-11">
+      <div className="section-bar">
         <Icon size={18} className="text-text-secondary shrink-0" />
         <h2 className="t-heading flex-1">
           {label}
@@ -52,11 +52,11 @@ function MealGroup({ mealType, diet, onItems, onTime, onAdd, latePenalty }) {
       </div>
 
       {late && (
-        <p className="text-sm text-danger pb-2">Dinner after 9 PM costs {latePenalty} pts. Correct the time if you ate earlier.</p>
+        <p className="text-sm text-danger px-3 pt-2">Dinner after 9 PM costs {latePenalty} pts. Correct the time if you ate earlier.</p>
       )}
 
       {items.length > 0 && (
-        <div className="group-list border-t border-surface-border">
+        <div className="group-list px-3 pt-1">
           {items.map(({ item, idx }) => {
             const pts    = Math.round(itemScore(item) * 10) / 10
             const isOver = item.idealPortions && item.portions > item.idealPortions
@@ -102,7 +102,7 @@ function FastingLine({ diet, yesterdayDiet, weights }) {
   const targetH = fc.target_hours ?? 16, maxPts = fc.max_points ?? 10
 
   return (
-    <section className="flex items-center gap-2.5 h-11">
+    <section className="section-bar">
       <Timer size={18} className="text-text-secondary shrink-0" />
       <h2 className="t-heading">Fasting</h2>
       {!win.lastDinner ? (
@@ -151,7 +151,7 @@ function DrinksBlock({ water, onSettings, sectionRef }) {
 
   return (
     <section ref={sectionRef} className="space-y-3 scroll-mt-20">
-      <div className="flex items-center gap-2.5 h-11">
+      <div className="section-bar">
         <GlassWater size={18} className="text-text-secondary shrink-0" />
         <h2 className="t-heading flex-1">Drinks</h2>
         <p className="text-sm tabular-nums text-text-primary">
@@ -368,7 +368,7 @@ export default function FoodSection({ afterSave }) {
     <div className="space-y-6">
       <SectionScore label="Diet" pts={dietPts} max={max.diet} color={CATEGORY_COLORS.diet} />
 
-      <div className="space-y-2">
+      <div className="space-y-4">
         {[...MAIN_MEALS, ...extras].map(mt => (
           <MealGroup key={mt} mealType={mt} diet={diet} onItems={setItems} onTime={setTime} onAdd={openAdd} latePenalty={latePenalty} />
         ))}

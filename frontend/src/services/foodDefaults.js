@@ -81,7 +81,7 @@ export async function seedFoodDefaults(db) {
 
     const toAdd = DEFAULT_FOODS
       .filter(f => !existingLabels.has(f.label.toLowerCase()))
-      .map(f => ({ ...f, id: Math.random().toString(36).slice(2, 10) }))
+      .map(f => ({ ...f, id: Math.random().toString(36).slice(2, 10), createdAt: new Date().toISOString() }))
 
     if (toAdd.length > 0) {
       await db.tracker_config.put({

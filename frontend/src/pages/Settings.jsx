@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Save, RotateCcw, Minus, Plus, Trash2, Sparkles, Sun, Moon, Download, Upload, Bell,
   ChevronRight, User, Scale, Sliders, Utensils, Dumbbell, Clock, Timer,
-  AlertTriangle, ArrowLeft, Smartphone, GlassWater, BarChart2, Footprints, BookOpen, RefreshCw, Pencil, Check, X,
+  AlertTriangle, ArrowLeft, Smartphone, GlassWater, Archive, ArchiveRestore, BarChart2, Footprints, BookOpen, RefreshCw, Pencil, Check, X,
   Copy, ChevronDown, Lock, HeartPulse, Flame, KeyRound, Eye, EyeOff,
 } from 'lucide-react'
 import { TutorialSlides } from './Onboarding'
@@ -14,6 +14,8 @@ import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { getConfig, saveConfig, getScoreForDate, getLatestWeight } from '../api/client'
 import { estimateWaterGoal, resolveWaterGoal, formatLitres, waterTotals, goalMet, GLASS_SIZES, GOAL_LIMITS, DEFAULT_GLASS_ML, DEFAULT_GOAL_ML } from '../services/hydration'
+import { splitFoods, ARCHIVE_AFTER_DAYS } from '../services/foodArchive'
+import { getFoodUsage, reviveFood } from '../services/localStore'
 import { scheduleFixedReminders, NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/reminders'
 import { version as APP_VERSION } from '../../package.json'
 import useStore from '../store/useStore'
@@ -112,6 +114,8 @@ export default function Settings() {
   const [bulkAiLoading, setBulkAiLoading] = useState(false)
   const [bulkAiProgress, setBulkAiProgress] = useState(null)
   const [customOptions, setCustomOptions] = useState([])
+  const [foodUsage, setFoodUsage]         = useState(null)   // last-logged dates; null while loading
+  const [archiveOpen, setArchiveOpen]     = useState(false)
   const [newOption, setNewOption]     = useState({ ...EMPTY_OPTION })
   const [bedTime, setBedTime]         = useState('23:00')
   const [wakeTime, setWakeTime]       = useState('06:30')
@@ -165,6 +169,7 @@ export default function Settings() {
       if (map.water_goal_custom_ml)  setWaterGoalCustom(map.water_goal_custom_ml)
       if (map.water_glass_ml)        setWaterGlassMl(map.water_glass_ml)
     })
+    getFoodUsage().then(setFoodUsage).catch(() => setFoodUsage({ byId: {}, byLabel: {} }))
     // Weight has one source: the weight log
     getLatestWeight().then(w => { if (w) setCurrentWeight(String(w.weight_kg)) }).catch(() => {})
   }, [])
@@ -172,7 +177,7 @@ export default function Settings() {
   const setW = (cat, key, val) => setWeights(w => ({ ...w, [cat]: { ...w[cat], [key]: Number(val) } }))
   const addCustomOption = () => {
     if (!newOption.label.trim()) return toast.error('Enter a meal name')
-    setCustomOptions(prev => [...prev, { ...newOption, label: newOption.label.trim(), id: Math.random().toString(36).slice(2, 10) }])
+    setCustomOptions(prev => [...prev, { ...newOption, label: newOption.label.trim(), id: Math.random().toString(36).slice(2, 10), createdAt: new Date().toISOString() }])
     setNewOption({ ...EMPTY_OPTION })
   }
   const removeCustomOption = (id) => setCustomOptions(prev => prev.filter(o => o.id !== id))
@@ -272,7 +277,28 @@ export default function Settings() {
   // ── Bulk nutrition fill ───────────────────────────────────────────────────
   // Nothing ships with nutrition data, so filling ~50 foods one at a time is
   // unworkable — this does the whole backlog in a single prompt/paste round trip.
-  const missingNutrition = customOptions.filter(o => !hasNutrition(o))
+  // Foods not logged, added or restored for more than a week are archived: out
+  // of this list and out of the nutrition count, but never deleted. Until the
+  // usage dates have loaded, everything is shown as active.
+  const foodSplit = foodUsage
+    ? splitFoods(customOptions, foodUsage, format(new Date(), 'yyyy-MM-dd'))
+    : { active: customOptions.map(food => ({ food, status: {} })), archived: [] }
+  const activeFoods   = foodSplit.active.map(a => a.food)
+  const archivedFoods = foodSplit.archived
+
+  // Restoring is saved straight away — it must not depend on pressing Save.
+  const restoreFood = async (id) => {
+    const at = new Date().toISOString()
+    setCustomOptions(prev => prev.map(o => (o.id === id ? { ...o, revivedAt: at } : o)))
+    try {
+      await reviveFood(id, at)
+      toast.success('Back in your food list')
+    } catch {
+      toast.error('Could not restore that food')
+    }
+  }
+
+  const missingNutrition = activeFoods.filter(o => !hasNutrition(o))
 
   const generateBulkPrompt = () => {
     const list = missingNutrition.map(o => `- ${o.label}`).join('\n')
@@ -533,7 +559,7 @@ export default function Settings() {
       { key: 'scoring', Icon: Sliders, label: 'Scoring rules', desc: `Advanced · Diet ${weights.diet_max} · Workout ${weights.workout_max} · Sleep ${weights.sleep_max}` },
     ] },
     { title: 'Food & AI', items: [
-      { key: 'foods',       Icon: Sparkles, label: 'Custom foods', desc: `${customOptions.length} food${customOptions.length !== 1 ? 's' : ''}` },
+      { key: 'foods',       Icon: Sparkles, label: 'Custom foods', desc: `${activeFoods.length} food${activeFoods.length !== 1 ? 's' : ''}${archivedFoods.length ? ` · ${archivedFoods.length} archived` : ''}` },
       { key: 'ai_provider', Icon: KeyRound, label: 'AI assistant', desc: hasLlmKey(aiConfig) ? 'Connected' : 'Not set up' },
     ] },
     { title: 'Reminders & data', items: [
@@ -1002,18 +1028,18 @@ export default function Settings() {
             </div>
 
             {/* Nutrition coverage + bulk fill */}
-            {customOptions.length > 0 && (
+            {activeFoods.length > 0 && (
               <div className="card space-y-3">
                 <div className="flex items-center gap-2">
                   <Flame size={18} className="text-text-secondary" />
                   <p className="t-heading flex-1">Nutrition data</p>
                   <span className="text-xs font-semibold tabular-nums text-text-primary">
-                    {customOptions.length - missingNutrition.length} / {customOptions.length}
+                    {activeFoods.length - missingNutrition.length} / {activeFoods.length}
                   </span>
                 </div>
                 <div className="progress-track">
                   <div className="progress-fill bg-brand" style={{
-                    width: `${((customOptions.length - missingNutrition.length) / customOptions.length) * 100}%`,
+                    width: `${((activeFoods.length - missingNutrition.length) / activeFoods.length) * 100}%`,
                   }} />
                 </div>
                 <p className="text-xs text-text-muted">
@@ -1032,12 +1058,18 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Existing options */}
-            {customOptions.length === 0 ? (
-              <p className="text-xs text-text-muted text-center py-4">No foods added yet</p>
+            {/* Active foods */}
+            <div className="flex items-baseline justify-between pt-2">
+              <h2 className="t-heading">Your foods</h2>
+              <span className="text-sm text-text-muted">{activeFoods.length}</span>
+            </div>
+            {activeFoods.length === 0 ? (
+              <p className="text-sm text-text-secondary py-2">
+                {customOptions.length === 0 ? 'No foods added yet.' : 'Nothing logged in the last week. Your foods are in the archive below.'}
+              </p>
             ) : (
               <div className="card space-y-0 divide-y divide-surface-border">
-                {customOptions.map(opt => {
+                {activeFoods.map(opt => {
                   const isEditing = editingId === opt.id
                   return (
                     <div key={opt.id} className="py-3 first:pt-0 last:pb-0 space-y-2">
@@ -1117,6 +1149,41 @@ export default function Settings() {
                   )
                 })}
               </div>
+            )}
+
+            {/* Archive — foods idle for more than a week. Restore brings one back. */}
+            {archivedFoods.length > 0 && (
+              <section className="pt-2">
+                <button onClick={() => setArchiveOpen(o => !o)} className="w-full flex items-center gap-2.5 h-11 text-left" aria-expanded={archiveOpen}>
+                  <Archive size={18} className="text-text-secondary shrink-0" />
+                  <h2 className="t-heading flex-1">Archive</h2>
+                  <span className="text-sm text-text-muted">{archivedFoods.length}</span>
+                  <ChevronDown size={18} className={`text-text-muted transition-transform ${archiveOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <p className="text-sm text-text-secondary">
+                  Foods you have not logged for more than {ARCHIVE_AFTER_DAYS} days move here to keep the list short.
+                  Nothing is deleted: they still appear when you search in Add Meal, and logging one brings it back.
+                </p>
+                {archiveOpen && (
+                  <div className="group-list mt-2">
+                    {archivedFoods.map(({ food, status }) => (
+                      <div key={food.id} className="flex items-center gap-3 py-2.5">
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${food.category === 'good' ? 'bg-success' : 'bg-danger'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-base text-text-primary truncate">{food.label}</p>
+                          <p className="text-sm text-text-secondary">
+                            {status.lastUsed ? `Last logged ${format(new Date(status.lastUsed + 'T00:00:00'), 'd MMM yyyy')}` : 'Never logged'}
+                          </p>
+                        </div>
+                        <button onClick={() => restoreFood(food.id)} aria-label={`Restore ${food.label}`}
+                          className="flex items-center gap-1.5 text-sm font-semibold text-brand-light py-2 pl-2 shrink-0 active:opacity-70">
+                          <ArchiveRestore size={16} />Restore
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
             )}
 
           </div>

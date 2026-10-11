@@ -150,6 +150,12 @@
   .card-sm { @apply card; }
   .group-list > * + * { border-top: 1px solid rgb(var(--c-surface-border)); }
   .tile { @apply bg-surface-elevated rounded-xl px-3 py-2.5; }
+  /* A section's title in its own padded bar, so stacked sections (the meals on
+     the Food log) read as separate blocks instead of one long list. */
+  .section-bar {
+    @apply flex items-center gap-2.5 h-12 px-3 rounded-xl bg-surface-card;
+    border: 1px solid var(--card-border);
+  }
 
   /* ── Type roles ─────────────────────────────────────────────────────── */
   .t-display { @apply text-4xl font-bold tabular-nums leading-none text-text-primary; }

@@ -8,8 +8,9 @@ import { getDiet, saveDiet, getConfig } from '../api/client'
 import {
   getFoods, saveFood, getFrequentMeals, getRecentMeals, getRecentFoods,
   getFavoriteFingerprints, toggleFavoriteMeal, suggestNextFoodsFor, getLearnedPortion,
-  saveMeal, forceLogMeal, updateMeal, getYesterdayMeal, getMealNames, setMealName,
+  saveMeal, forceLogMeal, updateMeal, getYesterdayMeal, getMealNames, setMealName, getFoodUsage,
 } from '../services/localStore'
+import { foodStatus } from '../services/foodArchive'
 import { searchFoods } from '../services/foodMatcher'
 import { hasLlmKey, analyzeFoodWithAI } from '../services/llmApi'
 
@@ -180,11 +181,12 @@ function BrowseStep({
             </div>
           )}
           {results.length > 0 && <p className="section-label">Closest matches</p>}
-          {results.map(({ food }) => (
+          {results.map(({ food, archived }) => (
             <button key={food.id} onClick={() => onPickFood(food)}
               className="w-full flex items-center gap-3 text-left rounded-xl px-4 py-3 bg-surface-elevated active:opacity-70 transition-opacity">
               <div className="flex-1 min-w-0">
                 <p className="text-base font-medium text-text-primary">{food.label}</p>
+                {archived && <p className="text-sm text-text-secondary">From your archive</p>}
               </div>
               <span className={`text-sm font-bold shrink-0 tabular-nums ${food.category === 'good' ? 'text-success' : 'text-danger'}`}>
                 {food.category === 'good' ? '+' : '-'}{food.points} pts
@@ -310,6 +312,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
   const [category, setCategory] = useState(presetCategory || defaultCategoryForTime())
   const [catMenuOpen, setCatMenuOpen] = useState(false)
   const [foods, setFoods] = useState([])
+  const [foodUsage, setFoodUsage] = useState(null)
   const [aiConfig, setAiConfig] = useState({})
   const [query, setQuery] = useState('')
   const [items, setItems] = useState([])
@@ -351,6 +354,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
     setCatMenuOpen(false)
     setQuery(''); setItems([]); setDuplicateInfo(null); setConfirmation(null)
     getFoods().then(setFoods)
+    getFoodUsage().then(setFoodUsage).catch(() => {})
     getConfig().then(rows => {
       const map = {}
       rows.forEach(r => { map[r.key] = r.value })
@@ -375,7 +379,18 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
     suggestNextFoodsFor(items).then(setSuggestions)
   }, [step, items])
 
-  const results = useMemo(() => (query ? searchFoods(query, foods) : []), [query, foods])
+  // Archived foods (not logged for over a week) are still found here — otherwise
+  // a search would miss them and the AI lookup would create duplicates. They
+  // rank just below active foods unless the name is a near-exact match, and
+  // logging one makes it active again.
+  const results = useMemo(() => {
+    if (!query) return []
+    const day = today()
+    const rank = (r) => r.confidence - (r.archived && r.confidence < 0.9 ? 0.1 : 0)
+    return searchFoods(query, foods)
+      .map(r => ({ ...r, archived: foodUsage ? foodStatus(r.food, foodUsage, day).archived : false }))
+      .sort((a, b) => rank(b) - rank(a))
+  }, [query, foods, foodUsage])
   const aiConfigured = hasLlmKey(aiConfig)
 
   const changeCategory = (cat) => { setCategory(cat); setCatMenuOpen(false); setQuery('') }

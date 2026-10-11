@@ -8,6 +8,7 @@ import db, { seedDefaults, DEFAULT_WEIGHTS } from './db'
 import { computeScore } from './scoring'
 import { dieteticsFromConfig } from './dietetics'
 import { resolveWaterGoal } from './hydration'
+import { buildFoodUsage } from './foodArchive'
 import { computeFingerprint } from './mealFingerprint'
 import {
   computeHealthScore, computeNutritionSummary, rankFrequentMeals, rankRecentMeals,
@@ -339,11 +340,28 @@ export async function getFoods() {
 export async function saveFood(food) {
   const current = await getCustomMealOptions()
   const id = food.id || Math.random().toString(36).slice(2, 10)
-  const withId = { ...food, id }
   const idx = current.findIndex(f => f.id === id)
+  // A new food is stamped so it gets a full week in the list before it can be archived
+  const withId = { ...food, id, ...(idx === -1 && !food.createdAt ? { createdAt: new Date().toISOString() } : {}) }
   const updated = idx === -1 ? [...current, withId] : current.map((f, i) => (i === idx ? withId : f))
   await saveConfig({ key: 'custom_meal_options', value: JSON.stringify(updated) })
   return withId
+}
+
+// When each food was last logged — what decides active vs archived (see foodArchive.js).
+export async function getFoodUsage() {
+  return buildFoodUsage(await db.diet_logs.toArray())
+}
+
+// Brings an archived food back into the list for another full window.
+export async function reviveFood(id, at = new Date().toISOString()) {
+  const current = await getCustomMealOptions()
+  if (!current.some(f => f.id === id)) return false
+  await saveConfig({
+    key: 'custom_meal_options',
+    value: JSON.stringify(current.map(f => (f.id === id ? { ...f, revivedAt: at } : f))),
+  })
+  return true
 }
 
 // ── Meals (immutable historical records — the new source of truth for

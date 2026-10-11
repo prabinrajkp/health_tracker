@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## [v4.33] — 2026-10-11
+
+### Added
+- **Food archive** — foods that have not been logged, added or restored for more than 7 days move out of Settings → Custom foods into an Archive section underneath, which keeps the list short. A food you eat on the same day every week stays. Nothing is deleted
+- **Restore** — each archived food shows when it was last logged and has a Restore button that brings it back for another 7 days. Restoring is saved immediately, without pressing Save
+- **Archived foods in search** — Add Meal search still finds archived foods, marked "From your archive" and ranked below active ones. Logging one brings it back to the list automatically
+
+### Changed
+- **Meal titles on the Food log** — Breakfast, Lunch, Dinner and Snacks, the Fasting row and the Drinks heading each sit in their own padded bar with more space between meals, so the meals read as separate blocks instead of one long list
+- **Nutrition count covers active foods** — the nutrition data count and the "Fill all with AI" button in Custom foods now ignore archived foods
+- **Custom foods row in Settings** — shows how many foods are active and how many are archived
+
+---
+
 ## [v4.32] — 2026-10-11
 
 Drinks tracking, following `docs/water_intake_logic.md`.
