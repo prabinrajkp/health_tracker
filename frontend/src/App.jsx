@@ -10,7 +10,7 @@ import Profile from './pages/Profile'
 import Badges from './pages/Badges'
 import Weight from './pages/Weight'
 import Onboarding from './pages/Onboarding'
-import { migrateHistoricalScores, migrateSleepDates, migrateSleepDatesV8 } from './services/localStore'
+import { migrateHistoricalScores, migrateSleepDates, migrateSleepDatesV8, seedDrinkTags } from './services/localStore'
 import db from './services/db'
 import { scheduleSmartNotifications } from './services/notificationEngine'
 import { scheduleTrendNotifications } from './services/trendNotificationEngine'
@@ -36,13 +36,15 @@ export default function App() {
     migrateSleepDatesV8().catch(console.error)   // undo v7 mis-convention; runs first
     migrateSleepDates().catch(console.error)
     migrateHistoricalScores().catch(console.error)
-    seedFoodDefaults(db).catch(console.error)
+    // Foods are seeded first, then tagged as drinks where the rules recognise them.
+    // The first screen waits for this, so today's drinks total is right from the first render.
+    const foodsReady = seedFoodDefaults(db).then(() => seedDrinkTags()).catch(console.error)
 
     // Sync steps on open, then every 30 minutes
     syncStepsBackground().catch(() => {})
     const stepSyncTimer = setInterval(() => syncStepsBackground().catch(() => {}), STEP_SYNC_INTERVAL_MS)
 
-    db.tracker_config.get('onboarding_complete')
+    foodsReady.then(() => db.tracker_config.get('onboarding_complete'))
       .then(async cfg => {
         if (cfg?.value === 'true') {
           setOnboardingDone(true)

@@ -78,5 +78,6 @@ export const deleteWeightEntry = (date) => local.deleteWeightEntry(date)
 // Water is local-only too, and never touches the score.
 export const getWaterGoal     = ()            => local.getWaterGoal()
 export const getWaterDay      = (date)        => local.getWaterDay(date)
+export const stampTodayDrinkItems = ()        => local.stampTodayDrinkItems()
 export const addWaterEntry    = (date, entry) => local.addWaterEntry(date, entry)
 export const removeWaterEntry = (date, id)    => local.removeWaterEntry(date, id)

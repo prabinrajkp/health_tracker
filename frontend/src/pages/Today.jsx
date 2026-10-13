@@ -13,6 +13,7 @@ import { getDiet, getWorkout, getSleep, getWeightEntry } from '../api/client'
 import { useWater } from '../hooks/useWater'
 import { formatLitres } from '../services/hydration'
 import WaterGlass from '../components/WaterGlass'
+import DrinksSheet from '../components/DrinksSheet'
 import { computeNextAction } from '../services/nextAction'
 import { scheduleSmartNotifications } from '../services/notificationEngine'
 import { scheduleTrendNotifications } from '../services/trendNotificationEngine'
@@ -51,8 +52,9 @@ function LogButton({ Icon, label, status, done, onClick }) {
   )
 }
 
-// Drinks: a glass that fills, and one tap to add a glass. Everything else
-// (other drink types, bigger amounts, removing an entry) is under Log → Food.
+// Drinks: a glass that fills, and one tap to add a glass. Tapping the card
+// opens the Drinks sheet for everything else (bigger amounts, other drinks,
+// removing an entry). Drinks logged in meals are already in the total.
 function WaterCard({ water, onOpen }) {
   const { totals, targetMl, glassMl, entries, add, undoLast } = water
   const hasGoal = targetMl > 0
@@ -62,15 +64,17 @@ function WaterCard({ water, onOpen }) {
   return (
     <section className="card flex items-center gap-3">
       <button onClick={onOpen} className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-70 transition-opacity"
-        aria-label="Open drinks in Log">
+        aria-label="Open drinks">
         <WaterGlass fraction={hasGoal ? totals.totalMl / targetMl : 0} />
         <span className="min-w-0">
           <span className="block text-xs font-semibold text-text-secondary">Drinks</span>
           <span className="block text-base font-semibold text-text-primary tabular-nums">
-            {formatLitres(totals.totalMl)}{hasGoal && <span className="font-normal text-text-muted"> of {formatLitres(targetMl)}</span>}
+            {hasGoal ? formatLitres(totals.totalMl).replace(' L', '') : formatLitres(totals.totalMl)}
+            {hasGoal && <span className="font-normal text-text-muted"> of {formatLitres(targetMl)}</span>}
           </span>
           <span className={`block text-sm ${reached ? 'text-success font-semibold' : 'text-text-secondary'}`}>
-            {reached ? 'Goal reached' : totals.totalMl === 0 ? 'Nothing logged yet' : `${glasses} glass${glasses === 1 ? '' : 'es'}`}
+            {reached ? 'Goal reached' : totals.totalMl === 0 ? 'Nothing logged yet'
+              : totals.mealMl > 0 ? `${formatLitres(totals.mealMl)} from meals` : `${glasses} glass${glasses === 1 ? '' : 'es'}`}
           </span>
         </span>
       </button>
@@ -124,6 +128,7 @@ export default function Today() {
   const [addMealOpen, setAddMealOpen]   = useState(false)
   const [timerStart, setTimerStart]     = useState(getSleepTimerStart)
   const [stopping, setStopping]         = useState(false)
+  const [drinksOpen, setDrinksOpen]     = useState(false)
 
   const loadLogs = async () => {
     const [diet, workout, sleep, yesterdayDiet, weight] = await Promise.all([
@@ -174,6 +179,7 @@ export default function Today() {
   const handleMealLogged = async () => {
     await refreshAll()
     await loadLogs()
+    await water.reload()   // a drink logged in the meal counts toward drinks
   }
 
   const handleStopTimer = async () => {
@@ -283,7 +289,7 @@ export default function Today() {
         </section>
 
         {/* ── 3. Drinks — the most frequent log of the day, one tap away ────── */}
-        <WaterCard water={water} onOpen={() => navigate('/log?tab=food&focus=drinks')} />
+        <WaterCard water={water} onOpen={() => setDrinksOpen(true)} />
 
         {/* ── 4. Sleep timer — one button, so it is never forgotten ────────── */}
         <SleepTimerButton startedAt={timerStart} busy={stopping}
@@ -313,6 +319,8 @@ export default function Today() {
           )}
         </div>
       </BottomSheet>
+
+      <DrinksSheet open={drinksOpen} onClose={() => setDrinksOpen(false)} water={water} />
 
       <AddMealFlow open={addMealOpen} presetCategory={mealCategory}
         onClose={() => setAddMealOpen(false)} onLogged={handleMealLogged} />

@@ -7,7 +7,8 @@ import { format, subDays, addDays, parseISO } from 'date-fns'
 import db, { seedDefaults, DEFAULT_WEIGHTS } from './db'
 import { computeScore } from './scoring'
 import { dieteticsFromConfig } from './dietetics'
-import { resolveWaterGoal } from './hydration'
+import { resolveWaterGoal, mealDrinks } from './hydration'
+import { tagFoodsByRule, applyDrinkTag, ruleTag, isDrinkFood } from './drinkTagging'
 import { buildFoodUsage } from './foodArchive'
 import { computeFingerprint } from './mealFingerprint'
 import {
@@ -129,11 +130,27 @@ export async function saveDiet(payload) {
     await db.diet_logs.update(existing.id, { ...payload, updated_at: now })
     const row = await db.diet_logs.get(existing.id)
     await recomputeScore(payload.date)
+    await stampWaterGoalForMeals(payload)
     return row
   }
   const id = await db.diet_logs.add({ ...payload, created_at: now })
   await recomputeScore(payload.date)
+  await stampWaterGoalForMeals(payload)
   return db.diet_logs.get(id)
+}
+
+// A day whose drinks all came from meals still needs the day's goal on record,
+// or it could never count as "goal met". Never touches the score.
+async function stampWaterGoalForMeals(diet) {
+  try {
+    if (mealDrinks(diet).length === 0) return
+    const goal = await currentWaterGoal()
+    const day  = await db.water_logs.get({ date: diet.date })
+    if (day) await db.water_logs.update(day.id, { goal_ml: goal.targetMl })
+    else await db.water_logs.add({ date: diet.date, entries: [], goal_ml: goal.targetMl, created_at: new Date().toISOString() })
+  } catch (e) {
+    console.warn('water goal stamp failed', e)
+  }
 }
 
 // ── Workout ───────────────────────────────────────────────────────────────────
@@ -341,11 +358,51 @@ export async function saveFood(food) {
   const current = await getCustomMealOptions()
   const id = food.id || Math.random().toString(36).slice(2, 10)
   const idx = current.findIndex(f => f.id === id)
-  // A new food is stamped so it gets a full week in the list before it can be archived
-  const withId = { ...food, id, ...(idx === -1 && !food.createdAt ? { createdAt: new Date().toISOString() } : {}) }
+  // A new food is stamped so it gets a full week in the list before it can be archived,
+  // and checked against the drink rules unless it already arrives tagged
+  let withId = { ...food, id, ...(idx === -1 && !food.createdAt ? { createdAt: new Date().toISOString() } : {}) }
+  if (!withId.drinkTagBy) withId = applyDrinkTag(withId, ruleTag(withId.label), 'rule')
   const updated = idx === -1 ? [...current, withId] : current.map((f, i) => (i === idx ? withId : f))
   await saveConfig({ key: 'custom_meal_options', value: JSON.stringify(updated) })
   return withId
+}
+
+// ── Drinks logged as food ────────────────────────────────────────────────────
+// One-time pass on upgrade: the built-in rules tag the existing food list, so
+// coffee, tea, juice and the like start counting without any setup.
+export async function seedDrinkTags() {
+  const done = await db.tracker_config.get('drink_tags_seeded_v1')
+  if (done?.value === 'true') return
+  const { foods, changed } = tagFoodsByRule(await getCustomMealOptions())
+  if (changed > 0) await saveConfig({ key: 'custom_meal_options', value: JSON.stringify(foods) })
+  await db.tracker_config.put({ key: 'drink_tags_seeded_v1', value: 'true' })
+  await stampTodayDrinkItems()
+}
+
+// Brings TODAY's already-logged meal items in line with the current food tags,
+// so tagging a food shows up at once. Earlier days are deliberately left alone:
+// history is counted with the tags that existed when it was logged.
+export async function stampTodayDrinkItems() {
+  const date = today()
+  const diet = await db.diet_logs.get({ date })
+  if (!diet?.meal_items?.length) return false
+  const foods   = await getCustomMealOptions()
+  const byId    = Object.fromEntries(foods.map(f => [f.id, f]))
+  const byLabel = Object.fromEntries(foods.map(f => [f.label.trim().toLowerCase(), f]))
+
+  let changed = false
+  const items = diet.meal_items.map(item => {
+    const food = byId[item.foodId] || byLabel[(item.label || '').trim().toLowerCase()]
+    if (!food) return item
+    const ml = isDrinkFood(food) ? food.mlPerPortion : null
+    if ((item.mlPerPortion ?? null) === ml) return item
+    changed = true
+    return { ...item, mlPerPortion: ml }
+  })
+  if (!changed) return false
+  await db.diet_logs.update(diet.id, { meal_items: items, updated_at: new Date().toISOString() })
+  await stampWaterGoalForMeals({ ...diet, meal_items: items })
+  return true
 }
 
 // When each food was last logged — what decides active vs archived (see foodArchive.js).

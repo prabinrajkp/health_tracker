@@ -91,11 +91,13 @@ function singleFoodPrompt(foodName) {
   return `You are a nutrition analyst for an Indian health-tracking app.
 
 Respond with ONLY valid JSON (no markdown, no code fences, no extra text), in exactly this shape:
-{"name":"...","points":1|2|3,"idealPortions":number,"category":"good"|"bad","kcal":number,"protein":number,"carbs":number,"fat":number,"reason":"..."}
+{"name":"...","points":1|2|3,"idealPortions":number,"category":"good"|"bad","kcal":number,"protein":number,"carbs":number,"fat":number,"isDrink":true|false,"mlPerPortion":number,"reason":"..."}
 
 ${SCORING_GUIDE}
 
 Nutrition is for ONE typical Indian household portion (1 chapati, 1 katori dal, 1 cup rice, 1 egg). reason is max 10 words.
+
+isDrink is true only for a beverage that is drunk (tea, coffee, juice, milk, buttermilk, soft drinks), never for food that merely contains liquid (soup, curd, fruit, oats with milk). mlPerPortion is the volume in mL of ONE typical serving of that drink (a cup of tea about 150, a glass of juice about 200), or 0 when isDrink is false.
 
 Analyze: ${foodName}`
 }
@@ -239,6 +241,8 @@ function normaliseSingle(json, fallbackName) {
     protein:       num(json.protein),
     carbs:         num(json.carbs),
     fat:           num(json.fat),
+    isDrink:       json.isDrink === true && Number(json.mlPerPortion) > 0,
+    mlPerPortion:  json.isDrink === true ? num(json.mlPerPortion) : null,
     reason:        json.reason || '',
   }
 }
@@ -266,6 +270,50 @@ export async function bulkAnalyzeFoodsWithAI(labels, config, onProgress) {
         if (!row?.name || row.kcal == null) continue
         results.set(String(row.name).toLowerCase().trim(), {
           kcal: num(row.kcal), protein: num(row.protein), carbs: num(row.carbs), fat: num(row.fat),
+        })
+      }
+    }
+    onProgress?.(Math.min(i + BULK_BATCH_SIZE, labels.length), labels.length)
+  }
+  if (results.size === 0) throw new Error("Couldn't parse the AI response — try again")
+  return results
+}
+
+function bulkDrinksPrompt(labels) {
+  const list = labels.map(l => `- ${l}`).join('\n')
+  return `You are helping an Indian health-tracking app decide which of its foods are drinks.
+
+For EACH item below, say whether it is a beverage that is drunk (tea, coffee, juice, milk,
+buttermilk, lassi, soft drinks, coconut water). Food that merely contains liquid is NOT a
+drink (soup, curd, fruit, oats with milk, ice cream).
+
+Respond with ONLY a valid JSON array (no markdown, no extra text), in exactly this shape:
+[{"name":"...","isDrink":true|false,"mlPerPortion":number}, ...]
+
+mlPerPortion is the volume in mL of ONE typical Indian household serving of that drink
+(a cup of tea or coffee about 150, a glass of juice or milk about 200), or 0 when isDrink is false.
+
+Keep each "name" EXACTLY as given below, one object per item, same order.
+
+Items:
+${list}`
+}
+
+/**
+ * Decides which of a batch of foods are drinks, and the volume of one serving.
+ * Returns a Map keyed by lower-cased label → { isDrink, mlPerPortion }.
+ */
+export async function bulkTagDrinksWithAI(labels, config, onProgress) {
+  const results = new Map()
+  for (let i = 0; i < labels.length; i += BULK_BATCH_SIZE) {
+    const batch = labels.slice(i, i + BULK_BATCH_SIZE)
+    const text  = await chatCompletion(bulkDrinksPrompt(batch), config)
+    const json  = extractJson(text, '[', ']')
+    if (Array.isArray(json)) {
+      for (const row of json) {
+        if (!row?.name || typeof row.isDrink !== 'boolean') continue
+        results.set(String(row.name).toLowerCase().trim(), {
+          isDrink: row.isDrink, mlPerPortion: row.isDrink ? num(row.mlPerPortion) : null,
         })
       }
     }

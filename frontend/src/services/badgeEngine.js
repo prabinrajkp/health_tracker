@@ -731,7 +731,7 @@ async function buildAggregateData() {
     db.water_logs.toArray(),
   ])
   if (allScores.length === 0) return null
-  const water = waterBadgeMetrics(allWater)
+  const water = waterBadgeMetrics(allWater, allDiet)
 
   const dietMap    = Object.fromEntries(allDiet.map(d => [d.date, d]))
   const workoutMap = Object.fromEntries(allWorkout.map(d => [d.date, d]))

@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here.
 
+## [v4.34] — 2026-10-13
+
+Drinks are tidied up and now count what you log in meals. See `docs/drinks_declutter_plan.md` and `docs/food_drinks_link_plan.md`.
+
+### Added
+- **Drinks logged in a meal count automatically** — a food can be tagged as a drink with a mL per portion. Logging it (coffee, tea, juice, milk) adds to the day's drinks total with no second entry, and changing the portion or removing the food corrects the total
+- **Tagging that works offline** — built-in rules tag common drinks, so on update Coffee, Tea, Buttermilk and Soft drinks in the default list start counting. New foods found through AI search arrive tagged, and Custom foods has a button to check untagged foods with AI when a key is set
+- **"This is a drink" switch** — each food in Custom foods has the switch and a mL per portion. A choice made by hand is never overwritten by the rules or the AI
+- **Drinks sheet** — opens from the Drinks row on the Food log or from the Today card, with bigger amounts, another drink type, and the day's entries with delete
+- **"From your meals" list** — the sheet shows drinks counted from meals separately, so the same drink is not logged twice. Add Meal confirms the mL it counted, and drink foods show their volume on the Food log
+
+### Changed
+- **Drinks on the Food log is one row** — the total, a slim bar and a one-tap glass of water, placed below Calories. It replaces the large block that sat in the middle of the meals
+- **Today card opens the sheet** — tapping it no longer jumps to the Food log
+- **Two drink buttons instead of four** — Tea / coffee and Milk are removed from Drinks, leaving Water and Other drink, since those are now logged as food
+- **Badges and the goal count meal drinks** — including on days when no drink was tapped in
+- **Counting starts from this update** — earlier days keep their totals
+- **Shorter goal note** — the three-line explanation on the Food log is now one line in the sheet, with a link to Settings
+- **Excel export** — the Drinks sheet has a "From meals" column
+
+Drinks still never affect the daily score.
+
+---
+
 ## [v4.33] — 2026-10-11
 
 ### Added

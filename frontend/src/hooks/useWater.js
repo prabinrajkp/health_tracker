@@ -3,33 +3,47 @@ import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { Capacitor } from '@capacitor/core'
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
-import { getWaterDay, getWaterGoal, addWaterEntry, removeWaterEntry, getConfig } from '../api/client'
-import { waterTotals, glassSize, DEFAULT_GLASS_ML } from '../services/hydration'
+import { getWaterDay, getWaterGoal, addWaterEntry, removeWaterEntry, getConfig, getDiet } from '../api/client'
+import { waterTotals, mealDrinks, glassSize, DEFAULT_GLASS_ML } from '../services/hydration'
 
-// Today's drinks, the goal in force and the user's glass size, with the
-// actions to add and remove a drink. Used by the Today card and Log → Food.
-export function useWater() {
+// Today's drinks: what was tapped in, what was logged in meals, the goal in
+// force and the user's glass size, with the actions to add and remove a drink.
+// One instance is shared by a screen's card or row and the Drinks sheet it
+// opens, so they always show the same numbers.
+//
+// Pass `diet` when the screen already holds today's diet log (the Food log
+// does, and edits it live); otherwise the hook loads it and `reload()`
+// refreshes it after a meal is logged.
+export function useWater({ diet: liveDiet } = {}) {
   const today = format(new Date(), 'yyyy-MM-dd')
-  const [entries, setEntries] = useState([])
-  const [goal, setGoal]       = useState(null)
-  const [glassMl, setGlassMl] = useState(DEFAULT_GLASS_ML)
+  const [entries, setEntries]       = useState([])
+  const [goal, setGoal]             = useState(null)
+  const [glassMl, setGlassMl]       = useState(DEFAULT_GLASS_ML)
+  const [loadedDiet, setLoadedDiet] = useState(null)
+  const ownsDiet = liveDiet === undefined
 
-  useEffect(() => {
-    Promise.all([getWaterDay(today), getWaterGoal(), getConfig()]).then(([day, g, rows]) => {
-      setEntries(day?.entries || [])
-      setGoal(g)
-      const map = {}
-      rows.forEach(r => { map[r.key] = r.value })
-      setGlassMl(glassSize(map))
-    }).catch(console.error)
-  }, [])
+  const reload = useCallback(async () => {
+    const [day, g, rows, diet] = await Promise.all([
+      getWaterDay(today), getWaterGoal(), getConfig(), ownsDiet ? getDiet(today) : null,
+    ])
+    setEntries(day?.entries || [])
+    setGoal(g)
+    const map = {}
+    rows.forEach(r => { map[r.key] = r.value })
+    setGlassMl(glassSize(map))
+    if (ownsDiet) setLoadedDiet(diet)
+  }, [ownsDiet])
 
-  const totals   = waterTotals(entries)
+  useEffect(() => { reload().catch(console.error) }, [reload])
+
+  const diet     = ownsDiet ? loadedDiet : liveDiet
+  const fromMeals = mealDrinks(diet)
+  const totals   = waterTotals(entries, diet)
   const targetMl = goal?.targetMl || 0
 
   const add = useCallback(async (ml, kind = 'water') => {
     try {
-      const before = waterTotals(entries).totalMl
+      const before = totals.totalMl
       const day = await addWaterEntry(today, { ml, kind })
       setEntries(day.entries)
       if (Capacitor.isNativePlatform()) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {})
@@ -38,7 +52,7 @@ export function useWater() {
     } catch {
       toast.error('Could not save that drink')
     }
-  }, [entries, targetMl])
+  }, [totals.totalMl, targetMl])
 
   const remove = useCallback(async (id) => {
     const day = await removeWaterEntry(today, id)
@@ -50,5 +64,5 @@ export function useWater() {
     return last ? remove(last.id) : undefined
   }, [entries, remove])
 
-  return { entries, totals, goal, targetMl, glassMl, add, remove, undoLast }
+  return { entries, fromMeals, totals, goal, targetMl, glassMl, add, remove, undoLast, reload }
 }

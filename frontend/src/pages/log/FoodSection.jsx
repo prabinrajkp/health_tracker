@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { format, subDays } from 'date-fns'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Minus, Trash2, Timer, Flame, ChevronRight, GlassWater } from 'lucide-react'
 import { getDiet, saveDiet, getConfig, getLatestWeight } from '../../api/client'
 import { calcDietScore, calcNutritionTotals, calcCalorieScore } from '../../services/scoring'
@@ -8,7 +8,8 @@ import { dieteticsFromConfig } from '../../services/dietetics'
 import { weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../../services/scoreMeta'
 import { fastingWindow, fastingPoints, fmtHours } from '../../services/fasting'
 import { schedulePostDinnerWalk } from '../../services/reminders'
-import { DRINK_KINDS, formatLitres } from '../../services/hydration'
+import { formatLitres } from '../../services/hydration'
+import DrinksSheet from '../../components/DrinksSheet'
 import { useWater } from '../../hooks/useWater'
 import { itemScore } from '../../components/DayDetail'
 import AddMealFlow from '../../components/AddMealFlow'
@@ -67,6 +68,9 @@ function MealGroup({ mealType, diet, onItems, onTime, onAdd, latePenalty }) {
                   <p className="text-sm text-text-secondary">
                     {!TIMED_MEALS.includes(mealType) && item.time ? `${item.time} · ` : ''}
                     <span className={pts >= 0 ? 'text-success' : 'text-danger'}>{pts >= 0 ? '+' : ''}{pts} pts</span>
+                    {item.mlPerPortion > 0 && (
+                      <span className="text-text-secondary"> · <GlassWater size={12} className="inline -mt-0.5" /> {Math.round(item.mlPerPortion * item.portions)} mL</span>
+                    )}
                     {isOver && <span className="text-warning"> · over the ideal {item.idealPortions}</span>}
                   </p>
                 </div>
@@ -134,90 +138,32 @@ function MacroRow({ label, value, range }) {
   )
 }
 
-const KIND_LABEL = Object.fromEntries(DRINK_KINDS.map(k => [k.id, k.label]))
-const VISIBLE_ENTRIES = 4
-
-// Drinks: everything logged today toward the estimated goal. Tap a type, then
-// an amount. The wording follows docs/water_intake_logic.md — the goal is an
-// estimate for all beverages, never a prescription.
-function DrinksBlock({ water, onSettings, sectionRef }) {
-  const { entries, totals, goal, targetMl, glassMl, add, remove } = water
-  const [kind, setKind]       = useState('water')
-  const [showAll, setShowAll] = useState(false)
+// Drinks on the Food log is one row: the total and a one-tap glass of water.
+// Everything else lives in the Drinks sheet, opened by tapping the row.
+function DrinksRow({ water, onOpen }) {
+  const { totals, targetMl, glassMl, add } = water
   const hasGoal = targetMl > 0
   const pct     = hasGoal ? Math.min((totals.totalMl / targetMl) * 100, 100) : 0
-  const recent  = [...entries].reverse()
-  const shown   = showAll ? recent : recent.slice(0, VISIBLE_ENTRIES)
-
   return (
-    <section ref={sectionRef} className="space-y-3 scroll-mt-20">
-      <div className="section-bar">
+    <section className="flex items-center gap-2">
+      <button onClick={onOpen} className="flex items-center gap-2.5 flex-1 min-w-0 h-12 text-left active:opacity-70 transition-opacity"
+        aria-label="Open drinks">
         <GlassWater size={18} className="text-text-secondary shrink-0" />
-        <h2 className="t-heading flex-1">Drinks</h2>
-        <p className="text-sm tabular-nums text-text-primary">
+        <span className="t-heading shrink-0">Drinks</span>
+        {hasGoal && (
+          <span className="flex-1 h-2 rounded-full overflow-hidden bg-surface-elevated">
+            <span className="block h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: 'rgb(var(--c-water))' }} />
+          </span>
+        )}
+        <span className={`text-sm tabular-nums text-text-primary shrink-0 ${hasGoal ? '' : 'flex-1 text-right'}`}>
           <span className="font-semibold">{formatLitres(totals.totalMl)}</span>
           {hasGoal && <span className="text-text-muted"> of {formatLitres(targetMl)}</span>}
-        </p>
-      </div>
-
-      {hasGoal && (
-        <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${pct}%`, background: 'rgb(var(--c-water))' }} />
-        </div>
-      )}
-
-      {totals.otherMl > 0 && (
-        <p className="text-sm text-text-secondary">
-          Water {formatLitres(totals.waterMl)} · other drinks {formatLitres(totals.otherMl)}
-        </p>
-      )}
-
-      <div className="flex gap-2 flex-wrap" role="radiogroup" aria-label="Type of drink">
-        {DRINK_KINDS.map(k => (
-          <button key={k.id} onClick={() => setKind(k.id)} role="radio" aria-checked={kind === k.id}
-            className={kind === k.id ? 'pill-option-active' : 'pill-option'} style={{ flex: '0 0 auto' }}>
-            {k.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex gap-2">
-        {[[glassMl, 'Glass'], [500, null], [1000, null]].map(([ml, name]) => (
-          <button key={`${ml}-${name}`} onClick={() => add(ml, kind)} className="btn-ghost flex-1 flex-col gap-0 py-2.5"
-            aria-label={`Add ${ml} mL of ${KIND_LABEL[kind].toLowerCase()}`}>
-            <span className="flex items-center gap-1"><Plus size={14} />{name || (ml >= 1000 ? `${ml / 1000} L` : `${ml} mL`)}</span>
-            {name && <span className="text-xs font-normal text-text-muted">{ml} mL</span>}
-          </button>
-        ))}
-      </div>
-
-      {shown.length > 0 && (
-        <div className="group-list">
-          {shown.map(e => (
-            <div key={e.id} className="flex items-center gap-3 py-2">
-              <span className="text-sm text-text-muted tabular-nums w-12 shrink-0">{e.time}</span>
-              <span className="text-base text-text-primary flex-1">{KIND_LABEL[e.kind] || 'Water'}</span>
-              <span className="text-sm text-text-secondary tabular-nums">{e.ml} mL</span>
-              <button onClick={() => remove(e.id)} aria-label={`Remove ${e.ml} mL at ${e.time}`}
-                className="w-9 h-9 text-text-muted flex items-center justify-center shrink-0"><Trash2 size={16} /></button>
-            </div>
-          ))}
-        </div>
-      )}
-      {recent.length > VISIBLE_ENTRIES && (
-        <button onClick={() => setShowAll(v => !v)} className="text-sm font-semibold text-brand-light py-1">
-          {showAll ? 'Show fewer' : `Show all ${recent.length}`}
-        </button>
-      )}
-
-      <p className="t-caption leading-relaxed">
-        {goal?.basis === 'weight' && 'The goal is a starting estimate from your body weight. '}
-        {goal?.basis === 'default' && 'The goal is the general 2 L guideline. Log a weight for an estimate based on yours. '}
-        {goal?.basis === 'custom' && 'You set this goal yourself. '}
-        {goal?.basis === 'off' && 'No daily goal is set. '}
-        {hasGoal && 'Needs change with activity, heat and illness, and only the drinks you log here are counted. Do not force fluids beyond thirst. '}
-        <button onClick={onSettings} className="font-semibold text-brand-light">Change goal or glass size</button>
-      </p>
+        </span>
+      </button>
+      <button onClick={() => add(glassMl, 'water')} aria-label={`Add a ${glassMl} mL glass of water`}
+        className="flex items-center gap-1 text-sm font-semibold text-brand-light pl-2 py-2 shrink-0 active:opacity-70">
+        <Plus size={16} />Glass
+      </button>
     </section>
   )
 }
@@ -298,16 +244,9 @@ export default function FoodSection({ afterSave }) {
   const [dietetics, setDietetics]         = useState(null)
   const [addOpen, setAddOpen]             = useState(false)
   const [addCategory, setAddCategory]     = useState(null)
-  const water     = useWater()
-  const drinksRef = useRef(null)
-  const [searchParams] = useSearchParams()
-
-  // Arriving from the Today card lands on the drinks block
-  useEffect(() => {
-    if (searchParams.get('focus') !== 'drinks') return
-    const t = setTimeout(() => drinksRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350)
-    return () => clearTimeout(t)
-  }, [])
+  // Drinks logged in today's meals count toward the total, live as portions change
+  const water = useWater({ diet })
+  const [drinksOpen, setDrinksOpen] = useState(false)
 
   const loadDiet = async () => {
     const data = await getDiet(today)
@@ -375,12 +314,15 @@ export default function FoodSection({ afterSave }) {
         <FastingLine diet={diet} yesterdayDiet={yesterdayDiet} weights={weights} />
       </div>
 
-      <DrinksBlock water={water} sectionRef={drinksRef} onSettings={() => navigate('/settings?section=water')} />
-
       <CaloriesCard diet={diet} dietetics={dietetics} weights={weights} onSetup={() => navigate('/settings?section=body')} />
+
+      {/* Not part of the score, so it sits below everything that is */}
+      <DrinksRow water={water} onOpen={() => setDrinksOpen(true)} />
 
       <NoteField value={diet.notes} placeholder="Anything to note about today's food…"
         onChange={notes => update({ ...diet, notes }, TEXT_SAVE_MS)} />
+
+      <DrinksSheet open={drinksOpen} onClose={() => setDrinksOpen(false)} water={water} />
 
       <AddMealFlow open={addOpen} presetCategory={addCategory}
         onClose={() => setAddOpen(false)} onLogged={handleMealLogged} />

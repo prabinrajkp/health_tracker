@@ -13,15 +13,17 @@ import * as XLSX from 'xlsx'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { getConfig, saveConfig, getScoreForDate, getLatestWeight } from '../api/client'
-import { estimateWaterGoal, resolveWaterGoal, formatLitres, waterTotals, goalMet, GLASS_SIZES, GOAL_LIMITS, DEFAULT_GLASS_ML, DEFAULT_GOAL_ML } from '../services/hydration'
+import { estimateWaterGoal, resolveWaterGoal, formatLitres, waterTotals, goalMet, mealDrinks, GLASS_SIZES, GOAL_LIMITS, DEFAULT_GLASS_ML, DEFAULT_GOAL_ML } from '../services/hydration'
 import { splitFoods, ARCHIVE_AFTER_DAYS } from '../services/foodArchive'
+import { ruleTag, applyDrinkTag, isDrinkFood, clampMl, ML_LIMITS } from '../services/drinkTagging'
+import { stampTodayDrinkItems } from '../api/client'
 import { getFoodUsage, reviveFood } from '../services/localStore'
 import { scheduleFixedReminders, NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/reminders'
 import { version as APP_VERSION } from '../../package.json'
 import useStore from '../store/useStore'
 import db, { DEFAULT_WEIGHTS } from '../services/db'
 import { ACTIVITY_PAC, LOSS_RATES, computeDietetics, ageFromBirthYear } from '../services/dietetics'
-import { hasLlmKey, analyzeFoodWithAI, bulkAnalyzeFoodsWithAI } from '../services/llmApi'
+import { hasLlmKey, analyzeFoodWithAI, bulkAnalyzeFoodsWithAI, bulkTagDrinksWithAI } from '../services/llmApi'
 
 // ids match Onboarding's ACTIVITY_LEVELS so onboarding_activity can prefill this
 const ACTIVITY_OPTIONS = [
@@ -53,6 +55,32 @@ function Stepper({ label, sublabel, value, onChange, min = 0, max = 20 }) {
         <button onClick={() => onChange(Math.min(max, value + 1))} aria-label={`More: ${label}`}
           className="w-9 h-9 flex items-center justify-center text-text-secondary"><Plus size={14} /></button>
       </div>
+    </div>
+  )
+}
+
+// "This is a drink" switch with its mL per portion, used when adding and editing a food.
+function DrinkFields({ isDrink, ml, onToggle, onMl }) {
+  return (
+    <div className="space-y-2">
+      <button type="button" role="switch" aria-checked={isDrink} onClick={() => onToggle(!isDrink)}
+        className="w-full flex items-center gap-3 text-left">
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-text-primary">This is a drink</span>
+          <span className="block text-xs text-text-muted">Logging it also counts toward your daily drinks</span>
+        </span>
+        <span className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${isDrink ? 'bg-brand' : 'bg-surface-border'}`}>
+          <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: isDrink ? 22 : 2 }} />
+        </span>
+      </button>
+      {isDrink && (
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-text-muted flex-1">mL in one portion</label>
+          <input type="number" inputMode="numeric" min={ML_LIMITS.min} max={ML_LIMITS.max} step="10" aria-label="mL in one portion"
+            className="input text-center tabular-nums w-28 py-2" placeholder="200"
+            value={ml ?? ''} onChange={e => onMl(e.target.value === '' ? null : Number(e.target.value))} />
+        </div>
+      )}
     </div>
   )
 }
@@ -113,6 +141,7 @@ export default function Settings() {
   const [savingKeys, setSavingKeys]       = useState(false)
   const [bulkAiLoading, setBulkAiLoading] = useState(false)
   const [bulkAiProgress, setBulkAiProgress] = useState(null)
+  const [drinkTagging, setDrinkTagging]     = useState(null)   // null | { done, total } while the AI checks foods
   const [customOptions, setCustomOptions] = useState([])
   const [foodUsage, setFoodUsage]         = useState(null)   // last-logged dates; null while loading
   const [archiveOpen, setArchiveOpen]     = useState(false)
@@ -177,7 +206,12 @@ export default function Settings() {
   const setW = (cat, key, val) => setWeights(w => ({ ...w, [cat]: { ...w[cat], [key]: Number(val) } }))
   const addCustomOption = () => {
     if (!newOption.label.trim()) return toast.error('Enter a meal name')
-    setCustomOptions(prev => [...prev, { ...newOption, label: newOption.label.trim(), id: Math.random().toString(36).slice(2, 10), createdAt: new Date().toISOString() }])
+    const base = { ...newOption, label: newOption.label.trim(), id: Math.random().toString(36).slice(2, 10), createdAt: new Date().toISOString() }
+    // Keep a drink tag set here by hand or by the AI; otherwise let the built-in rules decide
+    const food = base.drinkTagBy
+      ? applyDrinkTag({ ...base, drinkTagBy: undefined }, base, base.drinkTagBy)
+      : applyDrinkTag(base, ruleTag(base.label), 'rule')
+    setCustomOptions(prev => [...prev, food])
     setNewOption({ ...EMPTY_OPTION })
   }
   const removeCustomOption = (id) => setCustomOptions(prev => prev.filter(o => o.id !== id))
@@ -300,6 +334,44 @@ export default function Settings() {
 
   const missingNutrition = activeFoods.filter(o => !hasNutrition(o))
 
+  // ── Drinks among the foods ────────────────────────────────────────────────
+  // What the Add form will tag the new food as: the user's or AI's choice if
+  // one was made, otherwise what the built-in rules say about the name typed.
+  const newDrink = newOption.drinkTagBy
+    ? { isDrink: !!newOption.isDrink, mlPerPortion: newOption.mlPerPortion }
+    : ruleTag(newOption.label)
+  const setNewDrink = (isDrink, ml) => setNewOption(o => ({
+    ...o, isDrink, mlPerPortion: isDrink ? (ml ?? o.mlPerPortion ?? ruleTag(o.label).mlPerPortion ?? 200) : null, drinkTagBy: 'user',
+  }))
+
+  const drinkFoods    = customOptions.filter(isDrinkFood)
+  const untaggedByYou = customOptions.filter(o => o.drinkTagBy !== 'user' && o.drinkTagBy !== 'ai')
+
+  // Asks the AI about every food that only the rules have looked at. Runs on a
+  // button, never by itself: it uses the user's own key and needs a connection.
+  const tagDrinksWithAI = async () => {
+    if (!hasLlmKey(aiConfig)) return toast.error('Add an API key under AI assistant first')
+    setDrinkTagging({ done: 0, total: untaggedByYou.length })
+    try {
+      const results = await bulkTagDrinksWithAI(
+        untaggedByYou.map(o => o.label), aiConfig,
+        (done, total) => setDrinkTagging({ done, total }),
+      )
+      let checked = 0
+      setCustomOptions(prev => prev.map(o => {
+        const hit = results.get(o.label.toLowerCase().trim())
+        if (!hit) return o
+        checked++
+        return applyDrinkTag(o, hit, 'ai')
+      }))
+      toast.success(`Checked ${checked} food${checked !== 1 ? 's' : ''} — remember to save`)
+    } catch (e) {
+      toast.error(e.message || 'AI check failed')
+    } finally {
+      setDrinkTagging(null)
+    }
+  }
+
   const generateBulkPrompt = () => {
     const list = missingNutrition.map(o => `- ${o.label}`).join('\n')
     return `You are helping a health tracking app add nutrition data to its food list.\n\nFor EACH food below, give the nutrition of ONE typical Indian household portion\n(1 chapati, 1 katori dal, 1 cup rice, 1 egg, 1 glass, 1 piece).\n\nReply ONLY with one line per food, in this exact format, no other text:\n\nFoodName | calories | protein_g | carbs_g | fat_g\n\nExample:\nChapati | 120 | 3 | 18 | 3.7\nDal | 180 | 9 | 27 | 3\n\nKeep the food names EXACTLY as written below.\n\nFoods:\n${list}`
@@ -358,6 +430,10 @@ export default function Settings() {
       protein: aiResult.protein,
       carbs:   aiResult.carbs,
       fat:     aiResult.fat,
+      // Present only when the answer came from the API; a pasted reply has no drink line
+      ...(typeof aiResult.isDrink === 'boolean'
+        ? { isDrink: aiResult.isDrink, mlPerPortion: aiResult.isDrink ? aiResult.mlPerPortion : null, drinkTagBy: 'ai' }
+        : {}),
     }))
     setAiMode(null); setAiResult(null); setAiPasteText(''); setAiShowHowTo(false); setAiCopied(false)
   }
@@ -393,6 +469,8 @@ export default function Settings() {
         saveConfig({ key: 'water_glass_ml',        value: waterGlassMl }),
       ])
       await fetchConfig()
+      // Anything already logged today picks up the drink tags just saved
+      await stampTodayDrinkItems().catch(() => {})
       await scheduleFixedReminders({ requestPermission: true })
       toast.success('Settings saved')
     } catch { toast.error('Failed to save') }
@@ -438,11 +516,14 @@ export default function Settings() {
         Quality: r.quality || '',
       }))), 'Sleep')
       if (waterLogs.length) {
+        const dietByDate = Object.fromEntries(dietLogs.map(d => [d.date, d]))
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(waterLogs.map(r => {
-          const t = waterTotals(r.entries)
+          const diet = dietByDate[r.date]
+          const t = waterTotals(r.entries, diet)
           return {
             Date: r.date, 'Total (mL)': t.totalMl, 'Water (mL)': t.waterMl, 'Other drinks (mL)': t.otherMl,
-            'Goal (mL)': r.goal_ml || '', 'Goal met': r.goal_ml ? (goalMet(r) ? 'Yes' : 'No') : '',
+            'From meals (mL)': t.mealMl, 'Drinks in meals': mealDrinks(diet).map(d => `${d.label} ${d.ml}`).join(', '),
+            'Goal (mL)': r.goal_ml || '', 'Goal met': r.goal_ml ? (goalMet(r, diet) ? 'Yes' : 'No') : '',
           }
         })), 'Drinks')
       }
@@ -781,6 +862,10 @@ export default function Settings() {
               It covers all drinks, not plain water alone, and it is not an exact requirement.
             </p>
             <p className="text-sm text-text-secondary leading-relaxed">
+              Drinks you log in a meal, such as coffee or juice, are counted automatically. Which foods count,
+              and how many mL a portion is, can be changed under Custom foods.
+            </p>
+            <p className="text-sm text-text-secondary leading-relaxed">
               Needs change with activity, hot weather, food and illness. Do not force fluids beyond thirst.
             </p>
             <p className="text-sm text-text-secondary leading-relaxed">
@@ -957,11 +1042,19 @@ export default function Settings() {
           points: opt.points, idealPortions: opt.idealPortions ?? 1,
           kcal: opt.kcal ?? null, protein: opt.protein ?? null,
           carbs: opt.carbs ?? null, fat: opt.fat ?? null,
+          isDrink: isDrinkFood(opt), mlPerPortion: opt.mlPerPortion ?? null,
         })
       }
       const cancelEdit = () => { setEditingId(null); setEditDraft(null) }
       const commitEdit = (id) => {
-        setCustomOptions(prev => prev.map(o => o.id === id ? { ...o, ...editDraft } : o))
+        setCustomOptions(prev => prev.map(o => {
+          if (o.id !== id) return o
+          const { isDrink, mlPerPortion, ...rest } = editDraft
+          const next = { ...o, ...rest }
+          // Only a real change to the drink fields makes this the user's own tag
+          const changed = isDrink !== isDrinkFood(o) || (isDrink && clampMl(mlPerPortion) !== (o.mlPerPortion ?? null))
+          return changed ? applyDrinkTag(next, { isDrink, mlPerPortion }, 'user') : next
+        }))
         setEditingId(null); setEditDraft(null)
       }
 
@@ -1024,6 +1117,9 @@ export default function Settings() {
                   ))}
                 </div>
               </div>
+              <DrinkFields isDrink={newDrink.isDrink} ml={newDrink.mlPerPortion}
+                onToggle={on => setNewDrink(on)}
+                onMl={ml => setNewOption(o => ({ ...o, isDrink: true, mlPerPortion: ml, drinkTagBy: 'user' }))} />
               <button onClick={addCustomOption} className="btn-primary w-full"><Plus size={14} />Add Food</button>
             </div>
 
@@ -1053,6 +1149,29 @@ export default function Settings() {
                     {bulkAiLoading
                       ? <><RefreshCw size={14} className="animate-spin" /> Analyzing {bulkAiProgress?.done ?? 0}/{bulkAiProgress?.total ?? missingNutrition.length}…</>
                       : <><Sparkles size={14} /> Fill all {missingNutrition.length} with AI</>}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Drinks among the foods */}
+            {customOptions.length > 0 && (
+              <div className="card space-y-2">
+                <div className="flex items-center gap-2">
+                  <GlassWater size={18} className="text-text-secondary" />
+                  <p className="t-heading flex-1">Drinks</p>
+                  <span className="text-xs font-semibold tabular-nums text-text-primary">{drinkFoods.length} tagged</span>
+                </div>
+                <p className="text-xs text-text-muted leading-relaxed">
+                  A food tagged as a drink counts toward your daily drinks when you log it in a meal, so you never log it twice.
+                  {drinkFoods.length > 0 && ` Tagged now: ${drinkFoods.slice(0, 6).map(f => f.label).join(', ')}${drinkFoods.length > 6 ? ` and ${drinkFoods.length - 6} more` : ''}.`}
+                  {' '}Edit a food to change its tag or its mL per portion.
+                </p>
+                {hasLlmKey(aiConfig) && untaggedByYou.length > 0 && (
+                  <button onClick={tagDrinksWithAI} disabled={!!drinkTagging} className="btn-ghost w-full text-brand-light">
+                    {drinkTagging
+                      ? <><RefreshCw size={14} className="animate-spin" /> Checking {drinkTagging.done}/{drinkTagging.total}…</>
+                      : <><Sparkles size={14} /> Check {untaggedByYou.length} food{untaggedByYou.length !== 1 ? 's' : ''} with AI</>}
                   </button>
                 )}
               </div>
@@ -1136,6 +1255,13 @@ export default function Settings() {
                           </div>
                         </div>
                       )}
+                      {isEditing && (
+                        <div className="pl-5">
+                          <DrinkFields isDrink={!!editDraft.isDrink} ml={editDraft.mlPerPortion}
+                            onToggle={on => setEditDraft(d => ({ ...d, isDrink: on, mlPerPortion: on ? (d.mlPerPortion ?? ruleTag(opt.label).mlPerPortion ?? 200) : null }))}
+                            onMl={ml => setEditDraft(d => ({ ...d, mlPerPortion: ml }))} />
+                        </div>
+                      )}
                       {!isEditing && (
                         <p className="text-xs text-text-muted pl-5">
                           {opt.idealPortions ? `ideal: ${opt.idealPortions} portion${opt.idealPortions !== 1 ? 's' : ''}` : ''}
@@ -1143,6 +1269,7 @@ export default function Settings() {
                           {hasNutrition(opt)
                             ? `${opt.kcal} kcal · P${opt.protein ?? 0} C${opt.carbs ?? 0} F${opt.fat ?? 0}`
                             : <span className="text-warning">no calorie data</span>}
+                          {isDrinkFood(opt) && <span className="text-text-secondary"> · <GlassWater size={12} className="inline -mt-0.5" /> {opt.mlPerPortion} mL</span>}
                         </p>
                       )}
                     </div>

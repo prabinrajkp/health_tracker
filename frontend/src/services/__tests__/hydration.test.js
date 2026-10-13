@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  estimateWaterGoal, resolveWaterGoal, glassSize, waterTotals, goalMet, formatLitres, waterBadgeMetrics,
+  estimateWaterGoal, resolveWaterGoal, glassSize, waterTotals, goalMet, formatLitres, waterBadgeMetrics, mealDrinks,
   DEFAULT_GOAL_ML, DEFAULT_GLASS_ML,
 } from '../hydration'
 
@@ -55,14 +55,51 @@ describe('glassSize and totals', () => {
 
   it('counts every drink toward the total and reports water separately', () => {
     const entries = [{ ml: 250, kind: 'water' }, { ml: 500, kind: 'water' }, { ml: 150, kind: 'tea_coffee' }, { ml: 200, kind: 'milk' }]
-    expect(waterTotals(entries)).toEqual({ totalMl: 1100, waterMl: 750, otherMl: 350 })
-    expect(waterTotals([])).toEqual({ totalMl: 0, waterMl: 0, otherMl: 0 })
+    expect(waterTotals(entries)).toEqual({ totalMl: 1100, waterMl: 750, otherMl: 350, tappedMl: 1100, mealMl: 0 })
+    expect(waterTotals([])).toEqual({ totalMl: 0, waterMl: 0, otherMl: 0, tappedMl: 0, mealMl: 0 })
   })
 
   it('formats litres without pointless decimals', () => {
     expect(formatLitres(1500)).toBe('1.5 L')
     expect(formatLitres(3000)).toBe('3.0 L')
     expect(formatLitres(1250)).toBe('1.25 L')
+  })
+})
+
+describe('drinks logged in meals', () => {
+  const diet = { meal_items: [
+    { label: 'Coffee', mealType: 'breakfast', portions: 2, mlPerPortion: 150, time: '08:10' },
+    { label: 'Idli', mealType: 'breakfast', portions: 3 },                       // food: no volume
+    { label: 'Lemon juice', mealType: 'snacks', portions: 0.5, mlPerPortion: 200, time: '16:00' },
+    { label: 'Tea', mealType: 'snacks', portions: 1, mlPerPortion: null },      // untagged
+  ] }
+
+  it('counts portions × mL for tagged items only', () => {
+    expect(mealDrinks(diet)).toEqual([
+      { label: 'Coffee', mealType: 'breakfast', time: '08:10', ml: 300 },
+      { label: 'Lemon juice', mealType: 'snacks', time: '16:00', ml: 100 },
+    ])
+    expect(mealDrinks(null)).toEqual([])
+    expect(mealDrinks({ meal_items: [] })).toEqual([])
+  })
+
+  it('adds meal drinks to tapped drinks without double storage', () => {
+    const entries = [{ ml: 500, kind: 'water' }]
+    expect(waterTotals(entries, diet)).toEqual({ totalMl: 900, waterMl: 500, otherMl: 400, tappedMl: 500, mealMl: 400 })
+    expect(waterTotals([], diet).totalMl).toBe(400)
+  })
+
+  it('reaches the goal on meal drinks alone', () => {
+    expect(goalMet({ date: '2026-10-14', goal_ml: 400, entries: [] }, diet)).toBe(true)
+    expect(goalMet({ date: '2026-10-14', goal_ml: 401, entries: [] }, diet)).toBe(false)
+  })
+
+  it('counts a meal-only day for badges, including an early drink', () => {
+    const days  = [{ date: '2026-10-14', goal_ml: 400, entries: [] }]
+    const diets = [{ date: '2026-10-14', ...diet }]
+    expect(waterBadgeMetrics(days, diets)).toMatchObject({ waterDaysLogged: 1, waterGoalDays: 1, waterEarlyDays: 1 })
+    // without the diet log that day has nothing in it
+    expect(waterBadgeMetrics(days, []).waterDaysLogged).toBe(0)
   })
 })
 

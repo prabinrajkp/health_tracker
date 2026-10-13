@@ -11,6 +11,8 @@ import {
   saveMeal, forceLogMeal, updateMeal, getYesterdayMeal, getMealNames, setMealName, getFoodUsage,
 } from '../services/localStore'
 import { foodStatus } from '../services/foodArchive'
+import { isDrinkFood } from '../services/drinkTagging'
+import { mealDrinks } from '../services/hydration'
 import { searchFoods } from '../services/foodMatcher'
 import { hasLlmKey, analyzeFoodWithAI } from '../services/llmApi'
 
@@ -26,9 +28,13 @@ function itemFromFood(food, mealType, portions, time) {
     proteinPerPortion: food.protein ?? null,
     carbsPerPortion:   food.carbs   ?? null,
     fatPerPortion:     food.fat     ?? null,
+    // A drink carries its volume, so logging it also counts toward drinks
+    mlPerPortion:      isDrinkFood(food) ? food.mlPerPortion : null,
     time,
   }
 }
+
+const drinkMlOf = (items) => mealDrinks({ meal_items: items }).reduce((sum, d) => sum + d.ml, 0)
 
 function ptsLabel(item) {
   const pts = Math.round((item.pointsPerPortion || 0) * (item.portions || 1) * 10) / 10
@@ -231,7 +237,7 @@ function BuilderStep({ category, items, onChangePortion, onRemove, onAddMore, su
           <div key={idx} className="flex items-center gap-2 rounded-xl px-3 py-2.5 bg-surface-elevated">
             <div className="flex-1 min-w-0">
               <p className="text-sm text-text-primary truncate">{item.label}</p>
-              <p className="text-sm text-text-secondary">{ptsLabel(item)}</p>
+              <p className="text-sm text-text-secondary">{ptsLabel(item)}{item.mlPerPortion > 0 ? ` · ${Math.round(item.mlPerPortion * item.portions)} mL` : ''}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button onClick={() => onChangePortion(idx, -0.5)} className="w-9 h-9 rounded-full bg-surface-card flex items-center justify-center text-text-secondary"><Minus size={11} /></button>
@@ -281,7 +287,7 @@ function DuplicateStep({ onUpdate, onLogAnyway }) {
   )
 }
 
-function ConfirmationStep({ category, nutrition, healthScore, onDone }) {
+function ConfirmationStep({ category, nutrition, healthScore, drinkMl, onDone }) {
   const meta = MEAL_META[category]
   return (
     <div className="px-4 py-6 space-y-4 text-center">
@@ -300,6 +306,9 @@ function ConfirmationStep({ category, nutrition, healthScore, onDone }) {
           <div className="flex justify-between text-sm"><span className="text-text-muted">Fat</span><span className="font-semibold text-text-primary">{nutrition.fat} g</span></div>
           <div className="flex justify-between text-sm pt-2 border-t border-surface-border"><span className="text-text-muted">Health Score</span><span className="font-semibold text-text-primary">{healthScore}/100</span></div>
         </div>
+      )}
+      {drinkMl > 0 && (
+        <p className="text-sm text-text-secondary">+{drinkMl} mL counted toward today's drinks</p>
       )}
       <button onClick={onDone} className="btn-primary w-full py-3.5 rounded-2xl text-sm justify-center">Done</button>
     </div>
@@ -416,7 +425,13 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
 
   const logWholeMeal = async (mealOrTemplate) => {
     const time = format(new Date(), 'HH:mm')
-    const newItems = mealOrTemplate.foodItems.map(i => ({ ...i, mealType: category, time }))
+    // A saved meal keeps the volumes it was logged with; refresh them from the
+    // food list so a repeat uses today's drink tags.
+    const byId = Object.fromEntries(foods.map(f => [f.id, f]))
+    const newItems = mealOrTemplate.foodItems.map(i => {
+      const food = byId[i.foodId]
+      return { ...i, mealType: category, time, mlPerPortion: food ? (isDrinkFood(food) ? food.mlPerPortion : null) : (i.mlPerPortion ?? null) }
+    })
     setItems(newItems)
     await finish(newItems)
   }
@@ -426,7 +441,8 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
     setAiLoading(true)
     try {
       const result = await analyzeFoodWithAI(query.trim(), aiConfig)
-      const saved = await saveFood({ label: result.name, category: result.category, points: result.points, idealPortions: result.idealPortions, kcal: result.kcal, protein: result.protein, carbs: result.carbs, fat: result.fat, source: 'ai', aliases: [] })
+      const saved = await saveFood({ label: result.name, category: result.category, points: result.points, idealPortions: result.idealPortions, kcal: result.kcal, protein: result.protein, carbs: result.carbs, fat: result.fat, source: 'ai', aliases: [],
+        isDrink: result.isDrink, mlPerPortion: result.isDrink ? result.mlPerPortion : null, drinkTagBy: 'ai' })
       setFoods(prev => [...prev, saved])
       toast.success(`Added "${saved.label}" — future searches won't need AI again`)
       await addPickedFood(saved)
@@ -467,7 +483,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
       return
     }
     await appendToTodayDiet(finalItems)
-    setConfirmation({ nutrition: result.meal.nutritionSummary, healthScore: result.meal.healthScore })
+    setConfirmation({ nutrition: result.meal.nutritionSummary, healthScore: result.meal.healthScore, drinkMl: drinkMlOf(finalItems) })
     setStep('confirmation')
     onLogged?.()
   }
@@ -476,7 +492,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
     const cat = category
     const meal = await forceLogMeal({ category: cat, date: today(), foodItems: items })
     await appendToTodayDiet(items)
-    setConfirmation({ nutrition: meal.nutritionSummary, healthScore: meal.healthScore })
+    setConfirmation({ nutrition: meal.nutritionSummary, healthScore: meal.healthScore, drinkMl: drinkMlOf(items) })
     setStep('confirmation')
     onLogged?.()
   }
@@ -523,7 +539,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
       )}
       {step === 'duplicate' && <DuplicateStep onUpdate={resolveDuplicateUpdate} onLogAnyway={resolveDuplicateLogAnyway} />}
       {step === 'confirmation' && confirmation && (
-        <ConfirmationStep category={category} nutrition={confirmation.nutrition} healthScore={confirmation.healthScore} onDone={done} />
+        <ConfirmationStep category={category} nutrition={confirmation.nutrition} healthScore={confirmation.healthScore} drinkMl={confirmation.drinkMl} onDone={done} />
       )}
     </BottomSheet>
   )

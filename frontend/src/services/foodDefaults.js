@@ -1,3 +1,5 @@
+import { tagFoodsByRule } from './drinkTagging'
+
 // Default food options seeded on first install. Based on food_default.md.
 // 'good' category → positive points; 'bad' → points negated at log time.
 // Neutral foods from spec mapped to 'good' with low points (they still contribute positively).
@@ -86,7 +88,7 @@ export async function seedFoodDefaults(db) {
     if (toAdd.length > 0) {
       await db.tracker_config.put({
         key: 'custom_meal_options',
-        value: JSON.stringify([...current, ...toAdd]),
+        value: JSON.stringify([...current, ...tagFoodsByRule(toAdd).foods]),
       })
     }
 
