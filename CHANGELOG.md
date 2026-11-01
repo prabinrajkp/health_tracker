@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here.
 
+## [v4.36] — 2026-11-01
+
+Body goal and net calories. See `docs/body_goal_net_energy_plan.md`.
+
+### Added
+- **Body goal** — choose Lose, Keep or Gain weight, with an optional Build muscle setting, in onboarding and Settings. Your calorie target now follows the goal you chose, not your BMI. Existing users are asked once and keep exactly the same scores until they answer, and each change applies from its own date, so old days keep the goal they were lived under
+- **Support for gaining weight** — a surplus target with Slow and Steady paces, forgiving calorie points above the target, no points lost for extra portions of healthy food, fasting points off by default with a switch to keep them, and goal-aware colours and wording. The Calories card suggests foods you already eat when you are short
+- **New badges** — First Kilo Up, Five Up and Holding Steady. Badges for another goal stay out of the way, and anything earned stays on show
+- **Net calories** — food eaten minus an estimate of everything burned, on the Calories card, the day detail, Week with a bar for each complete day, Month and the Excel export. It is information only and never changes the score or the day's food target. Unfinished, half-logged and sick days stay out of the averages
+- **Exercise burn** — sessions get a Normal or Hard choice and show an estimated burn. Walks are counted through steps, so nothing is counted twice
+- **Expected vs actual** — on Month, compares your logs with your weight trend after about 3 weeks and offers a corrected maintenance figure. It applies only when you tap it, and is easy to undo
+- **Protein and healthy range** — protein targets by body weight once a goal is chosen, and a healthy weight range in Settings in place of a single ideal weight
+- **Hide calorie numbers** — an option for anyone who finds the numbers unhelpful. The score still works as usual
+- **Active calories from Health Connect** — optional, and replaces the steps and exercise estimates when turned on
+- **Guard rails** — Lose is not offered below BMI 18.5, a target on the wrong side of your weight is queried, under-18s get no calorie targets, and calm notes appear when weight falls too fast or falls while gaining. Reaching your target offers a switch to Keep
+
+### Changed
+- **Goal-aware coaching** — the AI health summary, reminders and weekly and monthly insights follow your goal, so nobody trying to gain is told to avoid snacks or protect a fasting window
+
+### Fixed
+- **"Target reached" too early** — the Weight screen said this straight away when your target was above your current weight
+- **Fasting maximum of 0** — it was treated as 10 when working out the bonus
+
+---
+
 ## [v4.35] — 2026-11-01
 
 Sick days. See `docs/sick_days_plan.md`.

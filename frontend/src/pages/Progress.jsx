@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, X, Share2, TrendingUp, Trending
 import { toPng } from 'html-to-image'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import toast from 'react-hot-toast'
-import { getMonthlyScores, getDiet, getWorkout, getSleep, getConfig } from '../api/client'
+import { getMonthlyScores, getDiet, getWorkout, getSleep, getConfig, getEnergyDays, getMaintenanceCheck, saveGoalEntry } from '../api/client'
 import {
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   LineChart, Line, ReferenceLine,
@@ -18,10 +18,12 @@ import { getMealAnalytics } from '../services/localStore'
 import { weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../services/scoreMeta'
 import { col, scoreColor } from '../services/theme'
 import { longestRun, toSickSet } from '../services/sickDays'
+import { planOn, fastingCounts } from '../services/bodyGoal'
+import { NetWeek, NetMonth } from '../components/NetSummary'
 
 // Deterministic, history-driven meal analytics (see recommendationEngine.js) —
 // top foods/templates, diversity, and repetition over the last 30 days.
-function MealInsightsCard() {
+function MealInsightsCard({ hideCalories }) {
   const [analytics, setAnalytics] = useState(null)
 
   useEffect(() => {
@@ -37,7 +39,7 @@ function MealInsightsCard() {
         <span className="text-sm text-text-muted">Last 30 days</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className={`grid gap-2 ${hideCalories ? 'grid-cols-2' : 'grid-cols-3'}`}>
         <div className="metric-card">
           <p className="metric-value">{analytics.diversityScore}%</p>
           <p className="metric-label">Variety</p>
@@ -46,10 +48,12 @@ function MealInsightsCard() {
           <p className="metric-value">{analytics.weeklyRepetitionPct}%</p>
           <p className="metric-label">Repeats this week</p>
         </div>
-        <div className="metric-card">
-          <p className="metric-value">{analytics.avgCalories}</p>
-          <p className="metric-label">Avg kcal a meal</p>
-        </div>
+        {!hideCalories && (
+          <div className="metric-card">
+            <p className="metric-value">{analytics.avgCalories}</p>
+            <p className="metric-label">Avg kcal a meal</p>
+          </div>
+        )}
       </div>
 
       {analytics.topFoods.length > 0 && (
@@ -108,14 +112,43 @@ export default function Progress() {
   const [maxes, setMaxes]               = useState(categoryMaxes())
 
   const [weights, setWeights]           = useState(null)
+  const [goalConfig, setGoalConfig]     = useState({})
+  const [hideCalories, setHideCalories] = useState(false)
+  const [weekNet, setWeekNet]           = useState([])
+  const [monthNet, setMonthNet]         = useState([])
+  const [scaleCheck, setScaleCheck]     = useState(null)
 
   useEffect(() => {
     getConfig().then(rows => {
       const w = weightsFromConfig(rows)
       setWeights(w)
       setMaxes(categoryMaxes(w))
+      const map = {}
+      rows.forEach(r => { map[r.key] = r.value })
+      setGoalConfig({ body_goal_history: map.body_goal_history })
+      setHideCalories(map.hide_calories === 'true')
     }).catch(() => {})
   }, [])
+
+  const loadScaleCheck = () => getMaintenanceCheck().then(setScaleCheck).catch(() => {})
+
+  // Applies from today, so days already lived keep their figures
+  const applyCorrection = async (offsets) => {
+    if (!scaleCheck?.plan) return
+    const previous = scaleCheck.plan
+    await saveGoalEntry({ ...previous, ...offsets })
+    await loadScaleCheck()
+    toast((t) => (
+      <span className="flex items-center gap-3">
+        <span>Target updated from today</span>
+        <button className="font-semibold text-brand-light shrink-0" onClick={async () => {
+          toast.dismiss(t.id)
+          await saveGoalEntry(previous)
+          await loadScaleCheck()
+        }}>Undo</button>
+      </span>
+    ), { duration: 6000 })
+  }
 
   // ── Lifetime stats (Trends) ──────────────────────────────────────────────
   useEffect(() => {
@@ -167,7 +200,7 @@ export default function Progress() {
     { key: 'diet',    color: CATEGORY_COLORS.diet,    label: 'Diet',    max: maxes.diet },
     { key: 'workout', color: CATEGORY_COLORS.workout, label: 'Workout', max: maxes.workout },
     { key: 'sleep',   color: CATEGORY_COLORS.sleep,   label: 'Sleep',   max: maxes.sleep },
-    { key: 'fasting', color: CATEGORY_COLORS.fasting, label: 'Fasting', max: maxes.fasting },
+    ...(fastingCounts(planOn(goalConfig)) ? [{ key: 'fasting', color: CATEGORY_COLORS.fasting, label: 'Fasting', max: maxes.fasting }] : []),
     { key: 'steps',   color: col('text-secondary'),   label: 'Steps',   max: 15000 },
   ]
   const activeLine = LINE_METRICS.find(m => m.key === selectedLine) || LINE_METRICS[0]
@@ -238,10 +271,15 @@ export default function Progress() {
       db.sleep_logs.where('date').between(mStart, mEnd, true, true).toArray(),
       db.daily_scores.where('date').between(pmStart, pmEnd, true, true).toArray(),
     ]).then(([s, d, w, sl, ps]) => {
-      const ins = computeMonthlyInsights({ scores: s, prevScores: ps, dietLogs: d, workoutLogs: w, sleepLogs: sl, year, month })
+      const ins = computeMonthlyInsights({
+        scores: s, prevScores: ps, dietLogs: d, workoutLogs: w, sleepLogs: sl, year, month,
+        fastingOn: fastingCounts(planOn(goalConfig, mEnd)),
+      })
       setMonthlyInsights(ins)
     }).catch(() => {})
-  }, [historyTab, year, month])
+    getEnergyDays(mStart, mEnd).then(setMonthNet).catch(() => setMonthNet([]))
+    loadScaleCheck()
+  }, [historyTab, year, month, goalConfig])
 
   // ── Week data fetch ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -266,9 +304,11 @@ export default function Progress() {
         scores, dietLogs: diet, workoutLogs: workout, sleepLogs: sleep,
         prevScores: pScores, prevDietLogs: pDiet, prevWorkoutLogs: pWorkout, prevSleepLogs: pSleep,
         weights,
+        fastingOn: fastingCounts(planOn(goalConfig, end)),
       }))
     }).finally(() => setWeekLoading(false))
-  }, [historyTab, weekRef, weights])
+    getEnergyDays(start, end).then(setWeekNet).catch(() => setWeekNet([]))
+  }, [historyTab, weekRef, weights, goalConfig])
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const pastScores = scores.filter(s => s.date <= todayStr)
@@ -437,6 +477,8 @@ export default function Progress() {
                     ))}
                   </div>
                 </section>
+
+                {!hideCalories && <NetWeek days={weekNet} />}
 
                 {/* ── What to fix ── */}
                 <section className="card">
@@ -670,6 +712,10 @@ export default function Progress() {
             </div>
           )}
 
+          {!hideCalories && (
+            <NetMonth days={monthNet} check={isCurrentMonth ? scaleCheck : null} onApply={applyCorrection} />
+          )}
+
           {/* ── Month insights (collapsed) ── */}
           {monthlyInsights && (monthlyInsights.storyArc?.length > 0 || monthlyInsights.trajectory
             || monthlyInsights.positives.length > 0 || monthlyInsights.risks.length > 0 || monthlyInsights.nearMiss?.length > 0) && (
@@ -878,7 +924,7 @@ export default function Progress() {
           )}
 
           {/* Meal Insights — deterministic, history-driven (see recommendationEngine.js) */}
-          <MealInsightsCard />
+          <MealInsightsCard hideCalories={hideCalories} />
 
           {lifetime && lifetime.days > 0 && (
             <section>

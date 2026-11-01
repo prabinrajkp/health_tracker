@@ -5,6 +5,8 @@
  * macro splits (protein 10-15%, carbs 50-60%, fat 20-30% of energy).
  */
 
+import { GAIN_PACES, ADULT_AGE, planOn, healthyRange } from './bodyGoal'
+
 // Keys match the ids Onboarding already stores, so onboarding_activity prefills cleanly.
 export const ACTIVITY_PAC = {
   sedentary:         1.2,
@@ -24,6 +26,13 @@ export const LOSS_RATES = [
 export const DEFAULT_DEFICIT = 500
 
 const isMale = (gender) => gender === 'm' || gender === 'male'
+
+// g/kg of body weight, once a goal has been chosen. `auto` keeps the energy split below.
+const PROTEIN_G_PER_KG = {
+  default: { min: 0.83, max: 1.2 },   // the low end is the ICMR-NIN 2024 figure
+  lose:    { min: 1.0,  max: 1.4 },
+  muscle:  { min: 1.6,  max: 2.0 },
+}
 
 export function computeBmi(heightCm, weightKg) {
   if (!heightCm || !weightKg) return null
@@ -54,19 +63,28 @@ export function getPacLevel(pac) {
   return 'Very Heavy'
 }
 
+// The signed daily calories a chosen goal asks for: minus to lose, plus to gain.
+export function goalKcal(plan) {
+  if (plan?.goal === 'lose') return -(LOSS_RATES.find(r => r.id === plan.pace)?.deficit ?? DEFAULT_DEFICIT)
+  if (plan?.goal === 'gain') return GAIN_PACES.find(r => r.id === plan.pace)?.surplus ?? GAIN_PACES[0].surplus
+  return 0
+}
+
 /**
- * ccc = maintenance calories, ncc = target calories after the BMI-driven adjustment.
- * Deficit defaults to 500 kcal (py_abacus); the rate-of-loss picker overrides it.
+ * ccc = maintenance calories, ncc = target calories. With a chosen goal the target
+ * follows it. Without one (`auto`) it follows BMI: deficit defaults to 500 kcal
+ * (py_abacus) and the rate-of-loss picker overrides it.
  */
-export function getCalorieDetails({ age, gender, heightCm, weightKg, pac, deficitKcal = DEFAULT_DEFICIT }) {
+export function getCalorieDetails({ age, gender, heightCm, weightKg, pac, deficitKcal = DEFAULT_DEFICIT, plan = null }) {
   const bmr = computeBmr(age, gender, heightCm, weightKg)
   if (bmr === null || !pac) return null
 
   const bmi = computeBmi(heightCm, weightKg)
-  const ccc = pac * bmr
+  const ccc = pac * bmr + (plan?.maintenanceOffset || 0)
 
   let ncc = ccc
-  if (bmi > 23)        ncc = ccc - deficitKcal
+  if (plan)            ncc = ccc + goalKcal(plan)
+  else if (bmi > 23)   ncc = ccc - deficitKcal
   else if (bmi < 18.5) ncc = ccc + 500
 
   // Never prescribe below the safe floor.
@@ -80,8 +98,8 @@ export function getCalorieDetails({ age, gender, heightCm, weightKg, pac, defici
  * Full target set for display. Returns null when body metrics are incomplete —
  * callers treat null as "targets unavailable" and skip anything that depends on them.
  */
-export function computeDietetics({ age, gender, heightCm, weightKg, pac, deficitKcal = DEFAULT_DEFICIT }) {
-  const details = getCalorieDetails({ age, gender, heightCm, weightKg, pac, deficitKcal })
+export function computeDietetics({ age, gender, heightCm, weightKg, pac, deficitKcal = DEFAULT_DEFICIT, plan = null }) {
+  const details = getCalorieDetails({ age, gender, heightCm, weightKg, pac, deficitKcal, plan })
   if (!details) return null
 
   const { bmr, bmi, ccc, ncc } = details
@@ -90,16 +108,37 @@ export function computeDietetics({ age, gender, heightCm, weightKg, pac, deficit
     max: Math.round((ncc * maxPct) / kcalPerGram),
   })
 
+  // A chosen goal sets protein by body weight; fat stays a share of energy and
+  // carbs take what is left. Without one, the original energy split stands.
+  let proteins = range(0.10, 0.15, 4)
+  let carbs    = range(0.50, 0.60, 4)
+  const fat    = range(0.20, 0.30, 9)
+  if (plan) {
+    const g = plan.muscle ? PROTEIN_G_PER_KG.muscle : plan.goal === 'lose' ? PROTEIN_G_PER_KG.lose : PROTEIN_G_PER_KG.default
+    proteins = { min: Math.round(g.min * weightKg), max: Math.round(g.max * weightKg) }
+    carbs = {
+      min: Math.max(0, Math.round((ncc - proteins.max * 4 - fat.max * 9) / 4)),
+      max: Math.max(0, Math.round((ncc - proteins.min * 4 - fat.min * 9) / 4)),
+    }
+  }
+
   return {
     activity_level: getPacLevel(pac),
     ideal_weight:   idealWeight(heightCm),
+    healthy_range:  healthyRange(heightCm),
     bmi,
     bmr,
+    pac,
+    heightCm,
+    weightKg,
     maintenance:    ccc,
     energy:         ncc,
-    proteins:       range(0.10, 0.15, 4),
-    carbs:          range(0.50, 0.60, 4),
-    fat:            range(0.20, 0.30, 9),
+    netGoal:        ncc - ccc,      // what the day's net should come to
+    goal:           plan?.goal ?? 'auto',
+    burnOffset:     plan?.burnOffset || 0,
+    proteins,
+    carbs,
+    fat,
     fibre:          isMale(gender) ? { min: 30, max: 50 } : { min: 25, max: 40 },
   }
 }
@@ -116,17 +155,24 @@ export function ageFromBirthYear(birthYear, now = new Date()) {
  * Builds the dietetics profile from stored config plus a weight reading.
  * `config` is the flat {key: value} map of tracker_config rows.
  */
-export function dieteticsFromConfig(config, weightKg) {
+export function dieteticsFromConfig(config, weightKg, date) {
   if (!config || !weightKg) return null
   const heightCm = Number(config.height_cm)
   const age      = ageFromBirthYear(config.birth_year)
   const gender   = config.gender
   if (!heightCm || !age || !gender) return null
+  if (age < ADULT_AGE) return null   // the formula and BMI cut-offs are for adults
 
   const pac  = ACTIVITY_PAC[config.activity_level] ?? ACTIVITY_PAC.lightly_active
   const rate = LOSS_RATES.find(r => r.id === config.loss_rate)
   return computeDietetics({
     age, gender, heightCm, weightKg, pac,
     deficitKcal: rate ? rate.deficit : DEFAULT_DEFICIT,
+    plan: planOn(config, date),
   })
+}
+
+export const isMinor = (config) => {
+  const age = ageFromBirthYear(config?.birth_year)
+  return age != null && age < ADULT_AGE
 }

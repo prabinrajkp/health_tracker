@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react'
 import { format, subDays } from 'date-fns'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Minus, Trash2, Timer, Flame, ChevronRight, GlassWater } from 'lucide-react'
-import { getDiet, saveDiet, getConfig, getLatestWeight } from '../../api/client'
+import { getDiet, saveDiet, getConfig, getLatestWeight, getWorkout, isSickDay, getRecentDietLogs } from '../../api/client'
 import { calcDietScore, calcNutritionTotals, calcCalorieScore } from '../../services/scoring'
-import { dieteticsFromConfig } from '../../services/dietetics'
+import { dieteticsFromConfig, isMinor } from '../../services/dietetics'
+import { planOn, fastingCounts } from '../../services/bodyGoal'
+import { computeNet, suggestAddOns } from '../../services/energy'
+import NetBreakdown from '../../components/NetBreakdown'
 import { weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../../services/scoreMeta'
 import { fastingWindow, fastingPoints, fmtHours } from '../../services/fasting'
 import { schedulePostDinnerWalk } from '../../services/reminders'
@@ -23,7 +26,7 @@ const EMPTY_DIET  = { meal_items: [], meal_times: { breakfast: '', lunch: '', di
 
 // One meal as a plain group: a heading row, then its foods divided by hairlines.
 // An empty meal is a single row, so four empty meals do not fill the screen.
-function MealGroup({ mealType, diet, onItems, onTime, onAdd, latePenalty }) {
+function MealGroup({ mealType, diet, onItems, onTime, onAdd, latePenalty, plan }) {
   const { Icon, label } = MEAL_META[mealType]
   const items = diet.meal_items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.mealType === mealType)
   const time  = diet.meal_times?.[mealType] || ''
@@ -59,8 +62,8 @@ function MealGroup({ mealType, diet, onItems, onTime, onAdd, latePenalty }) {
       {items.length > 0 && (
         <div className="group-list px-3 pt-1">
           {items.map(({ item, idx }) => {
-            const pts    = Math.round(itemScore(item) * 10) / 10
-            const isOver = item.idealPortions && item.portions > item.idealPortions
+            const pts    = Math.round(itemScore(item, plan) * 10) / 10
+            const isOver = plan?.goal !== 'gain' && item.idealPortions && item.portions > item.idealPortions
             return (
               <div key={idx} className="flex items-center gap-2 py-2.5">
                 <div className="flex-1 min-w-0">
@@ -170,7 +173,27 @@ function DrinksRow({ water, onOpen }) {
 
 // Calories eaten against the day's targets. The targets themselves (BMR,
 // maintenance, macro ranges) used to live on the Weight page.
-function CaloriesCard({ diet, dietetics, weights, onSetup }) {
+// How far the day's food is from the target, in the words that suit the goal.
+// Only someone losing or on the default rule sees going over as a warning.
+function targetText(left, goal) {
+  if (goal === 'gain') {
+    if (left > 0) return { text: `${left} to go` }
+    if (left >= -100) return { text: 'Goal reached' }
+    return { text: `${Math.abs(left)} extra` }
+  }
+  if (left >= 0) return { text: `${left} left` }
+  return { text: `${Math.abs(left)} over`, warn: goal !== 'keep' }
+}
+
+const GOAL_LINE = { lose: 'Goal: lose weight', keep: 'Goal: keep your weight', gain: 'Goal: gain weight' }
+
+function CaloriesCard({ diet, dietetics, weights, onSetup, minor, plan, net, addOns }) {
+  if (minor) return (
+    <section className="card flex items-start gap-3">
+      <Flame size={18} className="text-text-secondary shrink-0 mt-0.5" />
+      <p className="text-sm text-text-secondary">Calorie targets are for adults, so they are off. A doctor can help with weight goals at your age.</p>
+    </section>
+  )
   if (!dietetics) return (
     <button onClick={onSetup} className="w-full card flex items-center gap-3 text-left active:opacity-70 transition-opacity">
       <Flame size={18} className="text-text-secondary shrink-0" />
@@ -186,7 +209,8 @@ function CaloriesCard({ diet, dietetics, weights, onSetup }) {
   const target  = dietetics.energy
   const left    = target - totals.kcal
   const pct     = Math.min((totals.kcal / target) * 100, 100)
-  const score   = calcCalorieScore(diet, dietetics, weights)
+  const score   = calcCalorieScore(diet, dietetics, weights, plan)
+  const status  = targetText(left, dietetics.goal)
   const partial = totals.hasData && totals.coverage < (weights.calories?.min_coverage ?? 0.7)
 
   return (
@@ -203,14 +227,21 @@ function CaloriesCard({ diet, dietetics, weights, onSetup }) {
             <span className="t-number">{totals.kcal}</span>
             <span className="text-sm text-text-muted">/ {target} kcal</span>
           </p>
-          <span className={`text-sm font-semibold tabular-nums ${left < 0 ? 'text-warning' : 'text-text-secondary'}`}>
-            {left < 0 ? `${Math.abs(left)} over` : `${left} left`}
+          <span className={`text-sm font-semibold tabular-nums ${status.warn ? 'text-warning' : 'text-text-secondary'}`}>
+            {status.text}
           </span>
         </div>
         <div className="h-2 rounded-full overflow-hidden bg-surface-elevated">
-          <div className={`h-full rounded-full transition-all ${left < 0 ? 'bg-warning' : 'bg-brand'}`} style={{ width: `${pct}%` }} />
+          <div className={`h-full rounded-full transition-all ${status.warn ? 'bg-warning' : 'bg-brand'}`} style={{ width: `${pct}%` }} />
         </div>
+        {dietetics.goal === 'gain' && left > 200 && addOns?.length > 0 && (
+          <p className="text-sm text-text-secondary mt-2">
+            Foods you often have: {addOns.map(a => `${a.label} (${a.kcal})`).join(', ')}
+          </p>
+        )}
       </div>
+
+      <NetBreakdown net={net} />
 
       <div className="space-y-2.5">
         <MacroRow label="Protein" value={totals.protein} range={dietetics.proteins} />
@@ -219,7 +250,7 @@ function CaloriesCard({ diet, dietetics, weights, onSetup }) {
       </div>
 
       <p className="t-caption leading-relaxed">
-        Maintenance {dietetics.maintenance} kcal · BMR {dietetics.bmr} kcal · fibre {dietetics.fibre.min}–{dietetics.fibre.max} g · BMI {dietetics.bmi}
+        {GOAL_LINE[dietetics.goal] ? `${GOAL_LINE[dietetics.goal]} · ` : ''}Maintenance {dietetics.maintenance} kcal · BMR {dietetics.bmr} kcal · fibre {dietetics.fibre.min}–{dietetics.fibre.max} g · BMI {dietetics.bmi}
       </p>
 
       {partial && (
@@ -242,6 +273,13 @@ export default function FoodSection({ afterSave }) {
   const [weights, setWeights]             = useState(weightsFromConfig(null))
   const [customOptions, setCustomOptions] = useState([])
   const [dietetics, setDietetics]         = useState(null)
+  const [plan, setPlan]                   = useState(null)
+  const [minor, setMinor]                 = useState(false)
+  const [workout, setWorkout]             = useState(null)
+  const [sick, setSick]                   = useState(false)
+  const [useDevice, setUseDevice]         = useState(false)
+  const [hideCalories, setHideCalories]   = useState(false)
+  const [addOns, setAddOns]               = useState([])
   const [addOpen, setAddOpen]             = useState(false)
   const [addCategory, setAddCategory]     = useState(null)
   // Drinks logged in today's meals count toward the total, live as portions change
@@ -266,8 +304,16 @@ export default function FoodSection({ afterSave }) {
       rows.forEach(r => { map[r.key] = r.value })
       setWeights(weightsFromConfig(map))
       try { if (map.custom_meal_options) setCustomOptions(JSON.parse(map.custom_meal_options)) } catch {}
-      setDietetics(latestWeight ? dieteticsFromConfig(map, latestWeight.weight_kg) : null)
+      setDietetics(latestWeight ? dieteticsFromConfig(map, latestWeight.weight_kg, today) : null)
+      const p = planOn(map, today)
+      setPlan(p)
+      setMinor(isMinor(map))
+      setUseDevice(map.use_device_calories === 'true')
+      setHideCalories(map.hide_calories === 'true')
+      if (p?.goal === 'gain') getRecentDietLogs().then(logs => setAddOns(suggestAddOns(logs))).catch(() => {})
     }).catch(console.error)
+    getWorkout(today).then(setWorkout).catch(() => {})
+    isSickDay(today).then(setSick).catch(() => {})
   }, [])
 
   const { save, flush } = useAutoSave(async (next) => {
@@ -300,7 +346,8 @@ export default function FoodSection({ afterSave }) {
   const latePenalty = Math.abs(weights.penalties?.dinner_after_9pm || 0)
   const dinnerTime  = diet.meal_times?.dinner
   const penalty     = dinnerTime && Number(dinnerTime.split(':')[0]) >= 21 ? latePenalty : 0
-  const dietPts     = Math.max(0, calcDietScore(diet, weights, customOptions) - penalty)
+  const dietPts     = Math.max(0, calcDietScore(diet, weights, customOptions, plan) - penalty)
+  const net         = computeNet({ diet, workout, dietetics, date: today, today, sick, useDevice })
   const extras      = EXTRA_MEALS.filter(mt => diet.meal_items.some(i => i.mealType === mt))
 
   return (
@@ -309,12 +356,15 @@ export default function FoodSection({ afterSave }) {
 
       <div className="space-y-4">
         {[...MAIN_MEALS, ...extras].map(mt => (
-          <MealGroup key={mt} mealType={mt} diet={diet} onItems={setItems} onTime={setTime} onAdd={openAdd} latePenalty={latePenalty} />
+          <MealGroup key={mt} mealType={mt} diet={diet} onItems={setItems} onTime={setTime} onAdd={openAdd} latePenalty={latePenalty} plan={plan} />
         ))}
-        <FastingLine diet={diet} yesterdayDiet={yesterdayDiet} weights={weights} />
+        {fastingCounts(plan) && <FastingLine diet={diet} yesterdayDiet={yesterdayDiet} weights={weights} />}
       </div>
 
-      <CaloriesCard diet={diet} dietetics={dietetics} weights={weights} onSetup={() => navigate('/settings?section=body')} />
+      {!hideCalories && (
+        <CaloriesCard diet={diet} dietetics={dietetics} weights={weights} minor={minor} plan={plan} net={net} addOns={addOns}
+          onSetup={() => navigate('/settings?section=body')} />
+      )}
 
       {/* Not part of the score, so it sits below everything that is */}
       <DrinksRow water={water} onOpen={() => setDrinksOpen(true)} />

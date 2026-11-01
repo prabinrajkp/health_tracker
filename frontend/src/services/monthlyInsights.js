@@ -1,7 +1,7 @@
 import { format, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns'
 import { gradeFor } from './scoreMeta'
 
-function buildNarrative({ avgScore, trend, daysLogged, monthName, avgSleep, workoutSessions, junkFoodDays, lateDinnerDays }) {
+function buildNarrative({ avgScore, trend, daysLogged, monthName, avgSleep, workoutSessions, junkFoodDays, lateDinnerDays, fastingOn }) {
   const parts = []
   if (trend !== null && trend > 5)
     parts.push(`Strong growth in ${monthName} — avg score up ${trend} pts vs last month.`)
@@ -17,7 +17,7 @@ function buildNarrative({ avgScore, trend, daysLogged, monthName, avgSleep, work
   else if (workoutSessions >= 4)
     parts.push(`${workoutSessions} workout sessions powered your activity score.`)
   else if (lateDinnerDays === 0 && daysLogged >= 10)
-    parts.push('Zero late dinners protected your fasting window all month.')
+    parts.push(fastingOn ? 'Zero late dinners protected your fasting window all month.' : 'Zero late dinners all month.')
 
   if (junkFoodDays >= 8)
     parts.push(`Junk food on ${junkFoodDays} days was the main score drag.`)
@@ -75,7 +75,7 @@ function buildTrajectory({ pastScores, prevAvgScore }) {
   return { currentAvg, firstAvg, secondAvg, halfTrend, projected, prevAvgScore }
 }
 
-export function computeMonthlyInsights({ scores, prevScores, dietLogs, workoutLogs, sleepLogs, year, month }) {
+export function computeMonthlyInsights({ scores, prevScores, dietLogs, workoutLogs, sleepLogs, year, month, fastingOn = true }) {
   const today      = format(new Date(), 'yyyy-MM-dd')
   const pastScores = scores.filter(s => s.date <= today)
   if (pastScores.length === 0) return null
@@ -106,20 +106,20 @@ export function computeMonthlyInsights({ scores, prevScores, dietLogs, workoutLo
   const breakfastDays = dates.filter(d => (dietMap[d]?.meal_items || []).some(i => i.mealType === 'breakfast')).length
 
   const grade    = gradeFor(avgScore)
-  const narrative = buildNarrative({ avgScore, trend, daysLogged, monthName, avgSleep, workoutSessions, junkFoodDays, lateDinnerDays })
+  const narrative = buildNarrative({ avgScore, trend, daysLogged, monthName, avgSleep, workoutSessions, junkFoodDays, lateDinnerDays, fastingOn })
   const storyArc  = buildStoryArc({ pastScores, workoutMap, sleepMap, year, month })
   const trajectory = buildTrajectory({ pastScores, prevAvgScore })
 
   const positives = []
   if (workoutSessions >= 4) positives.push({ icon: '💪', text: `${workoutSessions} workout sessions`, sub: 'Exercise bonus stacked consistently' })
   if (avgSleep >= 7.2) positives.push({ icon: '🌙', text: `${avgSleep}h avg sleep`, sub: 'Recovery scores above baseline' })
-  if (lateDinnerDays === 0 && daysLogged >= 10) positives.push({ icon: '🍽️', text: 'Zero late dinners', sub: 'Full fasting window protected' })
+  if (lateDinnerDays === 0 && daysLogged >= 10) positives.push({ icon: '🍽️', text: 'Zero late dinners', sub: fastingOn ? 'Full fasting window protected' : 'No late-dinner cost all month' })
   if (breakfastDays >= daysLogged * 0.8 && daysLogged >= 8) positives.push({ icon: '🌅', text: `Breakfast ${breakfastDays}/${daysLogged} days`, sub: 'Morning consistency is strong' })
   if (trend !== null && trend >= 5) positives.push({ icon: '📈', text: `+${trend} pts vs last month`, sub: 'Clear upward momentum' })
 
   const risks = []
   if (junkFoodDays >= 8) risks.push({ icon: '🚨', text: `Junk food ${junkFoodDays} days`, sub: 'The biggest cost to your diet score' })
-  if (lateDinnerDays >= 6) risks.push({ icon: '⚠️', text: `${lateDinnerDays} late dinners`, sub: 'Each one costs points and shortens the fasting window' })
+  if (lateDinnerDays >= 6) risks.push({ icon: '⚠️', text: `${lateDinnerDays} late dinners`, sub: fastingOn ? 'Each one costs points and shortens the fasting window' : 'Each one costs points' })
   if (avgSleep < 6.5 && sleepHours.length >= 5) risks.push({ icon: '😴', text: `Avg sleep ${avgSleep}h`, sub: '7+ hours earns the full sleep-duration points' })
   if (workoutSessions === 0 && daysLogged >= 10) risks.push({ icon: '🏃', text: 'No workout sessions', sub: 'Exercise points left unclaimed' })
 

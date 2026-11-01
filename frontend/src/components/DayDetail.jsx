@@ -6,7 +6,9 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
 } from 'recharts'
 import { Sparkles, Loader2, RefreshCw } from 'lucide-react'
-import { getConfig } from '../api/client'
+import { getConfig, getDayEnergy } from '../api/client'
+import { planOn } from '../services/bodyGoal'
+import NetBreakdown from './NetBreakdown'
 import { generateHealthSummary } from '../services/llmApi'
 import { weightsFromConfig, categoryMaxes, gradeFor, CATEGORY_COLORS } from '../services/scoreMeta'
 import { col } from '../services/theme'
@@ -40,12 +42,12 @@ export function calcFastingHours(diet, yesterdayDiet) {
   return Math.round(((b - d) / 60) * 10) / 10
 }
 
-export function itemScore(item) {
+export function itemScore(item, plan = null) {
   const ppp = item.pointsPerPortion || 0
   const p   = item.portions || 1
   const ip  = item.idealPortions
   if (item.category === 'bad' || ppp < 0) return p * ppp
-  if (ip && ip > 0) return Math.min(p, ip) * ppp - Math.max(0, p - ip) * ppp * 0.5
+  if (ip && ip > 0) return Math.min(p, ip) * ppp - (plan?.goal === 'gain' ? 0 : Math.max(0, p - ip) * ppp * 0.5)
   return p * ppp
 }
 
@@ -112,23 +114,29 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
   const [summaryLoading, setLoading] = useState(false)
   const [summaryError, setError]     = useState('')
   const [max, setMax]                = useState(categoryMaxes())
+  const [plan, setPlan]              = useState(null)
+  const [net, setNet]                = useState(null)
+  const [hideCalories, setHideCalories] = useState(false)
 
   useEffect(() => {
+    if (date) getDayEnergy(date).then(setNet).catch(() => {})
     getConfig().then(rows => {
       const map = {}
       rows?.forEach?.(r => { map[r.key] = r.value })
       setMax(categoryMaxes(weightsFromConfig(map)))
+      setPlan(planOn(map, date))
+      setHideCalories(map.hide_calories === 'true')
       if (map.openrouter_api_key || map.groq_api_key) {
         setAiConfig({ openrouter_api_key: map.openrouter_api_key, groq_api_key: map.groq_api_key })
       }
     }).catch(() => {})
-  }, [])
+  }, [date])
 
   const runSummary = () => {
     if (!aiConfig) return
     setLoading(true)
     setError('')
-    generateHealthSummary({ score, diet, workout, sleep, yesterdayDiet }, aiConfig)
+    generateHealthSummary({ score, diet, workout, sleep, yesterdayDiet, plan, net: hideCalories ? null : net }, aiConfig)
       .then(text => {
         setSummary(text)
         try { localStorage.setItem(cacheKey, text) } catch {}
@@ -200,6 +208,13 @@ export function DayDetailPanel({ score, diet, workout, sleep, yesterdayDiet, dat
           </div>
         )}
       </div>
+
+      {net && !hideCalories && (
+        <div>
+          <p className="section-label mb-1">Calories</p>
+          <NetBreakdown net={net} />
+        </div>
+      )}
 
       {/* AI Health Summary */}
       <div>

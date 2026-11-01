@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcCalorieScore, calcNutritionTotals, computeScore } from '../scoring.js'
+import { calcCalorieScore, calcDietScore, calcNutritionTotals, computeScore } from '../scoring.js'
 import { DEFAULT_WEIGHTS } from '../db.js'
 
 const W = DEFAULT_WEIGHTS
@@ -140,5 +140,60 @@ describe('computeScore — no drift on pre-nutrition days', () => {
     expect(r.calorieScore).not.toBeNull()
     expect(r.calorieScore).toBeGreaterThan(0)
     expect(r.total).toBeLessThanOrEqual(100)
+  })
+})
+
+describe('body goal scoring', () => {
+  const gain = { goal: 'gain', fasting: false }
+  const lose = { goal: 'lose', fasting: true }
+  it('forgives going over the target on Gain', () => {
+    const d = { meal_items: [item({ portions: 4.6 })] }   // 2300 against 2000: +15%
+    expect(calcCalorieScore(d, TARGET, W, gain)).toBe(10)
+    expect(calcCalorieScore(d, TARGET, W, lose)).toBeLessThan(10)
+    expect(calcCalorieScore(d, TARGET, W, null)).toBeLessThan(10)
+  })
+  it('still has a limit on Gain', () => {
+    expect(calcCalorieScore({ meal_items: [item({ portions: 6 })] }, TARGET, W, gain)).toBe(0)     // +50%
+    const taper = calcCalorieScore({ meal_items: [item({ portions: 5.4 })] }, TARGET, W, gain)     // +35%
+    expect(taper).toBeGreaterThan(0)
+    expect(taper).toBeLessThan(10)
+  })
+  it('scores under-eating on Gain as before', () => {
+    const d = { meal_items: [item({ portions: 3 })] }   // 1500: −25%
+    expect(calcCalorieScore(d, TARGET, W, gain)).toBe(calcCalorieScore(d, TARGET, W, null))
+  })
+
+  const over = { meal_items: [item({ portions: 3, idealPortions: 1, pointsPerPortion: 4 })] }
+  it('does not take points for extra healthy portions on Gain', () => {
+    expect(calcDietScore(over, W, [], gain)).toBe(4)
+    expect(calcDietScore(over, W, [], null)).toBe(0)   // 4 − (2 × 4 × 0.5)
+  })
+  it('still takes points for junk on Gain', () => {
+    const junk = { meal_items: [item({ pointsPerPortion: 4 }), item({ category: 'bad', pointsPerPortion: -3 })] }
+    expect(calcDietScore(junk, W, [], gain)).toBe(1)
+  })
+
+  const fastDiet = { meal_items: [item({ mealType: 'breakfast', time: '10:00' })] }
+  const lastNight = { meal_items: [item({ mealType: 'dinner', time: '18:00' })] }
+  it('gives no fasting points on Gain unless kept', () => {
+    expect(computeScore(fastDiet, null, null, W, [], lastNight, null, gain).fastingScore).toBe(0)
+    expect(computeScore(fastDiet, null, null, W, [], lastNight, null, { goal: 'gain', fasting: true }).fastingScore).toBeGreaterThan(0)
+    expect(computeScore(fastDiet, null, null, W, [], lastNight, null, null).fastingScore).toBeGreaterThan(0)
+  })
+  it('can still reach 100 with fasting off', () => {
+    const big = { ...W, bonus: { all_rules_followed: 0, perfect_score: 0 } }
+    const full = { steps: 20000, post_dinner_walk: true, post_dinner_walk_minutes: 15, exercise_done: true, exercise_duration_minutes: 60 }
+    const sleep = { sleep_time: '22:30', sleep_hours: 8, wake_time: '06:30' }
+    const diet = { meal_items: [item({ portions: 4, pointsPerPortion: 10 })] }
+    const r = computeScore(diet, full, sleep, { ...big, workout_max: 35, sleep_max: 30 }, [], null, { energy: 2000 }, gain)
+    expect(r.total).toBeGreaterThanOrEqual(90)
+  })
+  it('reads a zero fasting maximum as zero, not ten', () => {
+    const zero = { ...W, fasting: { ...W.fasting, max_points: 0 } }
+    const diet = { meal_items: [item({ portions: 4, pointsPerPortion: 10 })] }
+    const full = { steps: 20000, post_dinner_walk: true, post_dinner_walk_minutes: 15, exercise_done: true, exercise_duration_minutes: 60 }
+    const sleep = { sleep_time: '22:30', sleep_hours: 8, wake_time: '06:30' }
+    const r = computeScore(diet, full, sleep, zero, [], null, null, null)
+    expect(r.bonus).toBeGreaterThan(0)
   })
 })

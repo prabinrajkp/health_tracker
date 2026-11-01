@@ -3,7 +3,8 @@ import toast from 'react-hot-toast'
 import { RefreshCw, Pencil } from 'lucide-react'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { HealthConnect } from 'capacitor-health-connect'
-import { getWorkout, saveWorkout, getConfig } from '../../api/client'
+import { getWorkout, saveWorkout, getConfig, getLatestWeight } from '../../api/client'
+import { exerciseKcal, fmtKcal, INTENSITIES } from '../../services/energy'
 import { calcWorkoutScore } from '../../services/scoring'
 import { weightsFromConfig, categoryMaxes, stepTargets, CATEGORY_COLORS } from '../../services/scoreMeta'
 import { isStepsManualToday, setStepsManualToday } from '../../services/stepSync'
@@ -14,7 +15,8 @@ const UsageStats = registerPlugin('UsageStats')
 const EXERCISE_TYPES     = ['Badminton', 'Stairs', 'Walking', 'Gym', 'Cycling', 'Other']
 const WALK_DURATIONS     = [5, 10, 15, 20, 30]
 const EXERCISE_DURATIONS = [20, 30, 45, 60, 90]
-const EMPTY_WORKOUT = { steps: 0, post_dinner_walk: false, post_dinner_walk_minutes: 0, exercise_done: false, exercise_type: '', exercise_duration_minutes: 0, notes: '' }
+const EMPTY_WORKOUT = { steps: 0, post_dinner_walk: false, post_dinner_walk_minutes: 0, exercise_done: false, exercise_type: '', exercise_duration_minutes: 0, exercise_intensity: 'normal', notes: '' }
+const INTENSITY_LABEL = { normal: 'Normal', hard: 'Hard' }
 
 const hhmm = (ts) => {
   const d = new Date(ts)
@@ -60,6 +62,8 @@ export default function MoveSection({ afterSave }) {
   const [source, setSource]     = useState(isStepsManualToday() ? 'manual' : null)
   const [syncedAt, setSyncedAt] = useState(null)
   const [syncing, setSyncing]   = useState(false)
+  const [weightKg, setWeightKg] = useState(null)
+  const [hideCalories, setHideCalories] = useState(false)
 
   const { save } = useAutoSave(async (next) => {
     await saveWorkout({ ...next, date: today })
@@ -84,7 +88,11 @@ export default function MoveSection({ afterSave }) {
   }
 
   useEffect(() => {
-    getConfig().then(rows => setWeights(weightsFromConfig(rows))).catch(() => {})
+    getConfig().then(rows => {
+      setWeights(weightsFromConfig(rows))
+      setHideCalories(rows.some(r => r.key === 'hide_calories' && r.value === 'true'))
+    }).catch(() => {})
+    getLatestWeight().then(w => setWeightKg(w?.weight_kg || null)).catch(() => {})
     getWorkout(today).then(async (existing) => {
       if (existing) commit({ ...EMPTY_WORKOUT, ...existing, date: today }, 0, false)
       if (!Capacitor.isNativePlatform()) return
@@ -159,6 +167,7 @@ export default function MoveSection({ afterSave }) {
     : `${(t.full - steps).toLocaleString()} to go for full points`
   const sourceLabel = { health_connect: 'Health Connect', sensor: 'Phone sensor', manual: 'Entered by you' }[source]
   const canSync = hcStatus === 'Available'
+  const sessionKcal = exerciseKcal(form, weightKg)
 
   return (
     <div className="space-y-6">
@@ -246,6 +255,15 @@ export default function MoveSection({ afterSave }) {
               <PillSelector options={EXERCISE_TYPES} value={form.exercise_type} onChange={type => update({ exercise_type: type })} />
               <PillSelector options={EXERCISE_DURATIONS} value={form.exercise_duration_minutes}
                 onChange={v => update({ exercise_duration_minutes: v })} formatter={v => `${v} min`} />
+              {!hideCalories && (
+                <>
+                  <PillSelector options={INTENSITIES} value={form.exercise_intensity || 'normal'}
+                    onChange={v => update({ exercise_intensity: v })} formatter={v => INTENSITY_LABEL[v]} />
+                  <p className="text-sm text-text-secondary tabular-nums">
+                    {sessionKcal > 0 ? `About ${fmtKcal(sessionKcal).slice(1)} kcal` : form.exercise_type === 'Walking' && steps > 0 ? 'Counted through your steps' : ''}
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

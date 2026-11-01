@@ -16,7 +16,7 @@ import { scheduleSmartNotifications } from './services/notificationEngine'
 import { scheduleTrendNotifications } from './services/trendNotificationEngine'
 import { migrateFixedReminders } from './services/reminders'
 import { seedFoodDefaults } from './services/foodDefaults'
-import { syncStepsBackground } from './services/stepSync'
+import { syncStepsBackground, syncActiveCalories } from './services/stepSync'
 import { runBadgeEngine } from './services/badgeEngine'
 
 const STEP_SYNC_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes
@@ -42,7 +42,11 @@ export default function App() {
 
     // Sync steps on open, then every 30 minutes
     syncStepsBackground().catch(() => {})
-    const stepSyncTimer = setInterval(() => syncStepsBackground().catch(() => {}), STEP_SYNC_INTERVAL_MS)
+    syncActiveCalories().catch(() => {})
+    const stepSyncTimer = setInterval(() => {
+      syncStepsBackground().catch(() => {})
+      syncActiveCalories().catch(() => {})
+    }, STEP_SYNC_INTERVAL_MS)
 
     foodsReady.then(() => db.tracker_config.get('onboarding_complete'))
       .then(async cfg => {

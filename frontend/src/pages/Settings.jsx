@@ -12,17 +12,21 @@ import { TutorialSlides } from './Onboarding'
 import * as XLSX from 'xlsx'
 import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
-import { getConfig, saveConfig, getScoreForDate, getLatestWeight } from '../api/client'
+import { getConfig, saveConfig, getScoreForDate, getLatestWeight, saveGoalEntry } from '../api/client'
 import { estimateWaterGoal, resolveWaterGoal, formatLitres, waterTotals, goalMet, mealDrinks, GLASS_SIZES, GOAL_LIMITS, DEFAULT_GLASS_ML, DEFAULT_GOAL_ML } from '../services/hydration'
 import { splitFoods, ARCHIVE_AFTER_DAYS } from '../services/foodArchive'
 import { ruleTag, applyDrinkTag, isDrinkFood, clampMl, ML_LIMITS } from '../services/drinkTagging'
 import { stampTodayDrinkItems } from '../api/client'
-import { getFoodUsage, reviveFood } from '../services/localStore'
+import { getFoodUsage, reviveFood, getEnergyDays } from '../services/localStore'
 import { scheduleFixedReminders, NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/reminders'
 import { version as APP_VERSION } from '../../package.json'
 import useStore from '../store/useStore'
 import db, { DEFAULT_WEIGHTS } from '../services/db'
-import { ACTIVITY_PAC, LOSS_RATES, computeDietetics, ageFromBirthYear } from '../services/dietetics'
+import { ACTIVITY_PAC, LOSS_RATES, computeDietetics, computeBmi, ageFromBirthYear } from '../services/dietetics'
+import { BODY_GOALS, GAIN_PACES, UNDERWEIGHT_BMI, ADULT_AGE, planOn, checkGoal, defaultPace, defaultFasting } from '../services/bodyGoal'
+import { round10 } from '../services/energy'
+import { Toggle } from './log/shared'
+import { HealthConnect } from 'capacitor-health-connect'
 import { hasLlmKey, analyzeFoodWithAI, bulkAnalyzeFoodsWithAI, bulkTagDrinksWithAI } from '../services/llmApi'
 
 // ids match Onboarding's ACTIVITY_LEVELS so onboarding_activity can prefill this
@@ -109,7 +113,7 @@ const NUTRITION_FIELDS = [
 ]
 
 export default function Settings() {
-  const { fetchConfig, theme, setTheme } = useStore()
+  const { fetchConfig, fetchTodayScore, theme, setTheme } = useStore()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const sectionFromUrl = searchParams.get('section')
@@ -122,6 +126,13 @@ export default function Settings() {
   const [gender, setGender]           = useState('')
   const [activityLevel, setActivityLevel] = useState('lightly_active')
   const [lossRate, setLossRate]       = useState('standard')
+  const [bodyGoal, setBodyGoal]       = useState('auto')   // 'auto' until the user chooses
+  const [gainPace, setGainPace]       = useState('slow')
+  const [buildMuscle, setBuildMuscle] = useState(false)
+  const [gainFasting, setGainFasting] = useState(false)
+  const [savedPlan, setSavedPlan]     = useState(null)
+  const [hideCalories, setHideCalories] = useState(false)
+  const [useDeviceCalories, setUseDeviceCalories] = useState(false)
   const [bulkMode, setBulkMode]       = useState(null)   // null | 'prompt' | 'paste'
   const [bulkText, setBulkText]       = useState('')
   const [saving, setSaving]           = useState(false)
@@ -184,6 +195,17 @@ export default function Settings() {
       if (map.activity_level)      setActivityLevel(map.activity_level)
       else if (map.onboarding_activity) setActivityLevel(map.onboarding_activity)
       if (map.loss_rate)           setLossRate(map.loss_rate)
+      const plan = planOn(map)
+      if (plan) {
+        setBodyGoal(plan.goal)
+        if (plan.goal === 'lose' && plan.pace) setLossRate(plan.pace)
+        if (plan.goal === 'gain' && plan.pace) setGainPace(plan.pace)
+        if (plan.goal === 'gain') setGainFasting(plan.fasting)
+        setBuildMuscle(plan.muscle)
+        setSavedPlan(plan)
+      }
+      setHideCalories(map.hide_calories === 'true')
+      setUseDeviceCalories(map.use_device_calories === 'true')
       if (map.custom_meal_options) { try { setCustomOptions(JSON.parse(map.custom_meal_options)) } catch {} }
       if (map.openrouter_api_key)  setOpenrouterKey(map.openrouter_api_key)
       if (map.groq_api_key)        setGroqKey(map.groq_api_key)
@@ -442,7 +464,32 @@ export default function Settings() {
     setAiMode(null); setAiResult(null); setAiPasteText(''); setAiShowHowTo(false); setAiCopied(false)
   }
 
+  // Only a real change adds a history entry, so saving other settings leaves it alone
+  const saveGoalIfChanged = async () => {
+    if (!formPlan) return
+    const sameGoal = savedPlan && savedPlan.goal === formPlan.goal && savedPlan.pace === formPlan.pace
+      && savedPlan.muscle === formPlan.muscle && savedPlan.fasting === formPlan.fasting
+    if (sameGoal) return
+    await saveGoalEntry(formPlan)
+    setSavedPlan(formPlan)
+    await fetchTodayScore()
+  }
+
+  const toggleDeviceCalories = async (on) => {
+    if (!on) { setUseDeviceCalories(false); return }
+    if (!Capacitor.isNativePlatform()) { toast.error('Health Connect only works on the Android app'); return }
+    try {
+      const perm = await HealthConnect.requestHealthPermissions({ read: ['ActiveCaloriesBurned'], write: [] })
+      if (perm.hasAllPermissions) setUseDeviceCalories(true)
+      else toast.error('Active calories permission not granted')
+    } catch { toast.error('Could not open Health Connect') }
+  }
+
   const handleSave = async () => {
+    if (goalCheck.blocks.length) {
+      toast.error(goalCheck.blocks[0])
+      return
+    }
     setSaving(true)
     try {
       await Promise.all([
@@ -454,6 +501,8 @@ export default function Settings() {
         saveConfig({ key: 'gender',               value: gender }),
         saveConfig({ key: 'activity_level',       value: activityLevel }),
         saveConfig({ key: 'loss_rate',            value: lossRate }),
+        saveConfig({ key: 'hide_calories',        value: String(hideCalories) }),
+        saveConfig({ key: 'use_device_calories',  value: String(useDeviceCalories) }),
         saveConfig({ key: 'custom_meal_options',  value: JSON.stringify(customOptions) }),
         saveConfig({ key: 'openrouter_api_key',   value: openrouterKey.trim() }),
         saveConfig({ key: 'groq_api_key',         value: groqKey.trim() }),
@@ -468,6 +517,7 @@ export default function Settings() {
         saveConfig({ key: 'water_goal_custom_ml',  value: waterGoalCustom }),
         saveConfig({ key: 'water_glass_ml',        value: waterGlassMl }),
       ])
+      await saveGoalIfChanged()
       await fetchConfig()
       // Anything already logged today picks up the drink tags just saved
       await stampTodayDrinkItems().catch(() => {})
@@ -488,12 +538,18 @@ export default function Settings() {
         db.weight_logs.orderBy('date').toArray(),
         db.water_logs.orderBy('date').toArray(),
       ])
+      const energyDays = scores.length ? await getEnergyDays(scores[0].date, scores[scores.length - 1].date) : []
+      const energyByDate = Object.fromEntries(energyDays.map(d => [d.date, d]))
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(scores.map(r => ({
         Date: r.date, 'Total Score': Math.round(r.total_score), 'Diet Score': Math.round(r.diet_score),
         'Workout Score': Math.round(r.workout_score), 'Sleep Score': Math.round(r.sleep_score),
         'Calorie Score': r.calorie_score == null ? '' : r.calorie_score,
         'Bonus Points': Math.round(r.bonus_points || 0), 'Streak Days': r.streak_days || 0,
+        'Eaten (kcal)': energyByDate[r.date]?.eaten ?? '',
+        'Burned (est. kcal)': energyByDate[r.date] ? round10(energyByDate[r.date].burned) : '',
+        'Net (est. kcal)': energyByDate[r.date] ? round10(energyByDate[r.date].net) : '',
+        'Complete Day': energyByDate[r.date]?.counts ? 'Yes' : 'No',
       }))), 'Scores')
       if (weightLogs.length) {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(weightLogs.map(r => ({
@@ -616,8 +672,29 @@ export default function Settings() {
   // ── Menu item definition ──────────────────────────────────────────────────
   const totalMax = (weights.diet_max || 35) + (weights.workout_max || 35) + (weights.sleep_max || 30)
   const bodyComplete = !!(heightCm && birthYear && gender)
+  const enteredAge = ageFromBirthYear(birthYear)
+  const enteredBmi = heightCm && currentWeight ? computeBmi(Number(heightCm), Number(currentWeight)) : null
+  const formPlan = bodyGoal === 'auto' ? null : {
+    goal: bodyGoal,
+    pace: bodyGoal === 'lose' ? lossRate : bodyGoal === 'gain' ? gainPace : null,
+    muscle: buildMuscle,
+    fasting: bodyGoal === 'gain' ? gainFasting : defaultFasting(bodyGoal),
+    maintenanceOffset: savedPlan?.maintenanceOffset || 0,
+    burnOffset: savedPlan?.burnOffset || 0,
+  }
+  const goalCheck = checkGoal({
+    goal: bodyGoal, bmi: enteredBmi, age: enteredAge, heightCm: Number(heightCm) || null,
+    target: Number(targetWeight) || null, current: Number(currentWeight) || null,
+  })
+  const pickBodyGoal = (goal) => {
+    setBodyGoal(goal)
+    if (goal === 'gain') {
+      setGainPace(savedPlan?.goal === 'gain' && savedPlan.pace ? savedPlan.pace : defaultPace('gain', { bmi: enteredBmi, muscle: buildMuscle }))
+      setGainFasting(savedPlan?.goal === 'gain' ? savedPlan.fasting : defaultFasting('gain'))
+    }
+  }
   // Live preview of what the entered metrics produce
-  const previewTargets = bodyComplete && currentWeight
+  const previewTargets = bodyComplete && currentWeight && !(enteredAge != null && enteredAge < ADULT_AGE)
     ? computeDietetics({
         age: ageFromBirthYear(birthYear),
         gender,
@@ -625,6 +702,7 @@ export default function Settings() {
         weightKg: Number(currentWeight),
         pac: ACTIVITY_PAC[activityLevel] ?? ACTIVITY_PAC.lightly_active,
         deficitKcal: LOSS_RATES.find(r => r.id === lossRate)?.deficit,
+        plan: formPlan,
       })
     : null
   const modeLabel = NOTIFICATION_MODES.find(m => m.id === notificationMode)?.label ?? 'Standard'
@@ -636,7 +714,7 @@ export default function Settings() {
   const MENU_GROUPS = [
     { title: 'You', items: [
       { key: 'profile',    Icon: User,       label: 'Name',        desc: playerName || 'Not set' },
-      { key: 'body',       Icon: HeartPulse, label: 'Body & goal', desc: bodyComplete ? `${heightCm} cm · ${targetWeight || '—'} kg goal · ${LOSS_RATES.find(r => r.id === lossRate)?.label ?? 'Standard'}` : 'Set up calorie & macro targets' },
+      { key: 'body',       Icon: HeartPulse, label: 'Body & goal', desc: bodyGoal !== 'auto' ? BODY_GOALS.find(g => g.id === bodyGoal)?.label : bodyComplete ? `${heightCm} cm · ${targetWeight || '—'} kg goal · ${LOSS_RATES.find(r => r.id === lossRate)?.label ?? 'Standard'}` : 'Set up calorie & macro targets' },
       { key: 'water',      Icon: GlassWater, label: 'Water goal',  desc: waterGoal.targetMl ? `${formatLitres(waterGoal.targetMl)} a day · ${waterGlassMl} mL glass` : `No goal · ${waterGlassMl} mL glass` },
       { key: 'appearance', Icon: Sun,        label: 'Theme',       desc: theme === 'system' ? 'Follows your phone' : theme === 'dark' ? 'Dark' : 'Light' },
     ] },
@@ -695,6 +773,93 @@ export default function Settings() {
       <div className="flex flex-col h-full">
         <DetailHeader title="Body & goal" onBack={back} />
         <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
+          <div>
+            <label className="section-label block mb-1.5">Body goal</label>
+            <div className="space-y-2">
+              {BODY_GOALS.map(g => {
+                const blocked = g.id === 'lose' && enteredBmi != null && enteredBmi < UNDERWEIGHT_BMI
+                return (
+                  <button key={g.id} disabled={blocked} onClick={() => pickBodyGoal(g.id)}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl border-2 transition-all disabled:opacity-40 ${
+                      bodyGoal === g.id ? 'border-brand bg-brand/10' : 'border-surface-border bg-surface-elevated'
+                    }`}>
+                    <p className="text-sm font-semibold text-text-primary">{g.label}</p>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      {blocked ? `Not offered below BMI ${UNDERWEIGHT_BMI}` : g.desc}
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+            {bodyGoal === 'auto' && (
+              <p className="text-xs text-text-muted mt-1.5">Not chosen yet, so your calorie target follows your BMI.</p>
+            )}
+          </div>
+
+          {(bodyGoal === 'auto' || bodyGoal === 'lose') && (
+            <div>
+              <label className="section-label block mb-1.5">Rate of loss</label>
+              <div className="space-y-2">
+                {LOSS_RATES.map(r => (
+                  <button key={r.id} onClick={() => setLossRate(r.id)}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border-2 transition-all ${
+                      lossRate === r.id
+                        ? 'border-brand bg-brand/10'
+                        : 'border-surface-border bg-surface-elevated'
+                    }`}>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-semibold text-text-primary">{r.label}</p>
+                      <p className="text-xs text-text-muted mt-0.5">{r.kgPerWeek} kg per week</p>
+                    </div>
+                    <span className="text-xs font-semibold tabular-nums text-text-secondary">−{r.deficit}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-text-muted mt-1.5">
+                {bodyGoal === 'auto' ? 'The deficit only applies above BMI 23, and your target' : 'Your target'} never drops below
+                {gender === 'female' ? ' 1200' : ' 1500'} kcal.
+              </p>
+            </div>
+          )}
+
+          {bodyGoal === 'gain' && (
+            <div>
+              <label className="section-label block mb-1.5">Pace</label>
+              <div className="space-y-2">
+                {GAIN_PACES.map(r => (
+                  <button key={r.id} onClick={() => setGainPace(r.id)}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border-2 transition-all ${
+                      gainPace === r.id ? 'border-brand bg-brand/10' : 'border-surface-border bg-surface-elevated'
+                    }`}>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-semibold text-text-primary">{r.label}</p>
+                      <p className="text-xs text-text-muted mt-0.5">About {r.kgPerWeek} kg per week · {r.desc}</p>
+                    </div>
+                    <span className="text-xs font-semibold tabular-nums text-text-secondary">+{r.surplus}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {bodyGoal !== 'auto' && (
+            <div className="group-list">
+              <Toggle label="Build muscle" sublabel="Raises your protein target" checked={buildMuscle}
+                onChange={on => {
+                  setBuildMuscle(on)
+                  if (on && bodyGoal === 'gain') setGainPace('slow')
+                }} />
+              {bodyGoal === 'gain' && (
+                <Toggle label="Keep fasting points" sublabel="Long gaps between meals make eating more harder, so this starts off"
+                  checked={gainFasting} onChange={setGainFasting} />
+              )}
+            </div>
+          )}
+
+          {[...goalCheck.blocks, ...goalCheck.notes].map(text => (
+            <p key={text} className={`text-sm ${goalCheck.blocks.includes(text) ? 'text-danger' : 'text-text-secondary'}`}>{text}</p>
+          ))}
+
           <p className="text-xs text-text-muted">
             Used to work out your daily calorie and macro targets. Weight comes from your
             weight log — everything else is set here.
@@ -746,35 +911,13 @@ export default function Settings() {
             </div>
           </div>
 
-          <div>
-            <label className="section-label block mb-1.5">Target weight (kg)</label>
-            <input type="number" className="input" placeholder="e.g. 70" value={targetWeight}
-              onChange={e => setTargetWeight(e.target.value)} />
-          </div>
-
-          <div>
-            <label className="section-label block mb-1.5">Rate of loss</label>
-            <div className="space-y-2">
-              {LOSS_RATES.map(r => (
-                <button key={r.id} onClick={() => setLossRate(r.id)}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border-2 transition-all ${
-                    lossRate === r.id
-                      ? 'border-brand bg-brand/10'
-                      : 'border-surface-border bg-surface-elevated'
-                  }`}>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-semibold text-text-primary">{r.label}</p>
-                    <p className="text-xs text-text-muted mt-0.5">{r.kgPerWeek} kg per week</p>
-                  </div>
-                  <span className="text-xs font-bold tabular-nums text-danger">−{r.deficit}</span>
-                </button>
-              ))}
+          {bodyGoal !== 'keep' && (
+            <div>
+              <label className="section-label block mb-1.5">Target weight (kg)</label>
+              <input type="number" className="input" placeholder="e.g. 70" value={targetWeight}
+                onChange={e => setTargetWeight(e.target.value)} />
             </div>
-            <p className="text-xs text-text-muted mt-1.5">
-              The deficit only applies above BMI 23, and your target never drops below
-              {gender === 'female' ? ' 1200' : ' 1500'} kcal.
-            </p>
-          </div>
+          )}
 
           {previewTargets && (
             <div className="card space-y-2.5">
@@ -785,7 +928,7 @@ export default function Settings() {
                 ['Maintenance', `${previewTargets.maintenance} kcal`],
                 ['Daily target', `${previewTargets.energy} kcal`],
                 ['BMI', `${previewTargets.bmi}`],
-                ['Ideal weight', `${previewTargets.ideal_weight} kg`],
+                ['Healthy range', `${previewTargets.healthy_range.min}–${previewTargets.healthy_range.max} kg`],
                 ['Protein', `${previewTargets.proteins.min}–${previewTargets.proteins.max} g`],
                 ['Carbs', `${previewTargets.carbs.min}–${previewTargets.carbs.max} g`],
                 ['Fat', `${previewTargets.fat.min}–${previewTargets.fat.max} g`],
@@ -804,6 +947,17 @@ export default function Settings() {
               Log a weight on the Weight page to see your targets.
             </p>
           )}
+
+          <div className="group-list">
+            <Toggle label="Hide calorie numbers" sublabel="Your score still works as usual" checked={hideCalories} onChange={setHideCalories} />
+            <Toggle label="Use active calories from Health Connect" sublabel="Replaces the steps and exercise estimates. Accuracy varies by device"
+              checked={useDeviceCalories} onChange={toggleDeviceCalories} />
+          </div>
+
+          <p className="text-xs text-text-muted leading-relaxed">
+            These targets are general estimates for healthy adults. They are not meant for pregnancy,
+            breastfeeding, eating disorders or medical conditions: please ask a doctor or dietitian.
+          </p>
         </div>
         <SaveBtn />
       </div>

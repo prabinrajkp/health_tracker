@@ -3,6 +3,7 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import { format } from 'date-fns'
 import db from './db'
 import { weightsFromConfig, stepTargets } from './scoreMeta'
+import { planOn } from './bodyGoal'
 
 // How much the app is allowed to notify. One setting governs all three sources:
 // the fixed daily reminders below (IDs 1–26), the smart nudges (30–39) and the
@@ -92,7 +93,10 @@ export async function scheduleFixedReminders({ requestPermission = false } = {})
         { id: 20, title: '🥗 Lunch time!',        body: 'Log your lunch in Health Quest — protein first for max points!', schedule: daily(lh, lm) },
         { id: 21, title: '💧 Stay hydrated!',      body: 'Drink a glass of water — hydration keeps energy sharp.',         schedule: daily(11, 0) },
         { id: 22, title: '💧 Afternoon hydration', body: 'Another glass of water! Stay fuelled for the rest of the day.',  schedule: daily(15, 30) },
-        { id: 24, title: '🚫 No late snacks!',     body: 'Avoid post-dinner snacking to protect your diet score.',         schedule: daily(21, 30) },
+        // Someone gaining weight may well need that snack
+        ...(planOn(cfg)?.goal === 'gain' ? [] : [
+          { id: 24, title: '🚫 No late snacks!',     body: 'Avoid post-dinner snacking to protect your diet score.',         schedule: daily(21, 30) },
+        ]),
         { id: 25, title: '🚶 Post-dinner walk?',   body: 'A short walk after dinner earns bonus workout points!',          schedule: daily(drh, Math.min(59, drm + 40)) },
         { id: 26, title: '📋 Log your day!',       body: "Don't forget to record Sleep & Workout before midnight.",        schedule: daily(elh, elm) },
       )

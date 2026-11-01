@@ -1,6 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { HealthConnect } from 'capacitor-health-connect'
-import { saveWorkout, getWorkout } from '../api/client'
+import { saveWorkout, getWorkout, getConfigKey } from '../api/client'
 import { format } from 'date-fns'
 
 const UsageStats = registerPlugin('UsageStats')
@@ -63,6 +63,36 @@ export async function syncStepsBackground() {
         await saveWorkout({ ...(existing || {}), date: today, steps: sr.steps })
       }
     }
+  } catch {
+    // silent — background sync must never break the app
+  }
+}
+
+// Active calories from Health Connect, for people who turned that on in Settings.
+// Largest single source, like steps, so two apps logging one workout do not add up.
+export async function syncActiveCalories() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    const cfg = await getConfigKey('use_device_calories').catch(() => null)
+    if (cfg?.value !== 'true') return
+    const perm = await HealthConnect.checkHealthPermissions({ read: ['ActiveCaloriesBurned'], write: [] })
+    if (!perm.hasAllPermissions) return
+    const start = new Date(); start.setHours(0, 0, 0, 0)
+    const end   = new Date(); end.setHours(23, 59, 59, 999)
+    const result = await HealthConnect.readRecords({
+      type: 'ActiveCaloriesBurned',
+      timeRangeFilter: { type: 'between', startTime: start.toISOString(), endTime: end.toISOString() },
+    })
+    const byOrigin = {}
+    for (const rec of result.records) {
+      const o = rec.metadata?.dataOrigin ?? 'unknown'
+      byOrigin[o] = (byOrigin[o] || 0) + (rec.energy?.value || 0) / 1000   // the plugin reports small calories
+    }
+    const total = Object.values(byOrigin).length > 0 ? Math.round(Math.max(...Object.values(byOrigin))) : 0
+    if (total <= 0) return
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const existing = await getWorkout(today)
+    await saveWorkout({ ...(existing || {}), date: today, active_kcal: total })
   } catch {
     // silent — background sync must never break the app
   }

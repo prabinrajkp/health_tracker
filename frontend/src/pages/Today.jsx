@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { format, subDays } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
-  Flame, ChevronRight, AlertTriangle, Check, Utensils, Footprints, Moon, Scale, Dumbbell, PersonStanding, Play, Square, Plus, Undo2, Thermometer,
+  Flame, ChevronRight, AlertTriangle, Check, Utensils, Footprints, Moon, Scale, Dumbbell, PersonStanding, Play, Square, Plus, Undo2, Thermometer, Target,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import BottomSheet from '../components/BottomSheet'
 import AddMealFlow from '../components/AddMealFlow'
 import { DayDetailPanel } from '../components/DayDetail'
-import { getDiet, getWorkout, getSleep, getWeightEntry, isSickDay, markSickDays, unmarkSickDays, getMissedDays } from '../api/client'
+import { getDiet, getWorkout, getSleep, getWeightEntry, isSickDay, markSickDays, unmarkSickDays, getMissedDays, getLatestWeight, saveConfig, saveGoalEntry } from '../api/client'
+import { BODY_GOALS, UNDERWEIGHT_BMI, planOn, goalHistory, fastingCounts, defaultPace, defaultFasting } from '../services/bodyGoal'
+import { computeBmi } from '../services/dietetics'
+import { scheduleFixedReminders } from '../services/reminders'
 import { describeDays } from '../services/sickDays'
 import { useWater } from '../hooks/useWater'
 import { formatLitres } from '../services/hydration'
@@ -140,6 +143,37 @@ function AskCard({ title, yes, no, onYes, onNo }) {
   )
 }
 
+// Asked once of anyone who has not chosen a body goal. The app already knows what
+// they picked at onboarding, so that answer is offered first.
+function GoalAskCard({ suggested, onPick, onLater }) {
+  return (
+    <section className="card space-y-3">
+      <div className="flex items-center gap-3">
+        <span className="w-10 h-10 rounded-full bg-surface-elevated flex items-center justify-center shrink-0">
+          <Target size={19} className="text-text-secondary" />
+        </span>
+        <p className="text-base font-semibold text-text-primary leading-snug">What's your body goal?</p>
+      </div>
+      <div className="flex gap-2">
+        {BODY_GOALS.map(g => (
+          <button key={g.id} onClick={() => onPick(g.id)}
+            className={`flex-1 ${suggested === g.id ? 'btn-primary' : 'btn-ghost'} px-1`}>{g.id === 'keep' ? 'Keep' : g.id === 'lose' ? 'Lose' : 'Gain'}</button>
+        ))}
+      </div>
+      <button onClick={onLater} className="w-full text-sm text-text-secondary py-1 active:opacity-70">Not now</button>
+    </section>
+  )
+}
+
+const suggestedGoal = (config) => {
+  try {
+    const picked = JSON.parse(config?.onboarding_goals || '[]')
+    if (picked.includes('muscle_gain') && !picked.includes('fat_loss')) return 'gain'
+    if (picked.includes('fat_loss') && !picked.includes('muscle_gain')) return 'lose'
+  } catch {}
+  return null
+}
+
 export default function Today() {
   const { todayScore, streak, refreshAll, config } = useStore()
   const navigate = useNavigate()
@@ -213,6 +247,22 @@ export default function Today() {
   const answerUnwell = () => { writeKey(UNWELL_KEY, today); setAnswered(a => ({ ...a, unwell: today })) }
   const answerCatchUp = () => { writeKey(CATCH_UP_KEY, missed.gapStart); setAnswered(a => ({ ...a, catchUp: missed.gapStart })) }
 
+  const closeGoalAsk = () => saveConfig({ key: 'body_goal_asked', value: 'true' }).then(() => refreshAll()).catch(() => {})
+
+  const pickGoal = async (goal) => {
+    const latest = await getLatestWeight().catch(() => null)
+    const bmi = latest ? computeBmi(Number(config.height_cm), latest.weight_kg) : null
+    if (goal === 'lose' && bmi != null && bmi < UNDERWEIGHT_BMI) {
+      toast(`Losing weight is not offered below BMI ${UNDERWEIGHT_BMI}. Keep or Gain would suit you better.`)
+      return
+    }
+    await saveGoalEntry({ goal, pace: defaultPace(goal, { bmi }), muscle: false, fasting: defaultFasting(goal) })
+    await saveConfig({ key: 'body_goal_asked', value: 'true' })
+    await refreshAll()
+    scheduleFixedReminders().catch(() => {})
+    toast.success('Goal saved. You can change the pace in Settings.')
+  }
+
   useEffect(() => {
     refreshAll()
     loadLogs().catch(console.error)
@@ -221,6 +271,8 @@ export default function Today() {
 
   const weights = weightsFromConfig(config)
   const max     = categoryMaxes(weights)
+  const plan    = planOn(config, today)
+  const askGoal = !!config?.onboarding_complete && !goalHistory(config).length && config.body_goal_asked !== 'true'
   const score   = Math.round(todayScore?.total_score ?? 0)
   const grade   = gradeFor(score)
   const nothingYet = !todayScore || (score === 0 && !(logs.diet?.meal_items?.length))
@@ -333,7 +385,7 @@ export default function Today() {
           ) : (
             <div className="space-y-2.5 mt-5">
               <ScoreBar label="Diet"    value={todayScore?.diet_score ?? 0}    max={max.diet}    color={CATEGORY_COLORS.diet} />
-              <ScoreBar label="Fasting" value={todayScore?.fasting_score ?? 0} max={max.fasting} color={CATEGORY_COLORS.fasting} />
+              {fastingCounts(plan) && <ScoreBar label="Fasting" value={todayScore?.fasting_score ?? 0} max={max.fasting} color={CATEGORY_COLORS.fasting} />}
               <ScoreBar label="Workout" value={todayScore?.workout_score ?? 0} max={max.workout} color={CATEGORY_COLORS.workout} />
               <ScoreBar label="Sleep"   value={todayScore?.sleep_score ?? 0}   max={max.sleep}   color={CATEGORY_COLORS.sleep} />
             </div>
@@ -361,6 +413,8 @@ export default function Today() {
             yes={missed.days.length === 1 ? 'Mark as sick day' : 'Mark as sick days'} no="No"
             onYes={() => markSick(missed.days, missed.days.length === 1 ? 'Marked as a sick day' : `Marked ${missed.days.length} sick days`)}
             onNo={answerCatchUp} />
+        ) : askGoal ? (
+          <GoalAskCard suggested={suggestedGoal(config)} onPick={pickGoal} onLater={closeGoalAsk} />
         ) : (
 <section className="card p-0 overflow-hidden">
           {next ? (

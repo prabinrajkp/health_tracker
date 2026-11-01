@@ -7,6 +7,9 @@ import { format, subDays, addDays, parseISO } from 'date-fns'
 import db, { seedDefaults, DEFAULT_WEIGHTS } from './db'
 import { computeScore } from './scoring'
 import { dieteticsFromConfig } from './dietetics'
+import { planOn, goalHistory, withGoalEntry } from './bodyGoal'
+import { computeNet } from './energy'
+import { checkMaintenance } from './maintenanceCheck'
 import { resolveWaterGoal, mealDrinks } from './hydration'
 import { toSickSet, activeDates, findMissedDays } from './sickDays'
 import { tagFoodsByRule, applyDrinkTag, ruleTag, isDrinkFood } from './drinkTagging'
@@ -36,14 +39,21 @@ async function getCustomMealOptions() {
 // ── Dietetics helper ──────────────────────────────────────────────────────────
 // Body metrics plus the most recent weight on or before `date`. Returns null when
 // metrics are incomplete, which makes the calorie component sit out entirely.
-async function getDieteticsFor(date) {
+async function configMap() {
   const rows = await db.tracker_config.toArray()
   const config = {}
   rows.forEach(r => { config[r.key] = r.value })
+  return config
+}
 
+// The goal in force on `date` comes with it, so an old day keeps its old goal.
+async function getGoalContext(date) {
+  const config = await configMap()
   const weight = await weightOnOrBefore(date)
-  if (!weight) return null
-  return dieteticsFromConfig(config, weight)
+  return {
+    dietetics: weight ? dieteticsFromConfig(config, weight, date) : null,
+    plan: planOn(config, date),
+  }
 }
 
 async function weightOnOrBefore(date) {
@@ -73,9 +83,9 @@ async function recomputeScore(date) {
   const sleep         = await db.sleep_logs.get({ date }) || null
   const yesterdayDiet = await db.diet_logs.get({ date: yesterdayDate })   || null  // fasting window
   const streak        = await getStreakCount(date)
-  const dietetics     = await getDieteticsFor(date)
+  const { dietetics, plan } = await getGoalContext(date)
   const { dietScore, fastingScore, workoutScore, sleepScore, calorieScore, bonus, total } =
-    computeScore(diet, workout, sleep, weights, customOptions, yesterdayDiet, dietetics)
+    computeScore(diet, workout, sleep, weights, customOptions, yesterdayDiet, dietetics, plan)
 
   const record = {
     date,
@@ -394,6 +404,82 @@ export async function saveConfig(payload) {
   }
   await db.tracker_config.put({ ...payload, updated_at: new Date().toISOString() })
   return db.tracker_config.get(payload.key)
+}
+
+// ── Body goal ─────────────────────────────────────────────────────────────────
+// A change applies from today on. Days before it keep the goal they were lived under.
+export async function saveGoalEntry(entry, date = today()) {
+  await seedDefaults()
+  const config = await configMap()
+  const history = withGoalEntry(goalHistory(config), date, entry)
+  await saveConfig({ key: 'body_goal_history', value: JSON.stringify(history) })
+  return recomputeScore(date)
+}
+
+// ── Net calories ──────────────────────────────────────────────────────────────
+const weightAt = (sortedWeights, date) => {
+  let found = null
+  for (const w of sortedWeights) {
+    if (w.date > date) break
+    if (w.weight_kg > 0) found = w.weight_kg
+  }
+  return found
+}
+
+// Net for each date in a range, derived from the logs and never stored.
+export async function getEnergyDays(start, end) {
+  await seedDefaults()
+  const [config, diets, workouts, weights, sickRows] = await Promise.all([
+    configMap(),
+    db.diet_logs.where('date').between(start, end, true, true).toArray(),
+    db.workout_logs.where('date').between(start, end, true, true).toArray(),
+    getWeightEntries(),
+    db.sick_days.toArray(),
+  ])
+  const sick = toSickSet(sickRows)
+  const dietMap = Object.fromEntries(diets.map(d => [d.date, d]))
+  const workoutMap = Object.fromEntries(workouts.map(w => [w.date, w]))
+  const useDevice = config.use_device_calories === 'true'
+
+  const out = []
+  for (let d = parseISO(start); format(d, 'yyyy-MM-dd') <= end; d = addDays(d, 1)) {
+    const date = format(d, 'yyyy-MM-dd')
+    if (date > today()) break
+    const dietetics = dieteticsFromConfig(config, weightAt(weights, date), date)
+    const day = computeNet({
+      diet: dietMap[date], workout: workoutMap[date], dietetics,
+      date, today: today(), sick: sick.has(date), useDevice,
+    })
+    if (day) out.push({ ...day, formulaMaintenance: dietetics.maintenance })
+  }
+  return out
+}
+
+export async function getDayEnergy(date) {
+  return (await getEnergyDays(date, date))[0] || null
+}
+
+const CHECK_WINDOW_DAYS = 28
+
+export async function getMaintenanceCheck() {
+  const config = await configMap()
+  const plan   = planOn(config)
+  const end    = format(subDays(new Date(), 1), 'yyyy-MM-dd')
+  let start    = format(subDays(new Date(), CHECK_WINDOW_DAYS), 'yyyy-MM-dd')
+  // A correction changes the figures from the day it applies, so only days since
+  // then can say whether it needs changing again.
+  if ((plan?.maintenanceOffset || plan?.burnOffset) && plan.from > start) start = plan.from
+  const [days, weights] = await Promise.all([getEnergyDays(start, end), getWeightEntries(start, end)])
+  return {
+    plan,
+    ...checkMaintenance({ days, weights, current: plan || {} }),
+  }
+}
+
+// What the user has eaten lately, for suggesting foods they already like.
+export async function getRecentDietLogs(days = 30) {
+  const start = format(subDays(new Date(), days), 'yyyy-MM-dd')
+  return db.diet_logs.where('date').between(start, today(), true, true).toArray()
 }
 
 // ── Foods (the shared food catalog — same tracker_config blob Settings edits) ──

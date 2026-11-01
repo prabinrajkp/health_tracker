@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format, subDays, parseISO } from 'date-fns'
 import toast from 'react-hot-toast'
-import { Scale, Minus, Plus, TrendingDown, TrendingUp, Target, ArrowLeft } from 'lucide-react'
+import { Scale, Minus, Plus, TrendingDown, TrendingUp, Target, ArrowLeft, Info } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from 'recharts'
-import { getWeightEntry, getWeightEntries, saveWeightEntry, getConfig } from '../api/client'
+import { getWeightEntry, getWeightEntries, saveWeightEntry, getConfig, saveConfig, saveGoalEntry } from '../api/client'
+import { planOn, weightDirection, targetProgress, weightTone, weightPaceNote } from '../services/bodyGoal'
 import useStore from '../store/useStore'
 import { col } from '../services/theme'
 
@@ -15,6 +16,8 @@ const RANGES = [
   { id: 90,  label: '90d' },
   { id: 365, label: '1y' },
 ]
+
+const TONE_TOKEN = { good: 'success', caution: 'warning' }
 
 const WeightTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -80,6 +83,8 @@ export default function Weight() {
   }, [today])
 
   const targetWeight = Number(config.target_weight) || null
+  const plan         = planOn(config, today)
+  const direction    = weightDirection(plan, { target: targetWeight, start: entries[0]?.weight_kg ?? null })
 
   const stats = useMemo(() => {
     if (!entries.length) return null
@@ -95,16 +100,31 @@ export default function Weight() {
 
     const thisWeek = avgOf(format(subDays(now, 6), 'yyyy-MM-dd'), today)
     const lastWeek = avgOf(format(subDays(now, 13), 'yyyy-MM-dd'), format(subDays(now, 7), 'yyyy-MM-dd'))
+    const fourWeeksAgo = avgOf(format(subDays(now, 34), 'yyyy-MM-dd'), format(subDays(now, 28), 'yyyy-MM-dd'))
 
     return {
       latest:     latest.weight_kg,
       sevenDayAvg: thisWeek != null ? Math.round(thisWeek * 10) / 10 : null,
       weekChange: thisWeek != null && lastWeek != null ? Math.round((thisWeek - lastWeek) * 10) / 10 : null,
       totalChange: Math.round((latest.weight_kg - first.weight_kg) * 10) / 10,
-      toTarget:   targetWeight ? Math.round((latest.weight_kg - targetWeight) * 10) / 10 : null,
+      target:     targetProgress(latest.weight_kg, targetWeight, direction),
+      monthChange: thisWeek != null && fourWeeksAgo != null ? Math.round((thisWeek - fourWeeksAgo) * 10) / 10 : null,
       count:      sorted.length,
     }
-  }, [entries, targetWeight, today, now])
+  }, [entries, targetWeight, direction, today, now])
+
+  const paceNote  = useMemo(() => weightPaceNote(entries, plan, now), [entries, plan?.goal, now])
+  const askKeep   = plan && plan.goal !== 'keep' && stats?.target?.reached && config.target_reached_asked !== plan.from
+
+  const answerReached = async (switchToKeep) => {
+    await saveConfig({ key: 'target_reached_asked', value: plan.from })
+    if (switchToKeep) {
+      await saveGoalEntry({ ...plan, goal: 'keep', pace: null, fasting: true })
+      await fetchTodayScore()
+      toast.success('Goal changed to Keep')
+    }
+    await reload()
+  }
 
   const chartData = useMemo(() => {
     const from = format(subDays(now, range), 'yyyy-MM-dd')
@@ -135,8 +155,11 @@ export default function Weight() {
     }
   }
 
-  const losing = stats?.totalChange != null && stats.totalChange < 0
-  const trendColor = col(losing ? 'success' : 'warning')
+  const totalTone  = stats ? weightTone(stats.totalChange, direction) : null
+  const weekTone   = stats ? weightTone(stats.weekChange, direction) : null
+  const monthTone  = stats ? weightTone(stats.monthChange, direction) : null
+  const trendColor = col(TONE_TOKEN[totalTone] || 'text-secondary')
+  const UpOrDown   = (change) => (change != null && change < 0 ? TrendingDown : TrendingUp)
 
   return (
     <div className="min-h-screen bg-surface-base pb-nav animate-fade-in">
@@ -187,6 +210,22 @@ export default function Weight() {
           </button>
         </section>
 
+        {askKeep && (
+          <section className="card space-y-3">
+            <p className="text-base font-semibold text-text-primary">You reached your target. Switch to keeping this weight?</p>
+            <div className="flex gap-2">
+              <button onClick={() => answerReached(true)} className="btn-primary flex-1">Switch to Keep</button>
+              <button onClick={() => answerReached(false)} className="btn-ghost flex-1">Not now</button>
+            </div>
+          </section>
+        )}
+
+        {paceNote && (
+          <p className="text-sm text-text-secondary flex items-start gap-2">
+            <Info size={15} className="shrink-0 mt-0.5 text-text-muted" />{paceNote}
+          </p>
+        )}
+
         {/* ── Progress ──────────────────────────────────────────────────── */}
         {stats && (
           <div className="grid grid-cols-2 gap-2">
@@ -195,21 +234,30 @@ export default function Weight() {
               label="vs last week"
               value={stats.weekChange == null ? '—' : `${stats.weekChange > 0 ? '+' : ''}${stats.weekChange}`}
               unit="kg"
-              tone={stats.weekChange == null ? null : stats.weekChange < 0 ? 'success' : 'warning'}
-              Icon={stats.weekChange != null && stats.weekChange < 0 ? TrendingDown : TrendingUp}
+              tone={TONE_TOKEN[weekTone]}
+              Icon={UpOrDown(stats.weekChange)}
             />
             <StatTile
               label="since start"
               value={`${stats.totalChange > 0 ? '+' : ''}${stats.totalChange}`}
-              unit="kg" tone={losing ? 'success' : 'warning'}
-              Icon={losing ? TrendingDown : TrendingUp}
+              unit="kg" tone={TONE_TOKEN[totalTone]}
+              Icon={UpOrDown(stats.totalChange)}
             />
-            <StatTile
-              label={stats.toTarget != null && stats.toTarget <= 0 ? 'target reached' : 'to target'}
-              value={stats.toTarget == null ? '—' : Math.abs(stats.toTarget)}
-              unit={stats.toTarget == null ? '' : 'kg'}
-              Icon={Target}
-            />
+            {direction === 'steady' ? (
+              <StatTile
+                label="vs 4 weeks ago"
+                value={stats.monthChange == null ? '—' : `${stats.monthChange > 0 ? '+' : ''}${stats.monthChange}`}
+                unit="kg" tone={TONE_TOKEN[monthTone]}
+                Icon={UpOrDown(stats.monthChange)}
+              />
+            ) : (
+              <StatTile
+                label={stats.target?.reached ? 'target reached' : 'to target'}
+                value={stats.target == null ? '—' : stats.target.left}
+                unit={stats.target == null ? '' : 'kg'}
+                Icon={Target}
+              />
+            )}
           </div>
         )}
 

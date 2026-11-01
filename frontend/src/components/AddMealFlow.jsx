@@ -81,6 +81,7 @@ function mealDisplayName(meal, mealNames) {
 
 // ── Step: recommendations + search + AI fallback ────────────────────────────
 function BrowseStep({
+  hideCalories,
   category, foods, query, setQuery, results, aiLoading, aiConfigured, onAskAi,
   frequentMeals, recentMeals, recentFoods, favorites, yesterdayMeal, mealNames,
   onPickFood, onLogWholeMeal, onToggleFavorite, onRenameMeal, searchInputRef,
@@ -117,7 +118,7 @@ function BrowseStep({
           className="w-full text-left rounded-2xl px-4 py-3.5 bg-brand/10 active:opacity-70 transition-opacity">
           <p className="text-xs font-semibold text-brand-light flex items-center gap-1"><RotateCcw size={12} /> Repeat yesterday</p>
           <p className="text-base font-medium text-text-primary mt-1">{mealDisplayName(yesterdayMeal, mealNames)}</p>
-          {yesterdayMeal.nutritionSummary?.kcal > 0 && <p className="text-sm text-text-secondary mt-0.5">{yesterdayMeal.nutritionSummary.kcal} kcal</p>}
+          {!hideCalories && yesterdayMeal.nutritionSummary?.kcal > 0 && <p className="text-sm text-text-secondary mt-0.5">{yesterdayMeal.nutritionSummary.kcal} kcal</p>}
         </button>
       )}
 
@@ -226,13 +227,13 @@ function BrowseStep({
 }
 
 // ── Step: build the meal (multi-item, portions, next-food suggestions) ─────
-function BuilderStep({ category, items, onChangePortion, onRemove, onAddMore, suggestions, onAddSuggested, onFinish }) {
+function BuilderStep({ category, items, onChangePortion, onRemove, onAddMore, suggestions, onAddSuggested, onFinish, hideCalories }) {
   const meta = MEAL_META[category]
   const total = items.reduce((s, i) => s + (i.kcalPerPortion || 0) * (i.portions || 1), 0)
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3">
-        <p className="section-label">Meal Items ({items.length}){total > 0 ? ` · ${Math.round(total)} kcal` : ''}</p>
+        <p className="section-label">Meal Items ({items.length}){total > 0 && !hideCalories ? ` · ${Math.round(total)} kcal` : ''}</p>
         {items.map((item, idx) => (
           <div key={idx} className="flex items-center gap-2 rounded-xl px-3 py-2.5 bg-surface-elevated">
             <div className="flex-1 min-w-0">
@@ -287,7 +288,7 @@ function DuplicateStep({ onUpdate, onLogAnyway }) {
   )
 }
 
-function ConfirmationStep({ category, nutrition, healthScore, drinkMl, onDone }) {
+function ConfirmationStep({ category, nutrition, healthScore, drinkMl, onDone, hideCalories }) {
   const meta = MEAL_META[category]
   return (
     <div className="px-4 py-6 space-y-4 text-center">
@@ -300,7 +301,7 @@ function ConfirmationStep({ category, nutrition, healthScore, drinkMl, onDone })
       </div>
       {nutrition && (
         <div className="rounded-2xl bg-surface-elevated p-4 space-y-2 text-left">
-          <div className="flex justify-between text-sm"><span className="text-text-muted">Calories</span><span className="font-semibold text-text-primary">{nutrition.kcal} kcal</span></div>
+          {!hideCalories && <div className="flex justify-between text-sm"><span className="text-text-muted">Calories</span><span className="font-semibold text-text-primary">{nutrition.kcal} kcal</span></div>}
           <div className="flex justify-between text-sm"><span className="text-text-muted">Protein</span><span className="font-semibold text-text-primary">{nutrition.protein} g</span></div>
           <div className="flex justify-between text-sm"><span className="text-text-muted">Carbs</span><span className="font-semibold text-text-primary">{nutrition.carbs} g</span></div>
           <div className="flex justify-between text-sm"><span className="text-text-muted">Fat</span><span className="font-semibold text-text-primary">{nutrition.fat} g</span></div>
@@ -323,6 +324,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
   const [foods, setFoods] = useState([])
   const [foodUsage, setFoodUsage] = useState(null)
   const [aiConfig, setAiConfig] = useState({})
+  const [hideCalories, setHideCalories] = useState(false)
   const [query, setQuery] = useState('')
   const [items, setItems] = useState([])
   const [aiLoading, setAiLoading] = useState(false)
@@ -368,6 +370,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
       const map = {}
       rows.forEach(r => { map[r.key] = r.value })
       setAiConfig({ openrouter_api_key: map.openrouter_api_key, groq_api_key: map.groq_api_key })
+      setHideCalories(map.hide_calories === 'true')
     })
   }, [open, presetCategory])
 
@@ -517,7 +520,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
       ) : null}
     >
       {step === 'browse' && (
-        <BrowseStep
+        <BrowseStep hideCalories={hideCalories}
           category={category} foods={foods} query={query} setQuery={setQuery} results={results}
           aiLoading={aiLoading} aiConfigured={aiConfigured} onAskAi={askAi}
           frequentMeals={frequentMeals} recentMeals={recentMeals} recentFoods={recentFoods} favorites={favorites}
@@ -529,7 +532,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
         />
       )}
       {step === 'builder' && (
-        <BuilderStep
+        <BuilderStep hideCalories={hideCalories}
           category={category} items={items}
           onChangePortion={changePortion} onRemove={removeItem}
           onAddMore={() => setStep('browse')}
@@ -539,7 +542,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
       )}
       {step === 'duplicate' && <DuplicateStep onUpdate={resolveDuplicateUpdate} onLogAnyway={resolveDuplicateLogAnyway} />}
       {step === 'confirmation' && confirmation && (
-        <ConfirmationStep category={category} nutrition={confirmation.nutrition} healthScore={confirmation.healthScore} drinkMl={confirmation.drinkMl} onDone={done} />
+        <ConfirmationStep hideCalories={hideCalories} category={category} nutrition={confirmation.nutrition} healthScore={confirmation.healthScore} drinkMl={confirmation.drinkMl} onDone={done} />
       )}
     </BottomSheet>
   )

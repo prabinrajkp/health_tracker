@@ -118,8 +118,23 @@ Foods:
 ${list}`
 }
 
+const GOAL_WORDS = { lose: 'lose weight', keep: 'keep their current weight', gain: 'gain weight' }
+
+// Only added once a goal is chosen, so the summary is otherwise unchanged.
+function goalBlock(plan, net) {
+  if (!plan) return ''
+  const lines = [`\n\nBODY GOAL: The user wants to ${GOAL_WORDS[plan.goal]}${plan.muscle ? ' and build muscle' : ''}.`]
+  lines.push(plan.goal === 'gain'
+    ? 'Frame diet advice around eating enough, with good food. Never suggest eating less, smaller portions or fasting.'
+    : 'Frame diet advice around this goal. Never suggest skipping meals or eating very little.')
+  if (net?.counts) {
+    lines.push(`ESTIMATED CALORIES: eaten ${net.eaten}, burned about ${Math.round(net.burned / 10) * 10}, net about ${Math.round(net.net / 10) * 10}, goal net ${Math.round(net.netGoal)}. These are rough estimates: treat them as a direction, and do not recompute them.`)
+  }
+  return lines.join('\n')
+}
+
 function buildHealthSummaryPrompt(data) {
-  const { score, diet, workout, sleep, yesterdayDiet } = data
+  const { score, diet, workout, sleep, yesterdayDiet, plan, net } = data
 
   // Build fasting window
   let fastingText = ''
@@ -217,7 +232,7 @@ ${sleep?.wake_time ? `  Wake time: ${sleep.wake_time}` : '  Wake time: Not recor
 ${sleep?.sleep_hours > 0 ? `  Total sleep: ${sleep.sleep_hours} hours` : '  Duration: Not recorded'}${screenH > 0 ? `\n  Screen time before bed: ${screenH} hours (effective sleep: ${effectiveSleep} hours)` : ''}${sleep?.quality ? `\n  Quality: ${qualityLabel[sleep.quality] || sleep.quality}/5` : ''}${sleep?.notes ? `\n  Notes: ${sleep.notes}` : ''}
 
 WORKOUT:
-${workout?.exercise_type ? `  Exercise: ${workout.exercise_type}${workout.exercise_duration_minutes ? ` — ${workout.exercise_duration_minutes} min` : ''}` : '  No workout logged'}${workout?.notes ? `\n  Notes: ${workout.notes}` : ''}`,
+${workout?.exercise_type ? `  Exercise: ${workout.exercise_type}${workout.exercise_duration_minutes ? ` — ${workout.exercise_duration_minutes} min` : ''}` : '  No workout logged'}${workout?.notes ? `\n  Notes: ${workout.notes}` : ''}${goalBlock(plan, net)}`,
   ]
   return lines.join('')
 }

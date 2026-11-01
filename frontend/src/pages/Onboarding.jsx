@@ -1,12 +1,13 @@
 import { useState, useRef } from 'react'
-import { Flame, Dumbbell, Activity, Moon, CalendarCheck, Zap, Footprints, Pizza, BedDouble, TrendingDown, TrendingUp, Trophy, PlusCircle } from 'lucide-react'
+import { Dumbbell, Activity, Moon, CalendarCheck, Zap, Footprints, Pizza, BedDouble, TrendingDown, TrendingUp, Trophy, PlusCircle } from 'lucide-react'
+import { format } from 'date-fns'
 import { saveConfig } from '../api/client'
+import { BODY_GOALS, defaultPace, defaultFasting } from '../services/bodyGoal'
 import toast from 'react-hot-toast'
 
 // ── Static data ────────────────────────────────────────────────────────────────
 const GOALS = [
-  { id: 'fat_loss',        Icon: Flame, label: 'Fat Loss',        desc: 'Burn fat through diet & movement' },
-  { id: 'muscle_gain',     Icon: Dumbbell, label: 'Muscle Gain',     desc: 'Build strength with protein & training' },
+  { id: 'muscle_gain',     Icon: Dumbbell, label: 'Build muscle',    desc: 'Build strength with protein & training' },
   { id: 'general_fitness', Icon: Activity, label: 'General Fitness', desc: 'Stay active and balanced' },
   { id: 'better_sleep',    Icon: Moon, label: 'Better Sleep',    desc: 'Improve rest and recovery' },
   { id: 'consistency',     Icon: CalendarCheck, label: 'Consistency',     desc: 'Build lasting daily habits' },
@@ -196,6 +197,7 @@ function OptionRow({ selected, onClick, label, desc, Icon }) {
 // ── Main Onboarding ────────────────────────────────────────────────────────────
 export default function Onboarding({ onComplete }) {
   const [step, setStep]                   = useState(0)
+  const [bodyGoal, setBodyGoal]           = useState(null)
   const [goals, setGoals]                 = useState([])
   const [activityLevel, setActivityLevel] = useState(null)
   const [primaryStruggle, setPrimaryStruggle] = useState(null)
@@ -205,7 +207,7 @@ export default function Onboarding({ onComplete }) {
     setGoals(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id])
 
   const canNext = () => {
-    if (step === 1) return goals.length > 0
+    if (step === 1) return !!bodyGoal
     if (step === 2) return !!activityLevel
     if (step === 3) return !!primaryStruggle
     return true
@@ -214,8 +216,15 @@ export default function Onboarding({ onComplete }) {
   const handleComplete = async () => {
     setSaving(true)
     try {
-      const weights = buildWeights(goals, activityLevel, primaryStruggle)
+      // Score weights still follow the same goal table: losing weight leans on fat_loss
+      const scored  = bodyGoal === 'lose' ? [...goals, 'fat_loss'] : goals
+      const weights = buildWeights(scored, activityLevel, primaryStruggle)
+      const muscle  = goals.includes('muscle_gain')
       await Promise.all([
+        saveConfig({ key: 'body_goal_history', value: JSON.stringify([{
+          from: format(new Date(), 'yyyy-MM-dd'), goal: bodyGoal,
+          pace: defaultPace(bodyGoal, { muscle }), muscle, fasting: defaultFasting(bodyGoal),
+        }]) }),
         saveConfig({ key: 'onboarding_complete', value: 'true' }),
         saveConfig({ key: 'score_weights',        value: JSON.stringify(weights) }),
         saveConfig({ key: 'onboarding_goals',     value: JSON.stringify(goals) }),
@@ -246,7 +255,7 @@ export default function Onboarding({ onComplete }) {
         <h1 className="text-2xl font-bold text-text-primary mb-1">Health Quest</h1>
         <p className="text-base text-text-secondary mb-5">Track less. Improve faster.</p>
         <p className="text-sm text-text-muted max-w-xs mx-auto leading-relaxed">
-          Three quick questions, and your scoring is set up around your goals.
+          Three quick questions, and your scoring and calories are set up around your goal.
         </p>
       </div>
       <div className="w-full max-w-xs space-y-3">
@@ -268,8 +277,17 @@ export default function Onboarding({ onComplete }) {
       <ProgressBar current={0} total={TOTAL} />
       <div className="flex-1 px-4 py-4 overflow-y-auto">
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-text-primary mb-1">What are you trying to improve?</h2>
-          <p className="text-sm text-text-muted">Select one or more — your score weights adjust automatically</p>
+          <h2 className="text-xl font-bold text-text-primary mb-1">What's your body goal?</h2>
+          <p className="text-sm text-text-muted">Sets your calorie target. You can change it later.</p>
+        </div>
+        <div className="space-y-2 mb-6">
+          {BODY_GOALS.map(g => (
+            <OptionRow key={g.id} selected={bodyGoal === g.id} onClick={() => setBodyGoal(g.id)} label={g.label} desc={g.desc} />
+          ))}
+        </div>
+        <div className="mb-3">
+          <h3 className="text-base font-semibold text-text-primary">Anything else to focus on?</h3>
+          <p className="text-sm text-text-muted">Optional — your score weights adjust automatically</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {GOALS.map(g => {

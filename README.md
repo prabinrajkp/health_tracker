@@ -39,10 +39,10 @@ These are the default maximums. Setup adjusts them to your goals, and all of the
 | Category | Max Points | How it's earned |
 |----------|-----------|----------------|
 | **Diet** | 35 pts | Points per food and portion; junk food and dinner after 9 PM take points off |
-| **Fasting** | 10 pts | Logistic curve from last dinner → first breakfast (12 h min, 16 h target) |
+| **Fasting** | 10 pts | Logistic curve from last dinner → first breakfast (12 h min, 16 h target). Off by default when your goal is to gain weight |
 | **Workout** | 35 pts | Steps + post-dinner walk + exercise session |
 | **Sleep** | 30 pts | Bedtime + effective hours (minus screen time) + wake time |
-| **Calories** | 10 pts | Staying near your calorie target; only counted once body details and food nutrition are set |
+| **Calories** | 10 pts | Staying near the calorie target for your body goal; only counted once body details and food nutrition are set |
 | **Bonus** | +10 pts | Near-perfect or perfect day |
 | **Total** | 100 pts | All components added and capped at 100 |
 
@@ -89,12 +89,13 @@ Four tabs, each with one job. Everything saves as you change it — there is no 
 ### Log
 - **Food:** each meal lists its foods with portions and the meal time; **+ Add** opens Add Meal on that meal (search, Repeat Yesterday, frequent and recent meals, named meals, optional AI lookup). One fasting line and the calories and macro targets sit below
 - **Drinks** (one row on Food, opening a sheet): one tap adds a glass of water; the sheet adds bigger amounts or another drink and lists the day's entries. Drinks logged in a meal (coffee, tea, juice, milk) are counted automatically, because foods can be tagged as drinks with a mL per portion. The total counts toward an estimated daily goal from body weight (30 mL per kg), which can be set by hand or switched off, and is never part of the score
-- **Move:** steps synced from Health Connect or the phone sensor, or typed in (a typed count is kept for the day until you tap Sync); switches for post-dinner walk and exercise
+- **Net calories** (on the Calories card): food eaten minus an estimate of everything burned, against the net your goal asks for. It opens to show resting burn, steps and exercise. It is information only and never changes the score or the food target
+- **Move:** steps synced from Health Connect or the phone sensor, or typed in (a typed count is kept for the day until you tap Sync); switches for post-dinner walk and exercise, with a Normal or Hard choice for sessions
 - **Sleep:** one timer button with automatic screen-time deduction; manual times, presets, quality and notes under Edit details
 
 ### Progress
-- **Week:** average score, one **What to fix**, and a **Why** card with wins and costs
-- **Month:** colour-coded calendar first; tap a day for full detail and share it as a PNG; month insights behind one expander
+- **Week:** average score, average net calories with a bar for each complete day, one **What to fix**, and a **Why** card with wins and costs
+- **Month:** colour-coded calendar first; tap a day for full detail and share it as a PNG; average net calories; **Expected vs actual**, which compares your logs with your weight trend after about 3 weeks and offers a corrected maintenance figure; month insights behind one expander
 - **Trends:** line or stacked score chart, Meal Insights, and all-time stats
 
 ### Profile
@@ -103,10 +104,10 @@ Four tabs, each with one job. Everything saves as you change it — there is no 
 - The gear icon opens Settings
 
 ### Weight
-- Daily weigh-in, 7-day average, change vs last week and since start, distance to target, 30d / 90d / 1y trend
+- Daily weigh-in, 7-day average, change vs last week and since start, distance to target, 30d / 90d / 1y trend. Colours follow your body goal, so gaining is good news when gaining is the goal. Reaching your target offers a switch to Keep
 
 ### Settings
-- **You:** name, body & goal (height, age, activity, target weight, rate of loss), water goal and glass size, theme
+- **You:** name, body & goal (Lose, Keep or Gain, pace, Build muscle, height, age, activity, target weight, hide calorie numbers, optional active calories from Health Connect), water goal and glass size, theme
 - **Scoring:** one screen for category maximums, workout points and step targets, sleep, fasting and penalties, with Reset to defaults
 - **Food & AI:** custom foods with points, ideal portions and nutrition; optional AI key. Foods not logged for more than 7 days move to an archive to keep the list short. They can be restored, still appear in Add Meal search, and come back by themselves when logged. Each food can be marked as a drink with its mL per portion
 - **Reminders & data:** Quiet / Standard / Coach notification level, reminder times, Excel export, JSON backup and restore, tutorial
@@ -141,14 +142,14 @@ The script will:
 
 **Option A — USB (fastest):**
 ```bash
-adb install health-quest-v4.35-debug.apk
+adb install health-quest-v4.36-debug.apk
 ```
 
 **Option B — WiFi (same network):**
 ```bash
 python3 -m http.server 9999 --directory .
 ```
-Then open `http://<your-pc-ip>:9999/health-quest-v4.35-debug.apk` on your phone and tap to install.
+Then open `http://<your-pc-ip>:9999/health-quest-v4.36-debug.apk` on your phone and tap to install.
 
 > Settings → Apps → Install unknown apps → enable for your browser
 

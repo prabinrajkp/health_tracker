@@ -31,6 +31,7 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import { format, subDays, startOfMonth, isLastDayOfMonth } from 'date-fns'
 import db from './db'
 import { getNotificationMode } from './reminders'
+import { planOn } from './bodyGoal'
 
 const TREND_IDS = [40, 41, 42, 43, 44]
 
@@ -67,6 +68,14 @@ const TIPS = {
   sleep:   'Start the sleep timer before 11:30 PM for full timing points.',
 }
 
+// Advice to eat less or skip snacks is wrong for someone trying to gain.
+const GAIN_TIPS = { ...TIPS, diet: 'Eat dinner before 8:30 PM and add a good snack earlier in the day.' }
+
+async function tipsForGoal() {
+  const row = await db.tracker_config.get('body_goal_history')
+  return planOn({ body_goal_history: row?.value })?.goal === 'gain' ? GAIN_TIPS : TIPS
+}
+
 // Motivators cycled by day-of-week
 const MOTIVATORS = [
   'Momentum is building — protect it tonight.',
@@ -85,7 +94,7 @@ const MOTIVATORS = [
  * d       = scoreDiff(current, previous)
  * refWord = "today" | "yesterday" (appears in the title)
  */
-function buildDecline(id, d, refWord) {
+function buildDecline(id, d, refWord, tips = TIPS) {
   if (!d) return null
 
   const dropped = Object.entries({ diet: d.diet, workout: d.workout, sleep: d.sleep })
@@ -97,7 +106,7 @@ function buildDecline(id, d, refWord) {
 
   const sectionNames = dropped.map(([k]) => LABELS[k])
   const changes      = dropped.map(([k, v]) => `${LABELS[k]} −${Math.abs(v)}`).join(' · ')
-  const primaryTip   = dropped.length > 0 ? TIPS[dropped[0][0]] : 'Keep logs early and aim for bed by 11 PM.'
+  const primaryTip   = dropped.length > 0 ? tips[dropped[0][0]] : 'Keep logs early and aim for bed by 11 PM.'
 
   const title = dropped.length > 0
     ? `📉 ${sectionNames.join(' & ')} down ${refWord}`
@@ -138,7 +147,7 @@ function buildAppreciation(id, d, score) {
 
 // ── Weekly summary builder ────────────────────────────────────────────────────
 
-async function buildWeeklySummary() {
+async function buildWeeklySummary(tips = TIPS) {
   const now          = new Date()
   const thisWeekEnd  = format(now, 'yyyy-MM-dd')
   const thisWeekStart= format(subDays(now, 6), 'yyyy-MM-dd')
@@ -175,7 +184,7 @@ async function buildWeeklySummary() {
     const [worstKey, worstVal] = Object.entries(sectionDeltas).sort(([,a],[,b]) => a - b)[0]
     return {
       title: `📉 Tougher week — avg ${thisAvg} pts (−${Math.abs(delta)} vs last week)`,
-      body:  `Biggest drop: ${LABELS[worstKey]} −${Math.abs(worstVal)} pts/day. ${TIPS[worstKey]}`,
+      body:  `Biggest drop: ${LABELS[worstKey]} −${Math.abs(worstVal)} pts/day. ${tips[worstKey]}`,
     }
   }
 
@@ -189,7 +198,7 @@ async function buildWeeklySummary() {
 
 // ── Monthly summary builder ───────────────────────────────────────────────────
 
-async function buildMonthlySummary() {
+async function buildMonthlySummary(tips = TIPS) {
   const now            = new Date()
   const thisMonthStart = format(startOfMonth(now), 'yyyy-MM-dd')
   const thisMonthEnd   = format(now, 'yyyy-MM-dd')
@@ -238,7 +247,7 @@ async function buildMonthlySummary() {
     const [worstKey, worstVal] = Object.entries(sectionDeltas).sort(([,a],[,b]) => a - b)[0]
     return {
       title: `📉 ${monthName} dipped — avg ${thisAvg} pts (−${Math.abs(delta)} vs ${prevName})`,
-      body:  `Biggest drop: ${LABELS[worstKey]} −${Math.abs(worstVal)} pts/day. ${TIPS[worstKey]} Target ${prevName}'s ${lastAvg}+ next month.`,
+      body:  `Biggest drop: ${LABELS[worstKey]} −${Math.abs(worstVal)} pts/day. ${tips[worstKey]} Target ${prevName}'s ${lastAvg}+ next month.`,
     }
   }
 
@@ -278,18 +287,19 @@ export async function scheduleTrendNotifications() {
     // Daily trend alerts are Coach-only; the weekly and monthly wraps go to everyone.
     const mode  = await getNotificationMode()
     const coach = mode === 'coach'
+    const tips  = await tipsForGoal()
 
     // ── ID 40: After-dinner review (9:30 PM) — today vs yesterday ─────────────
     if (coach && isInFuture(21, 30) && todayScore && yesterdayScore) {
       const d = diff(todayScore, yesterdayScore)
-      const n = buildDecline(40, d, 'today')
+      const n = buildDecline(40, d, 'today', tips)
       if (n) notifications.push({ ...n, schedule: { at: todayAt(21, 30), repeats: false, allowWhileIdle: true } })
     }
 
     // ── ID 41: Morning briefing (9 AM) — yesterday vs day-before ──────────────
     if (coach && isInFuture(9, 0) && yesterdayScore && dayBeforeScore) {
       const d = diff(yesterdayScore, dayBeforeScore)
-      const n = buildDecline(41, d, 'yesterday')
+      const n = buildDecline(41, d, 'yesterday', tips)
       if (n) {
         // Enrich body with "yesterday scored X"
         const score = Math.round(yesterdayScore.total_score || 0)
@@ -301,7 +311,7 @@ export async function scheduleTrendNotifications() {
     // ── ID 44: Monthly wrap (last day of month 8 PM) ──────────────────────────
     let monthlyScheduled = false
     if (isLastDayOfMonth(now) && isInFuture(20, 0)) {
-      const monthly = await buildMonthlySummary()
+      const monthly = await buildMonthlySummary(tips)
       if (monthly) {
         notifications.push({ id: 44, ...monthly, schedule: { at: todayAt(20, 0), repeats: false, allowWhileIdle: true } })
         monthlyScheduled = true
@@ -311,7 +321,7 @@ export async function scheduleTrendNotifications() {
     // ── ID 43: Weekly wrap (Sunday 8 PM) ──────────────────────────────────────
     // Outside Coach mode the monthly wrap replaces it when both land on one day.
     if (dayOfWeek === 0 && isInFuture(20, 0) && (coach || !monthlyScheduled)) {
-      const weekly = await buildWeeklySummary()
+      const weekly = await buildWeeklySummary(tips)
       if (weekly) notifications.push({ id: 43, ...weekly, schedule: { at: todayAt(20, 0), repeats: false, allowWhileIdle: true } })
     }
 

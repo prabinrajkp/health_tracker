@@ -4,8 +4,11 @@ function parseHM(timeStr) {
   return [parts[0] || 0, parts[1] || 0]
 }
 
+// Someone gaining needs to eat more, so extra portions of good food cost nothing.
+const overageFree = (plan) => plan?.goal === 'gain'
+
 // New meal_items scoring: proportional up to ideal, deduction above ideal
-function calcMealItemsScore(diet) {
+function calcMealItemsScore(diet, plan) {
   const items = diet?.meal_items || []
   if (!items.length) return null  // null → fall through to legacy path
   // If no items carry point values (e.g. old default-seeded items), fall back to legacy
@@ -24,7 +27,7 @@ function calcMealItemsScore(diet) {
     } else if (ip && ip > 0) {
       score += Math.min(portions, ip) * ppp
       const over = Math.max(0, portions - ip)
-      if (over > 0) score -= over * ppp * OVERAGE
+      if (over > 0 && !overageFree(plan)) score -= over * ppp * OVERAGE
     } else {
       score += portions * ppp  // no ideal limit → just multiply
     }
@@ -69,7 +72,7 @@ export function calcNutritionTotals(diet) {
  * Null means the component is skipped entirely and the day scores exactly as it
  * did before this feature existed, which is what keeps old scores comparable.
  */
-export function calcCalorieScore(diet, dietetics, weights) {
+export function calcCalorieScore(diet, dietetics, weights, plan = null) {
   const target = dietetics?.energy
   if (!target) return null
 
@@ -86,18 +89,22 @@ export function calcCalorieScore(diet, dietetics, weights) {
   if (!totals.hasData || totals.coverage < minCover) return null
 
   // Deviation in either direction — under-eating is penalised like over-eating.
+  // Gaining is more forgiving above the target, where going over is the point.
   const deviation = Math.abs(totals.kcal - target) / target
-  if (deviation <= tolerance) return maxPts
-  if (deviation >= zeroAt)    return 0
+  const above     = plan?.goal === 'gain' && totals.kcal > target
+  const tol  = above ? (c.gain_over_tolerance ?? 0.20) : tolerance
+  const zero = above ? (c.gain_over_zero_at   ?? 0.50) : zeroAt
+  if (deviation <= tol)  return maxPts
+  if (deviation >= zero) return 0
 
-  const taper = 1 - (deviation - tolerance) / (zeroAt - tolerance)
+  const taper = 1 - (deviation - tol) / (zero - tol)
   return Math.round(maxPts * taper * 10) / 10
 }
 
-export function calcDietScore(diet, weights, customOptions = []) {
+export function calcDietScore(diet, weights, customOptions = [], plan = null) {
   if (!diet) return 0
 
-  const newScore = calcMealItemsScore(diet)
+  const newScore = calcMealItemsScore(diet, plan)
   if (newScore !== null) {
     return Math.min(Math.max(Math.round(newScore * 10) / 10, 0), weights.diet_max || 35)
   }
@@ -249,12 +256,13 @@ export function calcPenalties(diet, sleep, weights, customOptions = []) {
 }
 
 // yesterdayDiet is required for fasting score calculation
-// dietetics carries the day's calorie target; omit it to score exactly as before
-export function computeScore(diet, workout, sleep, weights, customOptions = [], yesterdayDiet = null, dietetics = null) {
+// dietetics carries the day's calorie target; omit it to score exactly as before.
+// plan is the body goal in force that day; null keeps the original rules.
+export function computeScore(diet, workout, sleep, weights, customOptions = [], yesterdayDiet = null, dietetics = null, plan = null) {
   const p = weights.penalties || {}
 
   // ── Diet score — meals only, dinner penalty folded in ────────────────────
-  const mealScore = calcDietScore(diet, weights, customOptions)
+  const mealScore = calcDietScore(diet, weights, customOptions, plan)
   let dietPenalty = 0
   const dinnerTime = diet?.meal_times?.dinner || diet?.dinner_time
   if (dinnerTime) {
@@ -270,7 +278,8 @@ export function computeScore(diet, workout, sleep, weights, customOptions = [], 
   const dietScore = Math.max(0, Math.min(mealScore, weights.diet_max || 35) + dietPenalty)
 
   // ── Fasting score — separate additive component ───────────────────────────
-  const fastingScore = calcFastingScore(diet, yesterdayDiet, weights)
+  const fastingOn    = !plan || plan.fasting
+  const fastingScore = fastingOn ? calcFastingScore(diet, yesterdayDiet, weights) : 0
 
   // ── Workout score ─────────────────────────────────────────────────────────
   const workoutScore = calcWorkoutScore(workout, weights)
@@ -285,13 +294,14 @@ export function computeScore(diet, workout, sleep, weights, customOptions = [], 
   const sleepScore = Math.max(0, rawSleep + sleepPenalty)
 
   // ── Calorie adherence — null on days it cannot be judged ──────────────────
-  const calorieScore = calcCalorieScore(diet, dietetics, weights)
+  const calorieScore = calcCalorieScore(diet, dietetics, weights, plan)
 
   // ── Bonus ─────────────────────────────────────────────────────────────────
   const subtotal    = dietScore + fastingScore + workoutScore + sleepScore + (calorieScore || 0)
   // The calorie allowance only counts toward the ceiling on days it actually
   // applied — otherwise the bonus threshold would shift and rewrite old scores.
-  const maxPossible = (weights.diet_max || 35) + (weights.fasting?.max_points || 10) + (weights.workout_max || 35) + (weights.sleep_max || 30)
+  const fastingMax  = fastingOn ? (weights.fasting?.max_points ?? 10) : 0
+  const maxPossible = (weights.diet_max || 35) + fastingMax + (weights.workout_max || 35) + (weights.sleep_max || 30)
     + (calorieScore === null ? 0 : (weights.calories?.max_points ?? 10))
   const bw          = weights.bonus || {}
   let bonus = 0

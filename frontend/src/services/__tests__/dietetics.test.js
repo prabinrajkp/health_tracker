@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeBmr, computeBmi, idealWeight, getPacLevel,
-  getCalorieDetails, computeDietetics, ageFromBirthYear, dieteticsFromConfig,
+  getCalorieDetails, computeDietetics, ageFromBirthYear, dieteticsFromConfig, isMinor,
 } from '../dietetics.js'
 
 // Reference values computed by hand from py_abacus abacus/compute_dietetics.py
@@ -155,5 +155,64 @@ describe('dieteticsFromConfig', () => {
     const gentle   = dieteticsFromConfig({ ...config, loss_rate: 'gentle' }, 80)
     const standard = dieteticsFromConfig({ ...config, loss_rate: 'standard' }, 80)
     expect(gentle.energy).toBeGreaterThan(standard.energy)
+  })
+})
+
+describe('body goal targets', () => {
+  // The plan's example: a 30-year-old man, 175 cm, 72 kg, lightly active.
+  const birth = String(new Date().getFullYear() - 30)
+  const config = { height_cm: '175', birth_year: birth, gender: 'male', activity_level: 'lightly_active' }
+  const withGoal = (entry) => ({ ...config, body_goal_history: JSON.stringify([{ from: '2020-01-01', ...entry }]) })
+
+  it('without a goal, follows BMI exactly as before', () => {
+    const d = dieteticsFromConfig(config, 72)
+    expect(d.maintenance).toBe(2377)
+    expect(d.energy).toBe(1877)
+    expect(d.goal).toBe('auto')
+    expect(d.proteins).toEqual({ min: 47, max: 70 })
+  })
+  it('Gain ignores BMI and adds the pace', () => {
+    const d = dieteticsFromConfig(withGoal({ goal: 'gain', pace: 'slow' }), 72)
+    expect(d.energy).toBe(2652)
+    expect(d.netGoal).toBe(275)
+    expect(dieteticsFromConfig(withGoal({ goal: 'gain', pace: 'steady' }), 72).netGoal).toBe(500)
+  })
+  it('Keep eats at maintenance whatever the BMI', () => {
+    const d = dieteticsFromConfig(withGoal({ goal: 'keep' }), 72)
+    expect(d.energy).toBe(2377)
+    expect(d.netGoal).toBe(0)
+  })
+  it('Lose takes the deficit even at a BMI where the old rule would not', () => {
+    const d = dieteticsFromConfig(withGoal({ goal: 'lose', pace: 'gentle' }), 65)   // BMI 21.2
+    expect(d.netGoal).toBe(-275)
+  })
+  it('still respects the floor', () => {
+    const d = dieteticsFromConfig({ ...withGoal({ goal: 'lose', pace: 'aggressive' }), activity_level: 'sedentary', gender: 'female', height_cm: '150' }, 50)
+    expect(d.energy).toBe(1200)
+  })
+  it('sets protein by body weight once a goal is chosen', () => {
+    expect(dieteticsFromConfig(withGoal({ goal: 'keep' }), 72).proteins).toEqual({ min: 60, max: 86 })
+    expect(dieteticsFromConfig(withGoal({ goal: 'lose', pace: 'standard' }), 72).proteins).toEqual({ min: 72, max: 101 })
+    expect(dieteticsFromConfig(withGoal({ goal: 'gain', pace: 'slow', muscle: true }), 72).proteins).toEqual({ min: 115, max: 144 })
+  })
+  it('keeps macro ranges possible', () => {
+    const d = dieteticsFromConfig(withGoal({ goal: 'gain', pace: 'slow', muscle: true }), 72)
+    expect(d.carbs.min).toBeGreaterThan(0)
+    expect(d.carbs.max).toBeGreaterThan(d.carbs.min)
+  })
+  it('applies a correction from the scale to maintenance', () => {
+    const d = dieteticsFromConfig(withGoal({ goal: 'keep', maintenanceOffset: -150 }), 72)
+    expect(d.energy).toBe(2227)
+  })
+  it('uses the goal in force on the day asked about', () => {
+    const c = { ...config, body_goal_history: JSON.stringify([{ from: '2026-06-01', goal: 'gain', pace: 'slow' }]) }
+    expect(dieteticsFromConfig(c, 72, '2026-05-31').energy).toBe(1877)
+    expect(dieteticsFromConfig(c, 72, '2026-06-01').energy).toBe(2652)
+  })
+  it('gives no targets to under-18s', () => {
+    const c = { ...config, birth_year: String(new Date().getFullYear() - 16) }
+    expect(dieteticsFromConfig(c, 60)).toBeNull()
+    expect(isMinor(c)).toBe(true)
+    expect(isMinor(config)).toBe(false)
   })
 })

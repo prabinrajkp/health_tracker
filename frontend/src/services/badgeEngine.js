@@ -1,3 +1,4 @@
+import { goalHistory, planOn, kgGainedOnGoal, steadySpanDays, STEADY_DAYS } from './bodyGoal'
 import { format, startOfWeek, endOfWeek, parseISO } from 'date-fns'
 import db from './db'
 import { col } from './theme'
@@ -653,13 +654,36 @@ export const BADGES = [
     name: 'First Kilo',        emoji: '🪶', category: 'consistency', tier: 'rare',
     lore: 'One kilogram gone. Proof the plan works.',
     criterion: 'Lose 1 kg from your heaviest recorded weight',
+    forGoals: ['auto', 'lose'],
     check: d => ({ unlocked: d.totalKgLost >= 1, progress: Math.min(d.totalKgLost / 1, 1) }) },
 
   { id: 'five_kg_down',
     name: 'Five Down',         emoji: '🏔️', category: 'elite', tier: 'epic',
     lore: 'Five kilograms lighter. Months of small choices, made visible.',
     criterion: 'Lose 5 kg from your heaviest recorded weight',
+    forGoals: ['auto', 'lose'],
     check: d => ({ unlocked: d.totalKgLost >= 5, progress: Math.min(d.totalKgLost / 5, 1) }) },
+
+  { id: 'first_kg_up',
+    name: 'First Kilo Up',     emoji: '🌱', category: 'consistency', tier: 'rare',
+    lore: 'One kilogram gained, on purpose. Proof the plan works.',
+    criterion: 'Gain 1 kg while your goal is to gain weight',
+    forGoals: ['gain'],
+    check: d => ({ unlocked: d.kgGainedOnGoal >= 1, progress: Math.min(d.kgGainedOnGoal / 1, 1) }) },
+
+  { id: 'five_kg_up',
+    name: 'Five Up',           emoji: '🌳', category: 'elite', tier: 'epic',
+    lore: 'Five kilograms stronger. Months of eating enough, made visible.',
+    criterion: 'Gain 5 kg while your goal is to gain weight',
+    forGoals: ['gain'],
+    check: d => ({ unlocked: d.kgGainedOnGoal >= 5, progress: Math.min(d.kgGainedOnGoal / 5, 1) }) },
+
+  { id: 'steady_month',
+    name: 'Holding Steady',    emoji: '⚓', category: 'consistency', tier: 'rare',
+    lore: 'Four weeks inside a two-kilo band. Keeping it is a skill of its own.',
+    criterion: 'Keep your weight within 1 kg either way for 4 weeks, with 8 weigh-ins',
+    forGoals: ['keep'],
+    check: d => ({ unlocked: d.steadyDays >= STEADY_DAYS, progress: Math.min(d.steadyDays / STEADY_DAYS, 1) }) },
 
   // ── Hydration (8) ───────────────────────────────────────────────────────
   // These reward reaching the day's goal, never exceeding it: drinking far
@@ -723,7 +747,7 @@ export function getEarnEvolutionTier(count) {
 
 async function buildAggregateData() {
   const today = format(new Date(), 'yyyy-MM-dd')
-  const [allScores, allDiet, allWorkout, allSleep, allWeight, allWater, allSick] = await Promise.all([
+  const [allScores, allDiet, allWorkout, allSleep, allWeight, allWater, allSick, goalRow] = await Promise.all([
     db.daily_scores.where('date').belowOrEqual(today).sortBy('date'),
     db.diet_logs.toArray(),
     db.workout_logs.toArray(),
@@ -731,8 +755,10 @@ async function buildAggregateData() {
     db.weight_logs.toArray(),
     db.water_logs.toArray(),
     db.sick_days.toArray(),
+    db.tracker_config.get('body_goal_history'),
   ])
   if (allScores.length === 0) return null
+  const goalConfig = { body_goal_history: goalRow?.value }
   // Sick days pause streaks: a run carries across them without counting them
   const sick  = toSickSet(allSick)
   const water = waterBadgeMetrics(allWater, allDiet, sick)
@@ -1036,6 +1062,9 @@ async function buildAggregateData() {
     totalWorkoutSessions, totalStepsAllTime, deepSleepCount,
     earnCounts,
     ...buildWeightMetrics(allWeight),
+    kgGainedOnGoal: kgGainedOnGoal(allWeight, goalHistory(goalConfig)),
+    steadyDays:     steadySpanDays(allWeight, goalHistory(goalConfig)),
+    currentGoal:    planOn(goalConfig)?.goal ?? 'auto',
     ...water,
   }
 }
@@ -1075,6 +1104,8 @@ export async function runBadgeEngine() {
     const newlyUnlocked = []
 
     for (const badge of BADGES) {
+      // A dip on the scale should not congratulate someone trying to gain
+      if (badge.forGoals && !badge.forGoals.includes(data.currentGoal) && !unlockedIds.has(badge.id)) continue
       const { unlocked, progress } = badge.check(data)
       const earn_count = data.earnCounts[badge.id] || 0
       if (unlocked && !unlockedIds.has(badge.id)) {
@@ -1095,9 +1126,12 @@ export async function runBadgeEngine() {
 }
 
 export async function getBadgeStates() {
-  const records = await db.badges.toArray()
+  const [records, goalRow] = await Promise.all([db.badges.toArray(), db.tracker_config.get('body_goal_history')])
   const map = Object.fromEntries(records.map(r => [r.badge_id, r]))
-  return BADGES.map(b => {
+  const goal = planOn({ body_goal_history: goalRow?.value })?.goal ?? 'auto'
+  // Goal badges show for the goal they belong to. Anything earned stays on show.
+  const visible = BADGES.filter(b => !b.forGoals || b.forGoals.includes(goal) || map[b.id]?.unlock_timestamp)
+  return visible.map(b => {
     const rec = map[b.id]
     return {
       ...b,

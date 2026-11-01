@@ -79,6 +79,12 @@ export const deleteWeightEntry = (date) => local.deleteWeightEntry(date)
 export const getWaterGoal     = ()            => local.getWaterGoal()
 
 // So are sick days.
+export const saveGoalEntry      = (entry, date) => local.saveGoalEntry(entry, date)
+export const getEnergyDays      = (s, e)  => local.getEnergyDays(s, e)
+export const getDayEnergy       = (date)  => local.getDayEnergy(date)
+export const getMaintenanceCheck = ()     => local.getMaintenanceCheck()
+export const getRecentDietLogs  = (days)  => local.getRecentDietLogs(days)
+
 export const isSickDay      = (date)  => local.isSickDay(date)
 export const markSickDays   = (dates) => local.markSickDays(dates)
 export const unmarkSickDays = (dates) => local.unmarkSickDays(dates)

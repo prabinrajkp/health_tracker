@@ -55,6 +55,12 @@ function topJunkFoods(dietLogs) {
 }
 
 // ── Strategic fix map ────────────────────────────────────────────────────────
+// Fasting talk means nothing to someone who has fasting points switched off.
+const NO_FASTING_FIXES = {
+  late_dinner: 'Move dinner before 8:45 PM — it removes your most frequent penalty',
+  poor_steps:  'Take a 15-min post-dinner walk — it adds steps and earns the walk points',
+}
+
 const FIX_MAP = {
   late_dinner:       'Move dinner before 8:45 PM — it removes your most frequent penalty and protects your fasting window',
   poor_sleep:        'Lock your sleep window to 11 PM → 7 AM — a steady seven hours earns the full sleep-duration points',
@@ -70,8 +76,9 @@ const FIX_MAP = {
 export function computeWeeklySummary({
   scores, dietLogs, workoutLogs, sleepLogs,
   prevScores, prevDietLogs, prevWorkoutLogs, prevSleepLogs,
-  weights,
+  weights, fastingOn = true,
 }) {
+  const fixes = fastingOn ? FIX_MAP : { ...FIX_MAP, ...NO_FASTING_FIXES }
   // Step targets and the late-dinner cost follow the user's scoring settings
   const stepT      = stepTargets(weights)
   const dinnerCost = Math.abs(weights?.penalties?.dinner_after_9pm ?? 5)
@@ -169,7 +176,7 @@ export function computeWeeklySummary({
     wins.push({ text: `Sleep improved by +${(avgSleep - prevAvgSleep).toFixed(1)}h avg`, detail: `Now averaging ${avgSleep}h` })
 
   if (lateDinnerDays === 0 && daysLogged >= 3)
-    wins.push({ text: 'Zero late dinners all week', detail: 'No late-dinner cost, and your fasting window stayed intact' })
+    wins.push({ text: 'Zero late dinners all week', detail: fastingOn ? 'No late-dinner cost, and your fasting window stayed intact' : 'No late-dinner cost' })
   else if (prevLateDinners >= 3 && lateDinnerDays < prevLateDinners)
     wins.push({ text: `Late dinners down: ${lateDinnerDays} (was ${prevLateDinners} last week)`, detail: 'Dinner timing improving' })
 
@@ -230,8 +237,8 @@ export function computeWeeklySummary({
   for (const { key } of damage) bumpCause(key)
 
   const topCause = Object.entries(causeFreq).sort((a, b) => b[1] - a[1])[0]?.[0] || null
-  const strategicFix = FIX_MAP[topCause] || (
-    damage.length > 0 ? FIX_MAP[damage[0].key] : 'Keep doing what you are doing — this was a strong week'
+  const strategicFix = fixes[topCause] || (
+    damage.length > 0 ? fixes[damage[0].key] : 'Keep doing what you are doing — this was a strong week'
   )
 
   // ── Stacked failure detection ────────────────────────────────────────────
