@@ -10,7 +10,6 @@ import { computeNet, suggestAddOns } from '../../services/energy'
 import NetBreakdown from '../../components/NetBreakdown'
 import { weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../../services/scoreMeta'
 import { fastingWindow, fastingPoints, fmtHours } from '../../services/fasting'
-import { schedulePostDinnerWalk } from '../../services/reminders'
 import { formatLitres } from '../../services/hydration'
 import DrinksSheet from '../../components/DrinksSheet'
 import { useWater } from '../../hooks/useWater'
@@ -325,7 +324,6 @@ export default function FoodSection({ afterSave }) {
   const setItems = (meal_items) => update({ ...diet, meal_items })
   const setTime  = (meal, value) => {
     update({ ...diet, meal_times: { ...diet.meal_times, [meal]: value } })
-    if (meal === 'dinner') schedulePostDinnerWalk(value)
   }
 
   // Add Meal writes to the day's log itself, so anything typed here is saved
@@ -338,8 +336,6 @@ export default function FoodSection({ afterSave }) {
   const handleMealLogged = async () => {
     await loadDiet()
     await afterSave()
-    const fresh = await getDiet(today)
-    if (addCategory === 'dinner' && fresh?.meal_times?.dinner) schedulePostDinnerWalk(fresh.meal_times.dinner)
   }
 
   const max         = categoryMaxes(weights)

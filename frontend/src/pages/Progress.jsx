@@ -20,6 +20,7 @@ import { col, scoreColor } from '../services/theme'
 import { longestRun, toSickSet } from '../services/sickDays'
 import { planOn, fastingCounts } from '../services/bodyGoal'
 import { NetWeek, NetMonth } from '../components/NetSummary'
+import IfThenCard from '../components/IfThenCard'
 
 // Deterministic, history-driven meal analytics (see recommendationEngine.js) —
 // top foods/templates, diversity, and repetition over the last 30 days.
@@ -484,6 +485,7 @@ export default function Progress() {
                 <section className="card">
                   <p className="text-xs font-semibold text-brand-light mb-1">What to fix this week</p>
                   <p className="text-base text-text-primary leading-relaxed">{s.strategicFix}</p>
+                  {weekRange && weekRange.end >= todayStr && s.damage[0] && <IfThenCard cost={s.damage[0].key} />}
                 </section>
 
                 {/* ── Why ── */}

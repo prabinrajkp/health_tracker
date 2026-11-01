@@ -6,8 +6,7 @@ import { Capacitor } from '@capacitor/core'
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import useStore from '../store/useStore'
 import { isSickDay } from '../api/client'
-import { scheduleSmartNotifications } from '../services/notificationEngine'
-import { scheduleTrendNotifications } from '../services/trendNotificationEngine'
+import { planNudges } from '../services/nudgePlanner'
 import FoodSection from './log/FoodSection'
 import MoveSection from './log/MoveSection'
 import SleepSection from './log/SleepSection'
@@ -39,8 +38,7 @@ export default function Log() {
   // score, re-plan today's notifications, and confirm — quietly, once per change.
   const afterSave = useCallback(async () => {
     await fetchTodayScore()
-    scheduleSmartNotifications().catch(() => {})
-    scheduleTrendNotifications().catch(() => {})
+    planNudges().catch(() => {})
     if (Capacitor.isNativePlatform()) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {})
     setSaved(true)
     clearTimeout(savedTimer.current)

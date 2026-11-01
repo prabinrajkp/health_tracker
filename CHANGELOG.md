@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented here.
 
+## [v4.37] — 2026-11-01
+
+Smarter notifications and optional AI-written nudges. See `docs/ai_nudges_plan.md`.
+
+### Added
+- **Reminders that look first** — nothing is sent once the job is done, and tapping a notification opens the right screen. Notifications keep at least 2 hours apart, stay quiet between bedtime and wake-up, and use your own penalty, step target and times from Settings
+- **Booked ahead** — bedtime and dinner reminders are booked a week ahead, with a gentle comeback at day 3 and day 7 away, and nothing after that
+- **Separate channels** — reminders, nudges and summaries can each be muted in Android, and personal figures are hidden on a locked phone
+- **Nudges from your own logs** — patterns such as earlier dinners and sleep score, streak guard, nearly-finished goals, noticed progress and fresh starts
+- **Recent nudges** — under Settings, Reminders, showing why each was sent, with helpful or not buttons
+- **If-then plans** — pick one plan on the Week screen for your biggest cost, and it comes back at the moment it applies
+- **AI-written nudges** — optional and off by default, using your own key. The rules still decide what goes out and when, the AI only rewords, every number is checked, and anything that fails keeps the rule-written text. Settings shows exactly what is sent
+- **Background writing** — optional and off by default, it finishes wording that could not be written while the app was open
+- **Nudges that learn** — a kind ignored 3 times in a row rests for 7 days, two "not helpful" ratings turn it off, and mostly ignored nudges drop to every other day
+
+### Changed
+- **Coach mode** — about 6 well-timed notifications a day instead of about 20. Existing Coach users are told once
+- **Backups** — JSON backups include the nudge record, and older backups still restore
+- **AI connection** — requests now time out, and the OpenRouter model list refreshes weekly
+
+### Fixed
+- **Missing AI models** — three OpenRouter models that no longer exist were removed, which should make food lookups and summaries more reliable
+- **Bedtime nudge** — stopping the sleep timer in the morning no longer cancels that night's nudge, and a timer running at night now stops it
+- **Comeback and summaries** — the comeback message and the weekly and monthly summaries now reach people who have not opened the app
+- **Sick days** — notifications now stop on a sick day, with one note the next morning
+
+---
+
 ## [v4.36] — 2026-11-01
 
 Body goal and net calories. See `docs/body_goal_net_energy_plan.md`.

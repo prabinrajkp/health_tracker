@@ -28,7 +28,7 @@ A short setup asks for your goals, activity level and main struggle, and tunes t
 | Image export | `html-to-image` |
 | Data export | SheetJS (xlsx) |
 
-**Fully offline.** All data lives in IndexedDB on the phone. No login, no server, no internet required after install.
+**Fully offline.** All data lives in IndexedDB on the phone. No login, no server, no internet required after install. Optional AI features use your own key and only send what they need: AI-written nudges, off by default, send summary figures about once a day.
 
 ---
 
@@ -106,11 +106,19 @@ Four tabs, each with one job. Everything saves as you change it — there is no 
 ### Weight
 - Daily weigh-in, 7-day average, change vs last week and since start, distance to target, 30d / 90d / 1y trend. Colours follow your body goal, so gaining is good news when gaining is the goal. Reaching your target offers a switch to Keep
 
+### Notifications
+- The rules decide whether to notify, when, and which numbers are true, and work offline. Everything is booked with plain rule-written text first, so nothing depends on a network call
+- **Booked ahead:** bedtime and dinner a week out, nudges for three days, and a gentle comeback at day 3 and day 7 away. After that, nothing. Every open replans, so anything already done is cancelled
+- **Nudges:** before a late dinner, your own patterns (such as earlier dinners and sleep score, at least 5 days each side), streak guard, nearly-there goals, noticed progress, fresh starts, and the if-then plan you pick for the week's biggest cost
+- **Limits:** at least 2 hours apart, quiet between bedtime and wake-up, nothing on a sick day but one note the next morning
+- **Learns simply:** a kind ignored 3 times in a row rests for 7 days, two "not helpful" ratings turn it off, and mostly ignored nudges drop to every other day
+- **AI wording (optional):** the AI only rewords facts the rules chose. Every number is checked against those facts, and anything that fails keeps the rule-written text. Groq is tried first, then OpenRouter on hosts that do not collect data
+
 ### Settings
 - **You:** name, body & goal (Lose, Keep or Gain, pace, Build muscle, height, age, activity, target weight, hide calorie numbers, optional active calories from Health Connect), water goal and glass size, theme
 - **Scoring:** one screen for category maximums, workout points and step targets, sleep, fasting and penalties, with Reset to defaults
 - **Food & AI:** custom foods with points, ideal portions and nutrition; optional AI key. Foods not logged for more than 7 days move to an archive to keep the list short. They can be restored, still appear in Add Meal search, and come back by themselves when logged. Each food can be marked as a drink with its mL per portion
-- **Reminders & data:** Quiet / Standard / Coach notification level, reminder times, Excel export, JSON backup and restore, tutorial
+- **Reminders & data:** Quiet / Standard / Coach notification level, reminder times, optional AI-written nudges with a view of exactly what is sent, recent nudges with why each was sent and helpful or not buttons, Excel export, JSON backup and restore, tutorial
 
 ---
 
@@ -142,14 +150,14 @@ The script will:
 
 **Option A — USB (fastest):**
 ```bash
-adb install health-quest-v4.36-debug.apk
+adb install health-quest-v4.37-debug.apk
 ```
 
 **Option B — WiFi (same network):**
 ```bash
 python3 -m http.server 9999 --directory .
 ```
-Then open `http://<your-pc-ip>:9999/health-quest-v4.36-debug.apk` on your phone and tap to install.
+Then open `http://<your-pc-ip>:9999/health-quest-v4.37-debug.apk` on your phone and tap to install.
 
 > Settings → Apps → Install unknown apps → enable for your browser
 

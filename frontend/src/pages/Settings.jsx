@@ -18,7 +18,9 @@ import { splitFoods, ARCHIVE_AFTER_DAYS } from '../services/foodArchive'
 import { ruleTag, applyDrinkTag, isDrinkFood, clampMl, ML_LIMITS } from '../services/drinkTagging'
 import { stampTodayDrinkItems } from '../api/client'
 import { getFoodUsage, reviveFood, getEnergyDays } from '../services/localStore'
-import { scheduleFixedReminders, NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/reminders'
+import { NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/reminders'
+import { planNudges } from '../services/nudgePlanner'
+import NudgeSettings, { NudgeDeveloperStats } from '../components/NudgeSettings'
 import { version as APP_VERSION } from '../../package.json'
 import useStore from '../store/useStore'
 import db, { DEFAULT_WEIGHTS } from '../services/db'
@@ -513,6 +515,7 @@ export default function Settings() {
         saveConfig({ key: 'dinner_reminder_time',  value: dinnerReminderTime }),
         saveConfig({ key: 'evening_log_time',      value: eveningLogTime }),
         saveConfig({ key: 'notification_mode',     value: notificationMode }),
+        saveConfig({ key: 'reminders_on',          value: 'true' }),
         saveConfig({ key: 'water_goal_mode',       value: waterGoalMode }),
         saveConfig({ key: 'water_goal_custom_ml',  value: waterGoalCustom }),
         saveConfig({ key: 'water_glass_ml',        value: waterGlassMl }),
@@ -521,7 +524,7 @@ export default function Settings() {
       await fetchConfig()
       // Anything already logged today picks up the drink tags just saved
       await stampTodayDrinkItems().catch(() => {})
-      await scheduleFixedReminders({ requestPermission: true })
+      await planNudges({ requestPermission: true })
       toast.success('Settings saved')
     } catch { toast.error('Failed to save') }
     finally { setSaving(false) }
@@ -608,7 +611,7 @@ export default function Settings() {
   const handleJsonExport = async () => {
     setExporting(true)
     try {
-      const [config, dietLogs, workoutLogs, sleepLogs, scores, weightLogs, waterLogs, sickDays] = await Promise.all([
+      const [config, dietLogs, workoutLogs, sleepLogs, scores, weightLogs, waterLogs, sickDays, nudgeLog] = await Promise.all([
         db.tracker_config.toArray(),
         db.diet_logs.orderBy('date').toArray(),
         db.workout_logs.orderBy('date').toArray(),
@@ -617,12 +620,13 @@ export default function Settings() {
         db.weight_logs.orderBy('date').toArray(),
         db.water_logs.orderBy('date').toArray(),
         db.sick_days.toArray(),
+        db.nudge_log.where('status').equals('sent').toArray(),
       ])
       const backup = {
         // Stays at 1 — the import check is `!== 1`, so bumping would reject old backups.
         version: 1,
         exportedAt: format(new Date(), 'yyyy-MM-dd'),
-        data: { config, diet_logs: dietLogs, workout_logs: workoutLogs, sleep_logs: sleepLogs, daily_scores: scores, weight_logs: weightLogs, water_logs: waterLogs, sick_days: sickDays },
+        data: { config, diet_logs: dietLogs, workout_logs: workoutLogs, sleep_logs: sleepLogs, daily_scores: scores, weight_logs: weightLogs, water_logs: waterLogs, sick_days: sickDays, nudge_log: nudgeLog },
       }
       const json = JSON.stringify(backup, null, 2)
       const filename = `health-backup-${format(new Date(), 'yyyy-MM-dd')}.json`
@@ -650,7 +654,7 @@ export default function Settings() {
       const text = await file.text()
       const backup = JSON.parse(text)
       if (!backup?.data || backup?.version !== 1) return toast.error('Invalid backup file')
-      const { config, diet_logs, workout_logs, sleep_logs, daily_scores, weight_logs, water_logs, sick_days } = backup.data
+      const { config, diet_logs, workout_logs, sleep_logs, daily_scores, weight_logs, water_logs, sick_days, nudge_log } = backup.data
       await Promise.all([
         config?.length       && db.tracker_config.bulkPut(config),
         diet_logs?.length    && db.diet_logs.bulkPut(diet_logs),
@@ -660,6 +664,7 @@ export default function Settings() {
         weight_logs?.length  && db.weight_logs.bulkPut(weight_logs),   // absent in pre-v4.20 backups
         water_logs?.length   && db.water_logs.bulkPut(water_logs),     // absent in pre-v4.32 backups
         sick_days?.length    && db.sick_days.bulkPut(sick_days),       // absent in pre-v4.35 backups
+        nudge_log?.length    && db.nudge_log.bulkPut(nudge_log),       // absent in pre-v4.37 backups
       ].filter(Boolean))
       // A sick day never has a score, whatever else the backup held for that date
       if (sick_days?.length) await db.daily_scores.where('date').anyOf(sick_days.map(d => d.date)).delete()
@@ -1517,18 +1522,11 @@ export default function Settings() {
             </div>
           </div>
 
-          {notificationMode === 'coach' && (
-            <div className="card space-y-3">
-              <p className="section-label">Step check-ins</p>
-              <div className="grid grid-cols-3 gap-2">
-                {stepTimes.map((t, i) => (
-                  <input key={i} type="time" aria-label={`Step check-in ${i + 1}`} className="input py-2 text-xs" value={t}
-                    onChange={e => setStepTimes(prev => prev.map((v, j) => j === i ? e.target.value : v))} />
-                ))}
-              </div>
-              <p className="text-xs text-text-muted">Coach also sends hydration reminders at 11:00 and 15:30, a no-snacking reminder at 9:30 PM, a post-dinner walk prompt, and daily trend alerts.</p>
-            </div>
-          )}
+          <p className="text-xs text-text-muted">
+            Nothing is sent once the job is done. Nudges keep at least two hours apart and stay quiet between your bedtime and wake-up time.
+          </p>
+
+          <NudgeSettings hasKey={hasLlmKey(aiConfig)} onOpenAi={() => setActiveSection('ai_provider')} />
         </div>
         <SaveBtn />
       </div>
@@ -1683,6 +1681,7 @@ export default function Settings() {
         <div className="flex flex-col h-full">
           <DetailHeader title="Developer Tools" onBack={devBack} />
           <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
+            <NudgeDeveloperStats />
 
             {/* Date picker */}
             <div className="card space-y-3">

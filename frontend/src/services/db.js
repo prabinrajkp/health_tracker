@@ -74,6 +74,12 @@ db.version(6).stores({
   sick_days:     '&date',
 })
 
+// What the notification planner booked and what became of it. Pending rows are
+// rewritten by every plan; sent rows are the record the app learns from.
+db.version(7).stores({
+  nudge_log: '++id, key, date, status, trigger, at',
+})
+
 export const DEFAULT_WEIGHTS = {
   diet_max: 35, workout_max: 35, sleep_max: 30,
   diet: {

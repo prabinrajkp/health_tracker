@@ -2,7 +2,7 @@
 
 Personal, well-timed notifications written with the user's own AI key, for people who switch them on.
 
-**Status:** planning only. Nothing here is implemented.
+**Status:** all six phases are implemented in v4.37. At release, nothing had been run on a real phone or against a real AI provider. See "How it was built" at the end for where the build differs from this plan.
 
 **Scope note:** "notification panel" is read here as the notifications the app sends to the phone, plus the Reminders screen that controls them. The app has no in-app notification list today. Section 8 proposes a small one.
 
@@ -457,6 +457,19 @@ The weekly AI summary in `weekly_ai_summary_plan.md` can share phase 0 and the d
 - **Living with it:** a two-week trial on your own phone before release. The real test is whether you keep it on.
 
 ---
+
+## How it was built
+
+Where the build differs from the plan above, and why:
+
+- **Booking IDs are 60–119, not 60–89.** A week of bedtime and dinner reminders plus three days of nudges did not fit in 30.
+- **The dinner decision moment merges with the dinner reminder.** Notifications keep two hours apart, so a separate nudge could never fit next to the reminder. With the reminder on, it carries the personal wording at the time the user chose. The separate nudge only exists with reminders off.
+- **Evening nudges can go out from 5:30 PM.** A dinner reminder at 8 and bedtime at 11 leave no gap of two hours on both sides, so an evening nudge moves earlier rather than being dropped.
+- **Reminders keep the time the user set.** "Consistently done late" moves nudges through the learned times. It does not move a reminder away from a time chosen in Settings.
+- **Priority is points at stake, minus 5 for each send of that nudge in the last 3 days.** Plain "highest stake, then least recently sent" let the same high-stake nudge win every day.
+- **The noticed-progress nudge replaces the old appreciation alert.** It is part of the plan like any other nudge, so it counts towards the budget.
+- **`openrouter/free` is not used,** since nothing confirms how it behaves with `data_collection: "deny"`. The list is refreshed from the live model list instead.
+- **The background worker's job is narrow.** Slots for the next few days are written while the app is open, so the worker only finishes wording that could not be written then, such as when offline or out of quota. It is off by default, and keeps a copy of the AI key in the app's private storage while on.
 
 ## Sources
 

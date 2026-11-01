@@ -2,7 +2,6 @@ import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { getSleep, saveSleep } from '../api/client'
-import { checkAndFireAppreciation } from './trendNotificationEngine'
 import { fmtHours } from './fasting'
 
 // The sleep timer, shared by the Today button and the Log → Sleep screen so
@@ -76,7 +75,6 @@ export async function stopSleepTimer() {
       sleep_hours: sleepHours, screen_time_hours: screenOnHours,
     }
     await saveSleep(record)
-    checkAndFireAppreciation(logDate).catch(() => {})
     toast.success(`Sleep saved — ${fmtHours(sleepHours)} total · ${fmtHours(screenOnHours)} screen · ${fmtHours(effective)} effective`)
     return record
   } catch {

@@ -9,13 +9,17 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const GROQ_URL       = 'https://api.groq.com/openai/v1/chat/completions'
 
 // Ordered fallbacks — free-tier models get deprecated/renamed over time, so a
-// single call tries each in turn before giving up on that provider.
+// single call tries each in turn before giving up on that provider. This list is
+// only a starting value: refreshed from OpenRouter once a key is set (see below).
 const OPENROUTER_MODELS = [
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'openai/gpt-oss-20b:free',
   'google/gemma-4-31b-it:free',
-  'nvidia/nemotron-nano-9b-v2:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'nvidia/nemotron-3.5-super-vl:free',
+  'liquid/lfm-2.5-2.6b:free',
 ]
+let liveOpenRouterModels = null
+const openRouterModels = () => liveOpenRouterModels?.length ? liveOpenRouterModels : OPENROUTER_MODELS
+export function setOpenRouterModels(ids) { liveOpenRouterModels = ids }
 const GROQ_MODELS = [
   // llama-3.3-70b-versatile and llama-3.1-8b-instant were shut down 2026-08-16
   'openai/gpt-oss-120b',
@@ -28,7 +32,51 @@ export function hasLlmKey(config) {
   return !!(config?.openrouter_api_key || config?.groq_api_key)
 }
 
-function extractJson(text, opener = '{', closer = '}') {
+const SKIP_MODEL = /code|safety|guard|embed/i
+const NEAR_EXPIRY_DAYS = 14
+
+// Keeps general free models that can return JSON and are not about to be removed.
+export function pickFreeModels(models, now = new Date()) {
+  const soon = now.getTime() + NEAR_EXPIRY_DAYS * 86400000
+  return models
+    .filter(m => m.id?.endsWith(':free') && !SKIP_MODEL.test(m.id))
+    .filter(m => m.supported_parameters?.includes('response_format'))
+    .filter(m => !m.expiration_date || new Date(m.expiration_date).getTime() > soon)
+    .map(m => m.id)
+}
+
+export async function fetchFreeModels() {
+  const res = await fetchWithTimeout(`${OPENROUTER_URL.replace('/chat/completions', '')}/models`, {}, 20000)
+  if (!res.ok) throw new Error(`OpenRouter models: HTTP ${res.status}`)
+  return pickFreeModels((await res.json())?.data || [])
+}
+
+// Requests left today on free models, or null when OpenRouter does not say.
+export async function openRouterQuota(apiKey) {
+  try {
+    const res = await fetchWithTimeout(OPENROUTER_URL.replace('/chat/completions', '/key'),
+      { headers: { Authorization: `Bearer ${apiKey}` } }, 10000)
+    if (!res.ok) return null
+    const remaining = (await res.json())?.data?.free_model_daily_requests?.remaining
+    return typeof remaining === 'number' ? remaining : null
+  } catch {
+    return null
+  }
+}
+
+const DEFAULT_TIMEOUT_MS = 45000
+
+async function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export function extractJson(text, opener = '{', closer = '}') {
   if (!text) return null
   const start = text.indexOf(opener)
   const end   = text.lastIndexOf(closer)
@@ -36,8 +84,8 @@ function extractJson(text, opener = '{', closer = '}') {
   try { return JSON.parse(text.slice(start, end + 1)) } catch { return null }
 }
 
-async function callChat(url, apiKey, model, prompt) {
-  const res = await fetch(url, {
+async function callChat(url, apiKey, model, prompt, { temperature = 0.2, maxTokens, timeoutMs, extra = {} } = {}) {
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -45,11 +93,17 @@ async function callChat(url, apiKey, model, prompt) {
     },
     body: JSON.stringify({
       model,
-      temperature: 0.2,
+      temperature,
+      ...(maxTokens ? { max_tokens: maxTokens } : {}),
       messages: [{ role: 'user', content: prompt }],
+      ...extra,
     }),
-  })
-  if (!res.ok) throw new Error(`${url.includes('groq') ? 'Groq' : 'OpenRouter'} ${model}: HTTP ${res.status}`)
+  }, timeoutMs)
+  if (!res.ok) {
+    const err = new Error(`${url.includes('groq') ? 'Groq' : 'OpenRouter'} ${model}: HTTP ${res.status}`)
+    err.status = res.status
+    throw err
+  }
   const data = await res.json()
   const content = data?.choices?.[0]?.message?.content
   if (!content) throw new Error(`${model}: empty response`)
@@ -65,7 +119,7 @@ async function callChat(url, apiKey, model, prompt) {
 async function chatCompletion(prompt, config) {
   const errors = []
   if (config?.openrouter_api_key) {
-    for (const model of OPENROUTER_MODELS) {
+    for (const model of openRouterModels()) {
       try { return await callChat(OPENROUTER_URL, config.openrouter_api_key, model, prompt) }
       catch (e) { errors.push(e.message) }
     }
@@ -78,6 +132,58 @@ async function chatCompletion(prompt, config) {
   }
   if (!errors.length) throw new Error('No AI provider configured — add an API key in Settings')
   throw new Error(`All AI providers failed — ${errors[errors.length - 1]}`)
+}
+
+// ── Nudge copy ────────────────────────────────────────────────────────────────
+// This call runs without the user pressing a button and carries behaviour figures,
+// so it differs from the rest: Groq first, for its strict JSON and data policy, then
+// OpenRouter only on hosts that do not collect data. If nothing qualifies, the
+// privacy setting is not relaxed: nudges simply stay rule-written.
+const NUDGE_ATTEMPTS   = 2
+const NUDGE_TIMEOUT_MS = 20000
+const NUDGE_MAX_TOKENS = 500
+const MIN_OPENROUTER_REMAINING = 10
+const PRIVATE_ROUTE = { provider: { data_collection: 'deny' } }
+
+export function nudgeRequests(prompt, schema, config) {
+  const shared = { temperature: 0.7, max_tokens: NUDGE_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] }
+  const requests = []
+  if (config?.groq_api_key) {
+    for (const model of GROQ_MODELS) {
+      requests.push({ url: GROQ_URL, keyName: 'groq', body: { ...shared, model,
+        response_format: { type: 'json_schema', json_schema: { name: 'nudges', strict: true, schema } } } })
+    }
+  }
+  if (config?.openrouter_api_key) {
+    for (const model of openRouterModels()) {
+      requests.push({ url: OPENROUTER_URL, keyName: 'openrouter', body: { ...shared, model,
+        response_format: { type: 'json_object' }, ...PRIVATE_ROUTE } })
+    }
+  }
+  // Both providers get a chance when both have keys
+  const groq = requests.filter(r => r.keyName === 'groq'), or = requests.filter(r => r.keyName === 'openrouter')
+  return (groq.length && or.length ? [groq[0], or[0]] : requests).slice(0, NUDGE_ATTEMPTS)
+}
+
+export async function completeNudges(prompt, schema, config) {
+  const reasons = []
+  for (const r of nudgeRequests(prompt, schema, config)) {
+    const key = r.keyName === 'groq' ? config.groq_api_key : config.openrouter_api_key
+    if (r.keyName === 'openrouter') {
+      const remaining = await openRouterQuota(key)
+      if (remaining != null && remaining < MIN_OPENROUTER_REMAINING) { reasons.push('quota_low'); continue }
+    }
+    try {
+      const { model, messages, temperature, max_tokens, ...extra } = r.body
+      const text = await callChat(r.url, key, model, prompt, { temperature, maxTokens: max_tokens, timeoutMs: NUDGE_TIMEOUT_MS, extra })
+      return { text, provider: r.keyName, model }
+    } catch (e) {
+      reasons.push(r.keyName === 'openrouter' && e.status === 404 ? 'no_private_model' : e.status === 429 ? 'rate_limited' : 'failed')
+    }
+  }
+  const err = new Error('Nudge copy not written')
+  err.reason = reasons.includes('no_private_model') ? 'no_private_model' : reasons[0] || 'failed'
+  throw err
 }
 
 const SCORING_GUIDE = `Scoring guide:

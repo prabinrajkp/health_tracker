@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { format, subDays } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
@@ -12,15 +12,13 @@ import { DayDetailPanel } from '../components/DayDetail'
 import { getDiet, getWorkout, getSleep, getWeightEntry, isSickDay, markSickDays, unmarkSickDays, getMissedDays, getLatestWeight, saveConfig, saveGoalEntry } from '../api/client'
 import { BODY_GOALS, UNDERWEIGHT_BMI, planOn, goalHistory, fastingCounts, defaultPace, defaultFasting } from '../services/bodyGoal'
 import { computeBmi } from '../services/dietetics'
-import { scheduleFixedReminders } from '../services/reminders'
 import { describeDays } from '../services/sickDays'
 import { useWater } from '../hooks/useWater'
 import { formatLitres } from '../services/hydration'
 import WaterGlass from '../components/WaterGlass'
 import DrinksSheet from '../components/DrinksSheet'
 import { computeNextAction } from '../services/nextAction'
-import { scheduleSmartNotifications } from '../services/notificationEngine'
-import { scheduleTrendNotifications } from '../services/trendNotificationEngine'
+import { planNudges } from '../services/nudgePlanner'
 import { gradeFor, weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../services/scoreMeta'
 import { getSleepTimerStart, startSleepTimer, stopSleepTimer, hhmm, formatElapsed } from '../services/sleepTimer'
 
@@ -177,6 +175,7 @@ const suggestedGoal = (config) => {
 export default function Today() {
   const { todayScore, streak, refreshAll, config } = useStore()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const today     = format(new Date(), 'yyyy-MM-dd')
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd')
 
@@ -212,6 +211,7 @@ export default function Today() {
   const refreshAfterSickChange = async () => {
     await refreshAll()
     await Promise.all([loadLogs(), loadSick(), water.reload()])
+    planNudges().catch(() => {})
   }
 
   // One tap, no form or dialog: someone who is ill will not fill anything in,
@@ -259,7 +259,7 @@ export default function Today() {
     await saveGoalEntry({ goal, pace: defaultPace(goal, { bmi }), muscle: false, fasting: defaultFasting(goal) })
     await saveConfig({ key: 'body_goal_asked', value: 'true' })
     await refreshAll()
-    scheduleFixedReminders().catch(() => {})
+    planNudges().catch(() => {})
     toast.success('Goal saved. You can change the pace in Settings.')
   }
 
@@ -300,6 +300,15 @@ export default function Today() {
   const NextIcon = next ? (ACTION_ICONS[next.icon] || ChevronRight) : Check
 
   const openAddMeal = (category = null) => { setMealCategory(category); setAddMealOpen(true) }
+
+  // A dinner or breakfast notification opens Add Meal on that meal
+  useEffect(() => {
+    const meal = searchParams.get('meal')
+    if (!meal) return
+    openAddMeal(meal)
+    setSearchParams({}, { replace: true })
+  }, [searchParams])
+
   const runAction = (target) => {
     if (target.type === 'meal') openAddMeal(target.category)
     else navigate(`/log?tab=${target.tab}`)
@@ -318,8 +327,7 @@ export default function Today() {
       if (saved) {
         await refreshAll()
         await loadLogs()
-        scheduleSmartNotifications().catch(() => {})
-        scheduleTrendNotifications().catch(() => {})
+        planNudges().catch(() => {})
       }
     } finally {
       setStopping(false)
@@ -456,7 +464,7 @@ export default function Today() {
 
         {/* ── 4. Sleep timer — one button, so it is never forgotten ────────── */}
         <SleepTimerButton startedAt={timerStart} busy={stopping}
-          onStart={() => setTimerStart(startSleepTimer())} onStop={handleStopTimer} />
+          onStart={() => { setTimerStart(startSleepTimer()); planNudges().catch(() => {}) }} onStop={handleStopTimer} />
 
         {/* ── 5. Log — at the bottom, where the thumb is ───────────────────── */}
         <section className="mt-auto pb-3">

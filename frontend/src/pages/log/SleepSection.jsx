@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { Play, Square, ChevronDown, Moon } from 'lucide-react'
 import { getSleep, saveSleep, getConfig } from '../../api/client'
+import { planNudges } from '../../services/nudgePlanner'
 import { getSleepTimerStart, startSleepTimer, stopSleepTimer, hhmm, formatElapsed } from '../../services/sleepTimer'
 import { calcSleepScore } from '../../services/scoring'
 import { weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../../services/scoreMeta'
@@ -81,7 +82,7 @@ export default function SleepSection({ afterSave }) {
     if (next.sleep_time && next.wake_time) save(next, delay)
   }
 
-  const startTimer = () => setTimerStart(startSleepTimer())
+  const startTimer = () => { setTimerStart(startSleepTimer()); planNudges().catch(() => {}) }
 
   const stopTimer = async () => {
     setTimerStart(null)

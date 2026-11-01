@@ -36,6 +36,9 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Shows notifications the background nudge writer reworded -->
+        <receiver android:name=".NudgeAlarmReceiver" android:exported="false" />
+
         <!-- Home screen widget -->
         <receiver
             android:name=".HealthQuestWidget"

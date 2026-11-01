@@ -88,12 +88,12 @@
     <img src="logo.png" alt="Health Quest logo">
     <h1>Turn healthy habits into a <span>daily game</span></h1>
     <p class="lead">A fully offline, gamified health tracker for Android. Score your diet, fasting, workouts and sleep every day — no account, no cloud, no internet needed.</p>
-    <a class="btn" href="health-quest-v4.36-debug.apk" download>
+    <a class="btn" href="health-quest-v4.37-debug.apk" download>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
-      Download APK · v4.36
+      Download APK · v4.37
     </a>
     <p class="meta"><a href="https://github.com/prabinrajkp/health_tracker" target="_blank" rel="noopener">Source on GitHub</a></p>
-    <p class="meta">Android 7+ · ~7.8 MB · Debug build · Released 1 Nov 2026</p>
+    <p class="meta">Android 7+ · ~8.4 MB · Debug build · Released 1 Nov 2026</p>
     <div class="pills">
       <span class="pill">100% offline</span><span class="pill">No sign-up</span><span class="pill">Data stays on your phone</span><span class="pill">AI coach (optional)</span>
     </div>
@@ -108,10 +108,10 @@
   <ol class="steps">
     <li><h3>Download the APK</h3><p>Tap the <strong>Download APK</strong> button above on your phone (or download on a PC and copy the file over via USB / cable).</p></li>
     <li><h3>Allow installs from your browser</h3><p>Open <code>Settings → Apps → Special access → Install unknown apps</code>, choose your browser or file manager, and enable <em>Allow from this source</em>.</p></li>
-    <li><h3>Open the file and tap Install</h3><p>Open the downloaded <code>health-quest-v4.36-debug.apk</code> from your notifications or Downloads folder. If Play Protect warns about an unknown app, choose <em>Install anyway</em> — it's a personal debug build.</p></li>
+    <li><h3>Open the file and tap Install</h3><p>Open the downloaded <code>health-quest-v4.37-debug.apk</code> from your notifications or Downloads folder. If Play Protect warns about an unknown app, choose <em>Install anyway</em> — it's a personal debug build.</p></li>
     <li><h3>Finish onboarding</h3><p>Launch Health Quest, answer three quick setup questions (your goals, activity level and main struggle) and allow notifications, Usage Access and Health Connect when asked so reminders, screen-time and step sync work.</p></li>
   </ol>
-  <p class="note"><strong>From a PC with USB debugging:</strong> run <code>adb install health-quest-v4.36-debug.apk</code>. Updating from an older version keeps your data; installing over it just works.</p>
+  <p class="note"><strong>From a PC with USB debugging:</strong> run <code>adb install health-quest-v4.37-debug.apk</code>. Updating from an older version keeps your data; installing over it just works.</p>
 </section>
 
 <section id="tour">
@@ -166,7 +166,7 @@
   <div class="grid">
     <div class="card"><div class="ico">🏅</div><h3>100+ badges</h3><p>Seven categories — Consistency, Nutrition, Fitness, Sleep, Comeback, Hydration, Elite — plus hidden badges and three combination badges. Habit badges can be earned again and again.</p></div>
     <div class="card"><div class="ico">⚡</div><h3>Levels &amp; XP</h3><p>Every logged day earns XP from your score, and so do daily and weekly goals. Level up and keep a streak alive (quality days count).</p></div>
-    <div class="card"><div class="ico">🔔</div><h3>Reminders at your level</h3><p>Choose Quiet, Standard or Coach. Standard sends at most three a day (bedtime, dinner and one nudge); Coach adds step check-ins and daily trend alerts. Everyone gets the weekly and monthly summary.</p></div>
+    <div class="card"><div class="ico">🔔</div><h3>Reminders that look first</h3><p>Choose Quiet, Standard or Coach. Standard sends at most three a day (bedtime, dinner and one nudge); Coach about six. Nothing is sent once the job is done or on a sick day, and tapping one opens the right screen. Nudges draw on your own logs, and an optional AI key can word them for you, with no change in how many you get.</p></div>
     <div class="card"><div class="ico">🎯</div><h3>Your body goal</h3><p>Lose, keep or gain weight, with or without building muscle. Your calorie target, protein range, scoring, badges and colours all follow it.</p></div>
     <div class="card"><div class="ico">🔥</div><h3>Net calories</h3><p>Food eaten minus an estimate of everything you burned. See it by day, week and month, then check it against what the scale actually did, and correct your maintenance figure with one tap.</p></div>
     <div class="card"><div class="ico">🤖</div><h3>AI health summary</h3><p>Optional. Add a free API key in Settings and generate a per-day diet / sleep / workout brief with tomorrow's priorities. Without a key, everything else still works.</p></div>
@@ -175,20 +175,20 @@
 
 <section id="faq">
   <h2>FAQ</h2>
-  <details><summary>Where is my data stored?</summary><p>Only on your phone, in the app's local database. Nothing is uploaded. Use <em>Settings → Export &amp; backup</em> to save a JSON file and restore it on a new device.</p></details>
-  <details><summary>Do I need internet?</summary><p>No. Only the optional AI features (health summary and food lookup) need a connection.</p></details>
+  <details><summary>Where is my data stored?</summary><p>Only on your phone, in the app's local database. Nothing is uploaded unless you turn on an AI feature, and even then only what that feature needs. Use <em>Settings → Export &amp; backup</em> to save a JSON file and restore it on a new device.</p></details>
+  <details><summary>Do I need internet?</summary><p>No. Only the optional AI features (health summary, food lookup and AI-written nudges) need a connection. AI-written nudges are off by default. When on, they send summary figures such as average scores and usual times to your AI provider about once a day, and never your name, notes, foods or body measurements. You can see exactly what is sent under <em>Settings → Reminders</em>.</p></details>
   <details><summary>Why does Android warn me during install?</summary><p>The APK is a debug build shared outside the Play Store, so Play Protect doesn't recognise it. Only install it from a source you trust.</p></details>
   <details><summary>Steps aren't syncing — what do I check?</summary><p>Make sure Health Connect is installed and that Health Quest has permission to read Steps. Sleep screen-time deduction needs <em>Usage Access</em> enabled for the app.</p></details>
-  <details><summary>Reminders don't fire on time.</summary><p>Allow notifications and exact alarms, and set battery usage for Health Quest to <em>Unrestricted</em> on phones with aggressive battery savers.</p></details>
+  <details><summary>Reminders don't fire on time.</summary><p>Allow notifications, and set battery usage for Health Quest to <em>Unrestricted</em> on phones with aggressive battery savers. A delay of a few minutes is normal, because Android groups alarms together to save battery.</p></details>
   <details><summary>Can I export my data?</summary><p>Yes — Settings has a full Excel export (scores, diet, workouts, sleep, weight) and a JSON backup.</p></details>
 </section>
 
 <section class="cta">
   <h2>Ready to start your quest?</h2>
   <p>Download, install, and log your first day.</p>
-  <a class="btn" href="health-quest-v4.36-debug.apk" download>
+  <a class="btn" href="health-quest-v4.37-debug.apk" download>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
-    Download APK · v4.36
+    Download APK · v4.37
   </a>
 </section>
 

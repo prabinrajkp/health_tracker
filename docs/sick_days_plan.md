@@ -2,7 +2,7 @@
 
 How the app should treat days when you are unwell and in no mood to log anything.
 
-**Status:** phases 1 and 2 are implemented in v4.35. Phases 3 and 4 are not. JSON backup of sick days, from phase 3, was brought forward, because a new table left out of backups would be lost on restore.
+**Status:** phases 1 and 2 are implemented in v4.35. The notification part of phase 4 is built with the AI nudges work (`ai_nudges_plan.md`): a sick day cancels everything booked, with one note the next morning. The widget part of phase 4, and phase 3, are not. JSON backup of sick days, from phase 3, was brought forward, because a new table left out of backups would be lost on restore.
 
 ---
 

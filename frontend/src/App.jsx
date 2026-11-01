@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app'
+import { LocalNotifications } from '@capacitor/local-notifications'
+import toast from 'react-hot-toast'
 import BadgeUnlockOverlay from './components/BadgeUnlockOverlay'
 import Navbar from './components/Navbar'
 import Today from './pages/Today'
@@ -12,14 +16,13 @@ import Weight from './pages/Weight'
 import Onboarding from './pages/Onboarding'
 import { migrateHistoricalScores, migrateSleepDates, migrateSleepDatesV8, seedDrinkTags } from './services/localStore'
 import db from './services/db'
-import { scheduleSmartNotifications } from './services/notificationEngine'
-import { scheduleTrendNotifications } from './services/trendNotificationEngine'
-import { migrateFixedReminders } from './services/reminders'
+import { planNudges, recordTap, consumeNativeTap, takeNotices, refreshModelList } from './services/nudgePlanner'
 import { seedFoodDefaults } from './services/foodDefaults'
 import { syncStepsBackground, syncActiveCalories } from './services/stepSync'
 import { runBadgeEngine } from './services/badgeEngine'
 
 const STEP_SYNC_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes
+const RESUME_PLAN_GAP_MS    = 60 * 1000      // switching apps and back should not replan every time
 
 // Old tab routes still open the right screen (query string kept), so links
 // saved before the tabs were renamed keep working.
@@ -31,6 +34,7 @@ function Redirect({ to }) {
 export default function App() {
   const [onboardingDone, setOnboardingDone] = useState(null)
   const [unlockQueue, setUnlockQueue] = useState([])
+  const navigate = useNavigate()
 
   useEffect(() => {
     migrateSleepDatesV8().catch(console.error)   // undo v7 mis-convention; runs first
@@ -66,17 +70,42 @@ export default function App() {
       })
       .catch(() => setOnboardingDone(true)) // On db error, never block existing users
 
-    // Schedule smart notifications for today based on current data
-    migrateFixedReminders().catch(() => {})
-    scheduleSmartNotifications().catch(() => {})
-    scheduleTrendNotifications().catch(() => {})
+    // Plan the coming notifications from current data, then say anything owed once
+    refreshModelList().catch(() => {})
+    planNudges().then(() => takeNotices()).then(notices => notices.forEach(n => toast(n, { duration: 6000 }))).catch(() => {})
+
+    // Tapping a notification opens the screen the rule chose for it
+    const followTap = async (key, route) => {
+      await recordTap(key).catch(() => {})
+      if (route) navigate(route)
+    }
+    let lastPlanAt = Date.now()
+    const replanOnReturn = async () => {
+      const tap = await consumeNativeTap().catch(() => null)
+      if (tap?.route) followTap(tap.key, tap.route)
+      syncStepsBackground().catch(() => {})
+      if (Date.now() - lastPlanAt < RESUME_PLAN_GAP_MS) return
+      lastPlanAt = Date.now()
+      planNudges().catch(() => {})
+    }
+    const handles = []
+    if (Capacitor.isNativePlatform()) {
+      handles.push(LocalNotifications.addListener('localNotificationActionPerformed', ({ notification }) => {
+        followTap(notification?.extra?.key, notification?.extra?.route)
+      }))
+      handles.push(CapApp.addListener('appStateChange', ({ isActive }) => { if (isActive) replanOnReturn() }))
+      consumeNativeTap().then(tap => { if (tap?.route) followTap(tap.key, tap.route) }).catch(() => {})
+    }
 
     // Run badge engine — queue any newly unlocked badges for the overlay
     runBadgeEngine().then(newBadges => {
       if (newBadges.length > 0) setUnlockQueue(newBadges)
     }).catch(() => {})
 
-    return () => clearInterval(stepSyncTimer)
+    return () => {
+      clearInterval(stepSyncTimer)
+      handles.forEach(h => Promise.resolve(h).then(x => x?.remove?.()).catch(() => {}))
+    }
   }, [])
 
   if (onboardingDone === null) return null
