@@ -8,6 +8,7 @@ import db, { seedDefaults, DEFAULT_WEIGHTS } from './db'
 import { computeScore } from './scoring'
 import { dieteticsFromConfig } from './dietetics'
 import { resolveWaterGoal, mealDrinks } from './hydration'
+import { toSickSet, activeDates, findMissedDays } from './sickDays'
 import { tagFoodsByRule, applyDrinkTag, ruleTag, isDrinkFood } from './drinkTagging'
 import { buildFoodUsage } from './foodArchive'
 import { computeFingerprint } from './mealFingerprint'
@@ -56,6 +57,13 @@ async function weightOnOrBefore(date) {
 // ── Recompute and persist daily score ────────────────────────────────────────
 async function recomputeScore(date) {
   if (date > today()) return null  // never create records for future dates
+  // A sick day has no score at all, so averages, XP, charts and goals simply
+  // never see it. What was logged is kept, and unmarking recalculates from it.
+  if (await db.sick_days.get(date)) {
+    const row = await db.daily_scores.get({ date })
+    if (row) await db.daily_scores.delete(row.id)
+    return null
+  }
   const weights       = await getWeights()
   const customOptions = await getCustomMealOptions()
   const yesterdayDate = format(subDays(parseISO(date), 1), 'yyyy-MM-dd')
@@ -106,9 +114,12 @@ async function recomputeScore(date) {
 
 async function getStreakCount(targetDate) {
   let streak = 0
-  let check  = subDays(new Date(targetDate), 1)
+  let check  = subDays(parseISO(targetDate), 1)
+  const sick = toSickSet(await db.sick_days.toArray())
   for (let i = 0; i < 365; i++) {
     const key = format(check, 'yyyy-MM-dd')
+    // Sick days pause the streak: skipped over, neither adding nor breaking
+    if (sick.has(key)) { check = subDays(check, 1); continue }
     const row = await db.daily_scores.get({ date: key })
     if (row && row.total_score >= 60) { streak++; check = subDays(check, 1) }
     else break
@@ -144,7 +155,7 @@ export async function saveDiet(payload) {
 async function stampWaterGoalForMeals(diet) {
   try {
     if (mealDrinks(diet).length === 0) return
-    const goal = await currentWaterGoal()
+    const goal = await currentWaterGoal(diet.date)
     const day  = await db.water_logs.get({ date: diet.date })
     if (day) await db.water_logs.update(day.id, { goal_ml: goal.targetMl })
     else await db.water_logs.add({ date: diet.date, entries: [], goal_ml: goal.targetMl, created_at: new Date().toISOString() })
@@ -211,9 +222,46 @@ export async function getWeightEntries(start = null, end = null) {
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+// ── Sick days ────────────────────────────────────────────────────────────────
+export async function isSickDay(date = today()) {
+  return !!(await db.sick_days.get(date))
+}
+
+// Sets the days aside: their scores go, their logs stay.
+export async function markSickDays(dates) {
+  const now = new Date().toISOString()
+  await db.sick_days.bulkPut(dates.map(date => ({ date, created_at: now })))
+  for (const date of dates) {
+    await recomputeScore(date)
+    const water = await db.water_logs.get({ date })
+    if (water) await db.water_logs.update(water.id, { goal_ml: 0 })
+  }
+}
+
+// Brings the days back, with scores recalculated from whatever was logged.
+export async function unmarkSickDays(dates) {
+  await db.sick_days.bulkDelete(dates)
+  for (const date of dates) {
+    await recomputeScore(date)
+    const water = await db.water_logs.get({ date })
+    if (water) await db.water_logs.update(water.id, { goal_ml: (await currentWaterGoal(date)).targetMl })
+  }
+}
+
+// The empty days just before today that the catch-up prompt can offer.
+export async function getMissedDays() {
+  const [dietLogs, sleepLogs, workoutLogs, sick] = await Promise.all([
+    db.diet_logs.toArray(), db.sleep_logs.toArray(), db.workout_logs.toArray(), db.sick_days.toArray(),
+  ])
+  return findMissedDays(today(), activeDates({ dietLogs, sleepLogs, workoutLogs }), toSickSet(sick))
+}
+
 // ── Water and other drinks ───────────────────────────────────────────────────
 // Never part of the score: these do not call recomputeScore.
-async function currentWaterGoal() {
+async function currentWaterGoal(date = today()) {
+  // The generic goal is not meant for someone who is acutely ill (see
+  // docs/water_intake_logic.md §8), so a sick day has none.
+  if (await db.sick_days.get(date)) return { mode: 'sick', basis: 'sick', targetMl: 0 }
   const rows = await db.tracker_config.toArray()
   const config = {}
   rows.forEach(r => { config[r.key] = r.value })
@@ -221,8 +269,8 @@ async function currentWaterGoal() {
   return resolveWaterGoal(config, latest?.weight_kg ?? null)
 }
 
-export async function getWaterGoal() {
-  return currentWaterGoal()
+export async function getWaterGoal(date = today()) {
+  return currentWaterGoal(date)
 }
 
 export async function getWaterDay(date) {
@@ -238,7 +286,7 @@ export async function getAllWaterDays() {
 export async function addWaterEntry(date, { ml, kind = 'water' }) {
   const amount = Math.round(Number(ml))
   if (!Number.isFinite(amount) || amount <= 0 || amount > 5000) throw new Error('Invalid amount')
-  const goal  = await currentWaterGoal()
+  const goal  = await currentWaterGoal(date)
   const now   = new Date()
   const entry = {
     id: `${now.getTime()}-${Math.random().toString(36).slice(2, 6)}`,

@@ -552,7 +552,7 @@ export default function Settings() {
   const handleJsonExport = async () => {
     setExporting(true)
     try {
-      const [config, dietLogs, workoutLogs, sleepLogs, scores, weightLogs, waterLogs] = await Promise.all([
+      const [config, dietLogs, workoutLogs, sleepLogs, scores, weightLogs, waterLogs, sickDays] = await Promise.all([
         db.tracker_config.toArray(),
         db.diet_logs.orderBy('date').toArray(),
         db.workout_logs.orderBy('date').toArray(),
@@ -560,12 +560,13 @@ export default function Settings() {
         db.daily_scores.orderBy('date').toArray(),
         db.weight_logs.orderBy('date').toArray(),
         db.water_logs.orderBy('date').toArray(),
+        db.sick_days.toArray(),
       ])
       const backup = {
         // Stays at 1 — the import check is `!== 1`, so bumping would reject old backups.
         version: 1,
         exportedAt: format(new Date(), 'yyyy-MM-dd'),
-        data: { config, diet_logs: dietLogs, workout_logs: workoutLogs, sleep_logs: sleepLogs, daily_scores: scores, weight_logs: weightLogs, water_logs: waterLogs },
+        data: { config, diet_logs: dietLogs, workout_logs: workoutLogs, sleep_logs: sleepLogs, daily_scores: scores, weight_logs: weightLogs, water_logs: waterLogs, sick_days: sickDays },
       }
       const json = JSON.stringify(backup, null, 2)
       const filename = `health-backup-${format(new Date(), 'yyyy-MM-dd')}.json`
@@ -593,7 +594,7 @@ export default function Settings() {
       const text = await file.text()
       const backup = JSON.parse(text)
       if (!backup?.data || backup?.version !== 1) return toast.error('Invalid backup file')
-      const { config, diet_logs, workout_logs, sleep_logs, daily_scores, weight_logs, water_logs } = backup.data
+      const { config, diet_logs, workout_logs, sleep_logs, daily_scores, weight_logs, water_logs, sick_days } = backup.data
       await Promise.all([
         config?.length       && db.tracker_config.bulkPut(config),
         diet_logs?.length    && db.diet_logs.bulkPut(diet_logs),
@@ -602,7 +603,10 @@ export default function Settings() {
         daily_scores?.length && db.daily_scores.bulkPut(daily_scores),
         weight_logs?.length  && db.weight_logs.bulkPut(weight_logs),   // absent in pre-v4.20 backups
         water_logs?.length   && db.water_logs.bulkPut(water_logs),     // absent in pre-v4.32 backups
+        sick_days?.length    && db.sick_days.bulkPut(sick_days),       // absent in pre-v4.35 backups
       ].filter(Boolean))
+      // A sick day never has a score, whatever else the backup held for that date
+      if (sick_days?.length) await db.daily_scores.where('date').anyOf(sick_days.map(d => d.date)).delete()
       await fetchConfig()
       toast.success(`Imported — ${diet_logs?.length ?? 0} diet · ${workout_logs?.length ?? 0} workout · ${sleep_logs?.length ?? 0} sleep logs`)
     } catch { toast.error('Import failed — check the file format') }

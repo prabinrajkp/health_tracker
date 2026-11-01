@@ -104,7 +104,9 @@ export default function DrinksSheet({ open, onClose, water }) {
         )}
 
         <p className="t-caption pb-2">
-          {goal?.basis === 'off' ? 'No daily goal is set. ' : 'The goal is an estimate, not a requirement. '}
+          {goal?.basis === 'off' ? 'No daily goal is set. '
+            : goal?.basis === 'sick' ? 'No goal on a sick day. '
+            : 'The goal is an estimate, not a requirement. '}
           <button onClick={() => go('/settings?section=water')} className="font-semibold text-brand-light">About this goal</button>
         </p>
       </div>

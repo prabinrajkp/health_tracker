@@ -2,6 +2,7 @@ import { format, startOfWeek, endOfWeek, parseISO } from 'date-fns'
 import db from './db'
 import { col } from './theme'
 import { waterBadgeMetrics } from './hydration'
+import { toSickSet, isConsecutive } from './sickDays'
 
 // Rarity shows only as the badge's colour, taken from the theme tokens.
 const tier = (tone, label) => ({ tone, label, color: col(tone), bg: col(tone, 0.12) })
@@ -722,16 +723,19 @@ export function getEarnEvolutionTier(count) {
 
 async function buildAggregateData() {
   const today = format(new Date(), 'yyyy-MM-dd')
-  const [allScores, allDiet, allWorkout, allSleep, allWeight, allWater] = await Promise.all([
+  const [allScores, allDiet, allWorkout, allSleep, allWeight, allWater, allSick] = await Promise.all([
     db.daily_scores.where('date').belowOrEqual(today).sortBy('date'),
     db.diet_logs.toArray(),
     db.workout_logs.toArray(),
     db.sleep_logs.toArray(),
     db.weight_logs.toArray(),
     db.water_logs.toArray(),
+    db.sick_days.toArray(),
   ])
   if (allScores.length === 0) return null
-  const water = waterBadgeMetrics(allWater, allDiet)
+  // Sick days pause streaks: a run carries across them without counting them
+  const sick  = toSickSet(allSick)
+  const water = waterBadgeMetrics(allWater, allDiet, sick)
 
   const dietMap    = Object.fromEntries(allDiet.map(d => [d.date, d]))
   const workoutMap = Object.fromEntries(allWorkout.map(d => [d.date, d]))
@@ -749,7 +753,9 @@ async function buildAggregateData() {
     const diff = Math.round(
       (new Date(sortedDates[i] + 'T00:00:00') - new Date(sortedDates[i-1] + 'T00:00:00')) / 86400000
     )
-    if (diff === 1) {
+    // Coming back after 2+ days away is a comeback, whether or not they were sick days
+    if (diff >= 3) { bounceBackCount++; hasBounceBack = true }
+    if (isConsecutive(sortedDates[i-1], sortedDates[i], sick)) {
       currentStreak++
     } else {
       streakStarterCount   += Math.floor(currentStreak / 3)
@@ -760,7 +766,6 @@ async function buildAggregateData() {
       ironStreakCount      += Math.floor(currentStreak / 60)
       maxStreak = Math.max(maxStreak, currentStreak)
       currentStreak = 1
-      if (diff >= 3) { bounceBackCount++; hasBounceBack = true }
     }
   }
   streakStarterCount   += Math.floor(currentStreak / 3)
@@ -779,10 +784,7 @@ async function buildAggregateData() {
   let qStreakLegendCount = 0, qMonthMasterCount = 0, qIronStreakCount = 0
 
   for (let i = 1; i < qualityDates.length; i++) {
-    const diff = Math.round(
-      (new Date(qualityDates[i] + 'T00:00:00') - new Date(qualityDates[i-1] + 'T00:00:00')) / 86400000
-    )
-    if (diff === 1) {
+    if (isConsecutive(qualityDates[i-1], qualityDates[i], sick)) {
       currentQualityStreak++
     } else {
       qStreakStarterCount   += Math.floor(currentQualityStreak / 3)

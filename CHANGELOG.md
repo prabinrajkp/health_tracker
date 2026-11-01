@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## [v4.35] — 2026-11-01
+
+Sick days. See `docs/sick_days_plan.md`.
+
+### Added
+- **Sick days** — a "Not feeling well?" link on Today marks the day in one tap, with Undo and no form. The day has no score, adds no XP and does not count in averages or days logged. Streaks pause instead of breaking: 10 days, 2 sick days, then a good day continues the streak. What you logged is kept, not scored
+- **Rest state on Today** — a sick day shows a calm message in place of the score, the next step and any penalty, with an "I'm feeling better" button that brings the score back. Drinks, the sleep timer and the log buttons stay available, and the Log screen says the day is kept, not scored
+- **"Still unwell?"** — asked the morning after a sick day, answered in one tap
+- **Catch-up prompt** — after days with nothing logged, Today asks whether you were unwell and marks those days in one tap, up to 7 days back, restoring the streak. It only offers days with no meals, sleep or exercise, and answering No is remembered
+
+### Changed
+- **No drinks goal on a sick day** — the generic goal is not meant for someone who is acutely ill. Drinks can still be logged, and water badges neither count nor break that day
+- **Streaks carry across sick days** — badge streaks, the longest-run figures and the water streak all pause. Earned badges are never taken away
+- **Backups** — JSON backups include sick days, and older backups still restore
+
+### Fixed
+- **Empty days counting against you** — opening the app on a day with nothing logged saves a near-zero score. Marking the day as sick now removes it from your averages
+
+---
+
 ## [v4.34] — 2026-10-13
 
 Drinks are tidied up and now count what you log in meals. See `docs/drinks_declutter_plan.md` and `docs/food_drinks_link_plan.md`.

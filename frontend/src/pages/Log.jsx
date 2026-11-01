@@ -5,6 +5,7 @@ import { Utensils, Footprints, Moon, Check } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import useStore from '../store/useStore'
+import { isSickDay } from '../api/client'
 import { scheduleSmartNotifications } from '../services/notificationEngine'
 import { scheduleTrendNotifications } from '../services/trendNotificationEngine'
 import FoodSection from './log/FoodSection'
@@ -27,10 +28,12 @@ export default function Log() {
 
   const [tab, setTab]     = useState(initial)
   const [saved, setSaved] = useState(false)
+  const [sickToday, setSickToday] = useState(false)
   const savedTimer  = useRef(null)
   const touchStartX = useRef(null)
 
   useEffect(() => () => clearTimeout(savedTimer.current), [])
+  useEffect(() => { isSickDay().then(setSickToday).catch(() => {}) }, [])
 
   // Everything the old Save button did besides writing the record: refresh the
   // score, re-plan today's notifications, and confirm — quietly, once per change.
@@ -59,7 +62,9 @@ export default function Log() {
       <div className="page-header">
         <div className="flex-1">
           <h1 className="t-title">Log</h1>
-          <p className="text-sm text-text-muted">{format(new Date(), 'EEEE, MMM d')}</p>
+          <p className="text-sm text-text-muted">
+            {format(new Date(), 'EEEE, MMM d')}{sickToday && ' · Sick day: kept, not scored'}
+          </p>
         </div>
         <span className={`flex items-center gap-1 text-sm font-semibold text-success transition-opacity duration-300 ${saved ? 'opacity-100' : 'opacity-0'}`}
           aria-live="polite">

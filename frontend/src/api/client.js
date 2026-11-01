@@ -77,6 +77,13 @@ export const deleteWeightEntry = (date) => local.deleteWeightEntry(date)
 
 // Water is local-only too, and never touches the score.
 export const getWaterGoal     = ()            => local.getWaterGoal()
+
+// So are sick days.
+export const isSickDay      = (date)  => local.isSickDay(date)
+export const markSickDays   = (dates) => local.markSickDays(dates)
+export const unmarkSickDays = (dates) => local.unmarkSickDays(dates)
+export const getMissedDays  = ()      => local.getMissedDays()
+
 export const getWaterDay      = (date)        => local.getWaterDay(date)
 export const stampTodayDrinkItems = ()        => local.stampTodayDrinkItems()
 export const addWaterEntry    = (date, entry) => local.addWaterEntry(date, entry)

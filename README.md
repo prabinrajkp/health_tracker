@@ -83,6 +83,7 @@ Four tabs, each with one job. Everything saves as you change it — there is no 
 - A drinks card with a glass that fills: one tap adds a glass of water, and tapping the card opens the full drinks sheet
 - A sleep timer button: start it at bedtime, stop it when you wake
 - Four log buttons with done-state: Meal · Move · Sleep · Weight
+- Sick days: one tap on "Not feeling well?" sets the day aside, with no score and no effect on averages, and the streak pauses instead of breaking. After days with nothing logged, Today asks whether you were unwell
 - "Full detail" opens the day's radar, breakdown and optional AI health summary
 
 ### Log
@@ -140,14 +141,14 @@ The script will:
 
 **Option A — USB (fastest):**
 ```bash
-adb install health-quest-v4.34-debug.apk
+adb install health-quest-v4.35-debug.apk
 ```
 
 **Option B — WiFi (same network):**
 ```bash
 python3 -m http.server 9999 --directory .
 ```
-Then open `http://<your-pc-ip>:9999/health-quest-v4.34-debug.apk` on your phone and tap to install.
+Then open `http://<your-pc-ip>:9999/health-quest-v4.35-debug.apk` on your phone and tap to install.
 
 > Settings → Apps → Install unknown apps → enable for your browser
 
@@ -198,6 +199,7 @@ All data is stored in `IndexedDB` via Dexie under the database name `HealthQuest
 | `sleep_logs` | Sleep/wake times, hours, screen time, quality |
 | `weight_logs` | Daily weigh-ins |
 | `water_logs` | Each day's drinks and the goal that applied that day |
+| `sick_days` | Dates set aside because you were unwell |
 | `meals` | Each logged meal, used for Repeat Yesterday, frequent meals and Meal Insights |
 | `meal_templates` | Meals you repeat, learned automatically |
 | `badges` | Badge progress, unlock dates and earn counts |

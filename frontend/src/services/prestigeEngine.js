@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 import db from './db'
 import { getBadgeStates } from './badgeEngine'
+import { longestRun, toSickSet } from './sickDays'
 
 const TIER_XP       = { common: 10, rare: 25, epic: 50, legendary: 100 }
 const TIER_PRESTIGE = { common: 1,  rare: 3,  epic: 8,  legendary: 20  }
@@ -24,9 +25,10 @@ export function parseLevelFromXP(totalXP) {
 }
 
 export async function computePrestige() {
-  const [allScores, badgeStates] = await Promise.all([
+  const [allScores, badgeStates, allSick] = await Promise.all([
     db.daily_scores.orderBy('date').toArray(),
     getBadgeStates(),
+    db.sick_days.toArray(),
   ])
 
   const scoreXP = allScores.reduce((s, r) => s + Math.round((r.total_score || 0) / 5), 0)
@@ -37,13 +39,7 @@ export async function computePrestige() {
   const prestige = unlockedBadges.reduce((s, b) => s + (TIER_PRESTIGE[b.tier] || 1), 0)
 
   // Streak for prestige bonus
-  const sorted = allScores.map(s => s.date)
-  let maxStreak = sorted.length > 0 ? 1 : 0, cur = 1
-  for (let i = 1; i < sorted.length; i++) {
-    const diff = Math.round((new Date(sorted[i]+'T00:00:00') - new Date(sorted[i-1]+'T00:00:00')) / 86400000)
-    cur = diff === 1 ? cur + 1 : 1
-    if (cur > maxStreak) maxStreak = cur
-  }
+  const maxStreak = longestRun(allScores.map(s => s.date), toSickSet(allSick))
   const streakPrestige = maxStreak >= 14 ? 30 : maxStreak >= 7 ? 15 : maxStreak >= 3 ? 5 : 0
   const totalPrestige = prestige + streakPrestige
 

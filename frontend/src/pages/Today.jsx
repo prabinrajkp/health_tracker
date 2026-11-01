@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { format, subDays } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
-  Flame, ChevronRight, AlertTriangle, Check, Utensils, Footprints, Moon, Scale, Dumbbell, PersonStanding, Play, Square, Plus, Undo2,
+  Flame, ChevronRight, AlertTriangle, Check, Utensils, Footprints, Moon, Scale, Dumbbell, PersonStanding, Play, Square, Plus, Undo2, Thermometer,
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import BottomSheet from '../components/BottomSheet'
 import AddMealFlow from '../components/AddMealFlow'
 import { DayDetailPanel } from '../components/DayDetail'
-import { getDiet, getWorkout, getSleep, getWeightEntry } from '../api/client'
+import { getDiet, getWorkout, getSleep, getWeightEntry, isSickDay, markSickDays, unmarkSickDays, getMissedDays } from '../api/client'
+import { describeDays } from '../services/sickDays'
 import { useWater } from '../hooks/useWater'
 import { formatLitres } from '../services/hydration'
 import WaterGlass from '../components/WaterGlass'
@@ -20,7 +21,12 @@ import { scheduleTrendNotifications } from '../services/trendNotificationEngine'
 import { gradeFor, weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../services/scoreMeta'
 import { getSleepTimerStart, startSleepTimer, stopSleepTimer, hhmm, formatElapsed } from '../services/sleepTimer'
 
-const PERFECT_KEY = 'hq-perfect-day'
+const PERFECT_KEY  = 'hq-perfect-day'
+const UNWELL_KEY   = 'hq-still-unwell-dismissed'   // the date "Still unwell?" was answered
+const CATCH_UP_KEY = 'hq-catch-up-dismissed'       // the start of the gap that was answered "No"
+
+const readKey  = (k) => { try { return localStorage.getItem(k) } catch { return null } }
+const writeKey = (k, v) => { try { localStorage.setItem(k, v) } catch {} }
 const ACTION_ICONS = { meal: Utensils, steps: Footprints, sleep: Moon, exercise: Dumbbell, walk: PersonStanding }
 
 function ScoreBar({ label, value, max, color }) {
@@ -115,6 +121,25 @@ function SleepTimerButton({ startedAt, onStart, onStop, busy }) {
   )
 }
 
+// A question with two answers, in the Next card's place: "Still unwell?" and
+// the catch-up prompt after days with nothing logged.
+function AskCard({ title, yes, no, onYes, onNo }) {
+  return (
+    <section className="card space-y-3">
+      <div className="flex items-center gap-3">
+        <span className="w-10 h-10 rounded-full bg-surface-elevated flex items-center justify-center shrink-0">
+          <Thermometer size={19} className="text-text-secondary" />
+        </span>
+        <p className="text-base font-semibold text-text-primary leading-snug">{title}</p>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={onYes} className="btn-primary flex-1">{yes}</button>
+        <button onClick={onNo} className="btn-ghost flex-1">{no}</button>
+      </div>
+    </section>
+  )
+}
+
 export default function Today() {
   const { todayScore, streak, refreshAll, config } = useStore()
   const navigate = useNavigate()
@@ -129,6 +154,10 @@ export default function Today() {
   const [timerStart, setTimerStart]     = useState(getSleepTimerStart)
   const [stopping, setStopping]         = useState(false)
   const [drinksOpen, setDrinksOpen]     = useState(false)
+  const [sickToday, setSickToday]         = useState(false)
+  const [sickYesterday, setSickYesterday] = useState(false)
+  const [missed, setMissed]               = useState({ days: [], gapStart: null })
+  const [answered, setAnswered]           = useState({ unwell: readKey(UNWELL_KEY), catchUp: readKey(CATCH_UP_KEY) })
 
   const loadLogs = async () => {
     const [diet, workout, sleep, yesterdayDiet, weight] = await Promise.all([
@@ -138,9 +167,56 @@ export default function Today() {
     setLogs({ diet, workout, sleep, yesterdayDiet, weight })
   }
 
+  const loadSick = async () => {
+    const [todaySick, yesterdaySick, gap] = await Promise.all([isSickDay(today), isSickDay(yesterday), getMissedDays()])
+    setSickToday(todaySick)
+    setSickYesterday(yesterdaySick)
+    setMissed(gap)
+  }
+
+  // Marking changes the score, the streak and the drinks goal, so all three reload
+  const refreshAfterSickChange = async () => {
+    await refreshAll()
+    await Promise.all([loadLogs(), loadSick(), water.reload()])
+  }
+
+  // One tap, no form or dialog: someone who is ill will not fill anything in,
+  // and a mistaken tap is one Undo away.
+  const markSick = async (dates, message) => {
+    try {
+      await markSickDays(dates)
+      await refreshAfterSickChange()
+      toast((t) => (
+        <span className="flex items-center gap-3">
+          <span>{message}</span>
+          <button className="font-semibold text-brand-light shrink-0" onClick={async () => {
+            toast.dismiss(t.id)
+            await unmarkSickDays(dates)
+            await refreshAfterSickChange()
+          }}>Undo</button>
+        </span>
+      ), { duration: 6000 })
+    } catch {
+      toast.error('Could not mark that day')
+    }
+  }
+
+  const markToday = () => markSick([today], todayScore && !nothingYet
+    ? "Today's score is set aside. What you logged is kept."
+    : 'Marked as a sick day')
+
+  const feelingBetter = async () => {
+    await unmarkSickDays([today])
+    await refreshAfterSickChange()
+  }
+
+  const answerUnwell = () => { writeKey(UNWELL_KEY, today); setAnswered(a => ({ ...a, unwell: today })) }
+  const answerCatchUp = () => { writeKey(CATCH_UP_KEY, missed.gapStart); setAnswered(a => ({ ...a, catchUp: missed.gapStart })) }
+
   useEffect(() => {
     refreshAll()
     loadLogs().catch(console.error)
+    loadSick().catch(console.error)
   }, [])
 
   const weights = weightsFromConfig(config)
@@ -204,7 +280,12 @@ export default function Today() {
     <div className="min-h-screen bg-surface-base pb-nav flex flex-col animate-fade-in">
       <div className="px-4 pt-5 pb-2 flex items-center justify-between">
         <div>
-          <p className="text-sm text-text-muted">{format(new Date(), 'EEEE, MMM d')}</p>
+          <p className="text-sm text-text-muted">
+            {format(new Date(), 'EEEE, MMM d')}
+            {!sickToday && (
+              <> · <button onClick={markToday} className="font-medium text-text-secondary underline underline-offset-2 active:opacity-70">Not feeling well?</button></>
+            )}
+          </p>
           <h1 className="t-title mt-0.5">{playerName ? `Hi, ${playerName}` : 'Today'}</h1>
         </div>
         {streak > 0 && (
@@ -217,6 +298,22 @@ export default function Today() {
 
       <div className="max-w-lg w-full mx-auto px-4 flex-1 flex flex-col gap-4">
 
+        {/* ── Sick day: no score, no next step, no penalties ──────────────────── */}
+        {sickToday ? (
+          <section className="text-center py-5">
+            <span className="w-14 h-14 rounded-full bg-surface-elevated inline-flex items-center justify-center mb-3">
+              <Thermometer size={24} className="text-text-secondary" />
+            </span>
+            <h2 className="t-title">Sick day</h2>
+            <p className="text-base text-text-secondary mt-1 max-w-[18rem] mx-auto">
+              Rest up. Nothing to log today{streak > 0 ? `, and your ${streak}-day streak is safe` : ''}.
+            </p>
+            <button onClick={feelingBetter} className="text-sm font-semibold text-brand-light py-2 mt-1 active:opacity-70">
+              I'm feeling better
+            </button>
+          </section>
+        ) : (
+          <>
         {/* ── 1. Score — the hero, so it gets no box ───────────────────────── */}
         <section className="pt-2">
           <div className="flex items-end justify-between">
@@ -255,8 +352,17 @@ export default function Today() {
           )}
         </section>
 
-        {/* ── 2. Next ──────────────────────────────────────────────────────── */}
-        <section className="card p-0 overflow-hidden">
+        {/* ── 2. Next, or a question about being unwell in its place ────────── */}
+        {sickYesterday && answered.unwell !== today ? (
+          <AskCard title="Still unwell?" yes="Yes, rest today too" no="I'm better"
+            onYes={() => markSick([today], 'Marked as a sick day')} onNo={answerUnwell} />
+        ) : missed.days.length > 0 && answered.catchUp !== missed.gapStart ? (
+          <AskCard title={`Nothing logged on ${describeDays(missed.days)}. Were you unwell?`}
+            yes={missed.days.length === 1 ? 'Mark as sick day' : 'Mark as sick days'} no="No"
+            onYes={() => markSick(missed.days, missed.days.length === 1 ? 'Marked as a sick day' : `Marked ${missed.days.length} sick days`)}
+            onNo={answerCatchUp} />
+        ) : (
+<section className="card p-0 overflow-hidden">
           {next ? (
             <button onClick={() => runAction(next.target)}
               className="w-full flex items-center gap-3 p-4 text-left active:opacity-70 transition-opacity">
@@ -287,6 +393,9 @@ export default function Today() {
             </div>
           ))}
         </section>
+        )}
+          </>
+        )}
 
         {/* ── 3. Drinks — the most frequent log of the day, one tap away ────── */}
         <WaterCard water={water} onOpen={() => setDrinksOpen(true)} />

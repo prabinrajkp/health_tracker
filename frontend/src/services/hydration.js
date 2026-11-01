@@ -1,3 +1,5 @@
+import { longestRun } from './sickDays'
+
 // Daily fluid goal and totals. Logic follows docs/water_intake_logic.md.
 //
 // The goal is an ESTIMATE of beverage intake for a healthy adult, not a
@@ -104,20 +106,15 @@ export const formatLitres = (ml) => {
 
 // Counts for the water badges, from every day's drinks record and diet log
 // (any order). A day is "logged" if anything was drunk, tapped in or in a meal.
-export function waterBadgeMetrics(days = [], dietLogs = []) {
+// A sick day neither counts nor breaks: it is left out, and streaks carry across it.
+export function waterBadgeMetrics(days = [], dietLogs = [], sickSet = new Set()) {
   const dietByDate = Object.fromEntries((dietLogs || []).filter(d => d?.date).map(d => [d.date, d]))
   const logged = [...(days || [])]
-    .filter(d => d?.date && ((d.entries || []).length > 0 || mealDrinks(dietByDate[d.date]).length > 0))
+    .filter(d => d?.date && !sickSet.has(d.date) && ((d.entries || []).length > 0 || mealDrinks(dietByDate[d.date]).length > 0))
     .sort((a, b) => a.date.localeCompare(b.date))
   const metDates = logged.filter(d => goalMet(d, dietByDate[d.date])).map(d => d.date)
 
-  let bestStreak = 0, run = 0, prev = null
-  for (const date of metDates) {
-    const gap = prev ? Math.round((new Date(date + 'T00:00:00') - new Date(prev + 'T00:00:00')) / 86400000) : null
-    run = gap === 1 ? run + 1 : 1
-    if (run > bestStreak) bestStreak = run
-    prev = date
-  }
+  const bestStreak = longestRun(metDates, sickSet)
 
   // Weeks (Monday start) with the goal met on five or more days
   const perWeek = {}

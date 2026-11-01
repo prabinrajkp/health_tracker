@@ -17,6 +17,7 @@ import { computeMonthlyInsights } from '../services/monthlyInsights'
 import { getMealAnalytics } from '../services/localStore'
 import { weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../services/scoreMeta'
 import { col, scoreColor } from '../services/theme'
+import { longestRun, toSickSet } from '../services/sickDays'
 
 // Deterministic, history-driven meal analytics (see recommendationEngine.js) —
 // top foods/templates, diversity, and repetition over the last 30 days.
@@ -123,14 +124,9 @@ export default function Progress() {
       db.daily_scores.orderBy('date').toArray(),
       db.workout_logs.toArray(),
       db.sleep_logs.toArray(),
-    ]).then(([allScores, allWorkout, allSleep]) => {
-      const dates = allScores.map(r => r.date)
-      let best = dates.length ? 1 : 0, run = 1
-      for (let i = 1; i < dates.length; i++) {
-        const gap = Math.round((new Date(dates[i] + 'T00:00:00') - new Date(dates[i - 1] + 'T00:00:00')) / 86400000)
-        run = gap === 1 ? run + 1 : 1
-        if (run > best) best = run
-      }
+      db.sick_days.toArray(),
+    ]).then(([allScores, allWorkout, allSleep, allSick]) => {
+      const best = longestRun(allScores.map(r => r.date), toSickSet(allSick))
       const goodDays = allScores.filter(r => r.total_score >= 70).length
       setLifetime({
         days:      allScores.length,
