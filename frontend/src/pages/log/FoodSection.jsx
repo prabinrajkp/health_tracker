@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Minus, Trash2, Timer, Flame, ChevronRight, GlassWater } from 'lucide-react'
 import { getDiet, saveDiet, getConfig, getLatestWeight, getWorkout, isSickDay, getRecentDietLogs } from '../../api/client'
 import { calcDietScore, calcNutritionTotals, calcCalorieScore } from '../../services/scoring'
-import { dieteticsFromConfig, isMinor } from '../../services/dietetics'
+import { dieteticsFromConfig, isMinor, targetText } from '../../services/dietetics'
 import { planOn, fastingCounts } from '../../services/bodyGoal'
 import { computeNet, suggestAddOns } from '../../services/energy'
 import NetBreakdown from '../../components/NetBreakdown'
@@ -172,18 +172,6 @@ function DrinksRow({ water, onOpen }) {
 
 // Calories eaten against the day's targets. The targets themselves (BMR,
 // maintenance, macro ranges) used to live on the Weight page.
-// How far the day's food is from the target, in the words that suit the goal.
-// Only someone losing or on the default rule sees going over as a warning.
-function targetText(left, goal) {
-  if (goal === 'gain') {
-    if (left > 0) return { text: `${left} to go` }
-    if (left >= -100) return { text: 'Goal reached' }
-    return { text: `${Math.abs(left)} extra` }
-  }
-  if (left >= 0) return { text: `${left} left` }
-  return { text: `${Math.abs(left)} over`, warn: goal !== 'keep' }
-}
-
 const GOAL_LINE = { lose: 'Goal: lose weight', keep: 'Goal: keep your weight', gain: 'Goal: gain weight' }
 
 function CaloriesCard({ diet, dietetics, weights, onSetup, minor, plan, net, addOns }) {

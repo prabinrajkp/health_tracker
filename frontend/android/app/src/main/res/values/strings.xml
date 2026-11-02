@@ -4,4 +4,21 @@
     <string name="title_activity_main">HEALTH QUEST</string>
     <string name="package_name">com.healthquest.tracker</string>
     <string name="custom_url_scheme">com.healthquest.tracker</string>
+    <!-- Home-screen widgets: names and picker descriptions -->
+    <string name="widget_today_label">Today\'s score</string>
+    <string name="widget_today_description">Your score, grade and what to do next</string>
+    <string name="widget_week_label">This week</string>
+    <string name="widget_week_description">Seven days of scores at a glance, and one thing to fix</string>
+    <string name="widget_calories_label">Calories</string>
+    <string name="widget_calories_description">Food against your target. Anyone who sees your home screen sees the numbers</string>
+    <string name="widget_goals_label">Goals</string>
+    <string name="widget_goals_description">Your level, streak and today\'s goals</string>
+    <string name="widget_drinks_label">Drinks</string>
+    <string name="widget_drinks_description">One tap adds a glass of water</string>
+    <string name="widget_sleep_label">Sleep timer</string>
+    <string name="widget_sleep_description">Start the timer in bed and stop it when you wake</string>
+    <string name="widget_quick_label">Quick log</string>
+    <string name="widget_quick_description">Meal, move, sleep and weight, one tap from the home screen</string>
+    <string name="widget_weight_label">Weight</string>
+    <string name="widget_weight_description">Log today\'s weight in 0.1 kg steps. Anyone who sees your home screen sees it</string>
 </resources>

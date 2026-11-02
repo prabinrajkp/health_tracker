@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A home-screen widget layout. Colours and text are set in code: see docs/widgets_plan.md -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/w_card_base" android:foreground="@drawable/w_ripple_card"
+    android:clipToOutline="true">
+<include layout="@layout/w_card_bg" />
+<LinearLayout android:id="@+id/w_body" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="horizontal" android:gravity="center_vertical"
+    android:paddingStart="12dp" android:paddingEnd="12dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:id="@+id/wk_days" android:layout_marginTop="0dp">
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:gravity="center_horizontal">
+<TextView style="@style/WText.Caption" android:id="@+id/wk_l0" android:text="M" />
+<ImageView android:id="@+id/wk_d0" android:layout_width="14dp" android:layout_height="14dp" android:layout_marginTop="6dp" android:src="@drawable/w_dot" android:tint="@color/widget_success" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:gravity="center_horizontal">
+<TextView style="@style/WText.Caption" android:id="@+id/wk_l1" android:text="T" />
+<ImageView android:id="@+id/wk_d1" android:layout_width="14dp" android:layout_height="14dp" android:layout_marginTop="6dp" android:src="@drawable/w_dot" android:tint="@color/widget_brand" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:gravity="center_horizontal">
+<TextView style="@style/WText.Caption" android:id="@+id/wk_l2" android:text="W" />
+<ImageView android:id="@+id/wk_d2" android:layout_width="14dp" android:layout_height="14dp" android:layout_marginTop="6dp" android:src="@drawable/w_dot" android:tint="@color/widget_warning" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:gravity="center_horizontal">
+<TextView style="@style/WText.Caption" android:id="@+id/wk_l3" android:text="T" />
+<ImageView android:id="@+id/wk_d3" android:layout_width="14dp" android:layout_height="14dp" android:layout_marginTop="6dp" android:src="@drawable/w_ring" android:tint="@color/widget_muted" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:gravity="center_horizontal">
+<TextView style="@style/WText.Caption" android:id="@+id/wk_l4" android:text="F" />
+<ImageView android:id="@+id/wk_d4" android:layout_width="14dp" android:layout_height="14dp" android:layout_marginTop="6dp" android:src="@drawable/w_dot_small" android:tint="@color/widget_muted" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:gravity="center_horizontal">
+<TextView style="@style/WText.Caption" android:id="@+id/wk_l5" android:text="S" />
+<ImageView android:id="@+id/wk_d5" android:layout_width="14dp" android:layout_height="14dp" android:layout_marginTop="6dp" android:src="@drawable/w_dot_small" android:tint="@color/widget_muted" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1" android:gravity="center_horizontal">
+<TextView style="@style/WText.Caption" android:id="@+id/wk_l6" android:text="S" />
+<ImageView android:id="@+id/wk_d6" android:layout_width="14dp" android:layout_height="14dp" android:layout_marginTop="6dp" android:src="@drawable/w_dot_small" android:tint="@color/widget_muted" android:importantForAccessibility="no" />
+</LinearLayout>
+</LinearLayout>
+<TextView style="@style/WText.Secondary" android:id="@+id/wk_msg" android:text="Open the app to see this week" android:layout_width="0dp" android:layout_weight="1" android:visibility="gone" />
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="12dp" android:gravity="center_horizontal">
+<TextView style="@style/WText.Number" android:id="@+id/wk_avg" android:text="71" />
+<TextView style="@style/WText.Caption" android:id="@+id/wk_avg_label" android:text="avg" android:layout_marginTop="2dp" />
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>

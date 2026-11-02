@@ -176,3 +176,16 @@ export const isMinor = (config) => {
   const age = ageFromBirthYear(config?.birth_year)
   return age != null && age < ADULT_AGE
 }
+
+// How far the day's food is from the target, in the words that suit the goal.
+// Only someone losing or on the default rule sees going over as a warning.
+// Shared by the Food log and the Calories widget.
+export function targetText(left, goal) {
+  if (goal === 'gain') {
+    if (left > 0) return { text: `${left} to go` }
+    if (left >= -100) return { text: 'Goal reached' }
+    return { text: `${Math.abs(left)} extra` }
+  }
+  if (left >= 0) return { text: `${left} left` }
+  return { text: `${Math.abs(left)} over`, warn: goal !== 'keep' }
+}

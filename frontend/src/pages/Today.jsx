@@ -21,6 +21,7 @@ import { computeNextAction } from '../services/nextAction'
 import { planNudges } from '../services/nudgePlanner'
 import { gradeFor, weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../services/scoreMeta'
 import { getSleepTimerStart, startSleepTimer, stopSleepTimer, hhmm, formatElapsed } from '../services/sleepTimer'
+import { APPLIED_EVENT } from '../services/widgetInbox'
 
 const PERFECT_KEY  = 'hq-perfect-day'
 const UNWELL_KEY   = 'hq-still-unwell-dismissed'   // the date "Still unwell?" was answered
@@ -269,6 +270,18 @@ export default function Today() {
     loadSick().catch(console.error)
   }, [])
 
+  // A drink, a night or a weight tapped on a home-screen widget was just written
+  useEffect(() => {
+    const reload = () => {
+      setTimerStart(getSleepTimerStart())
+      refreshAll()
+      loadLogs().catch(console.error)
+      water.reload().catch(console.error)
+    }
+    window.addEventListener(APPLIED_EVENT, reload)
+    return () => window.removeEventListener(APPLIED_EVENT, reload)
+  }, [water.reload])
+
   const weights = weightsFromConfig(config)
   const max     = categoryMaxes(weights)
   const plan    = planOn(config, today)
@@ -301,11 +314,12 @@ export default function Today() {
 
   const openAddMeal = (category = null) => { setMealCategory(category); setAddMealOpen(true) }
 
-  // A dinner or breakfast notification opens Add Meal on that meal
+  // A dinner or breakfast notification opens Add Meal on that meal. The Quick log
+  // widget asks for "now": Add Meal then picks the meal that fits the time of day.
   useEffect(() => {
     const meal = searchParams.get('meal')
     if (!meal) return
-    openAddMeal(meal)
+    openAddMeal(meal === 'now' ? null : meal)
     setSearchParams({}, { replace: true })
   }, [searchParams])
 

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A home-screen widget layout. Colours and text are set in code: see docs/widgets_plan.md -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/w_card_base" android:foreground="@drawable/w_ripple_card"
+    android:clipToOutline="true">
+<include layout="@layout/w_card_bg" />
+<LinearLayout android:id="@+id/w_body" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center"
+    android:paddingStart="8dp" android:paddingEnd="8dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+<TextView style="@style/WText.Number" android:id="@+id/k_value" android:text="72.4" android:textSize="20sp" />
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="6dp">
+<FrameLayout android:id="@+id/k_minus" android:layout_width="34dp" android:layout_height="34dp" android:foreground="@drawable/w_ripple_round" android:contentDescription="0.1 kg less">
+<ImageView android:id="@+id/k_minus_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:src="@drawable/w_round" android:scaleType="fitXY" android:tint="@color/widget_tile" android:importantForAccessibility="no" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center" >
+<ImageView style="@style/WIcon" android:id="@+id/k_minus_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_minus" android:tint="@color/widget_text2" />
+</LinearLayout>
+</FrameLayout>
+<FrameLayout android:id="@+id/k_plus" android:layout_width="34dp" android:layout_height="34dp" android:foreground="@drawable/w_ripple_round" android:contentDescription="0.1 kg more" android:layout_marginStart="6dp">
+<ImageView android:id="@+id/k_plus_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:src="@drawable/w_round" android:scaleType="fitXY" android:tint="@color/widget_tile" android:importantForAccessibility="no" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center" >
+<ImageView style="@style/WIcon" android:id="@+id/k_plus_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_plus" android:tint="@color/widget_text2" />
+</LinearLayout>
+</FrameLayout>
+<FrameLayout android:id="@+id/k_save" android:layout_width="34dp" android:layout_height="34dp" android:foreground="@drawable/w_ripple_round" android:contentDescription="Save this weight" android:layout_marginStart="6dp">
+<ImageView android:id="@+id/k_save_bg" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:src="@drawable/w_round" android:scaleType="fitXY" android:tint="@color/widget_brand" android:importantForAccessibility="no" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:gravity="center" >
+<ImageView style="@style/WIcon" android:id="@+id/k_save_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_check" android:tint="@color/widget_on_brand" />
+</LinearLayout>
+</FrameLayout>
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>

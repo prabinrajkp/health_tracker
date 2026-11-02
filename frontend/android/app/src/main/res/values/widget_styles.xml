@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's type scale on widgets, in the phone's own font: nothing under 12sp -->
+<resources>
+    <style name="WText">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/widget_text</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:fontFeatureSettings">tnum</item>
+    </style>
+    <style name="WText.Hero">
+        <item name="android:textSize">32sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="WText.Number">
+        <item name="android:textSize">22sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="WText.Heading">
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="WText.Body" />
+    <style name="WText.Secondary">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/widget_text2</item>
+    </style>
+    <style name="WText.Caption">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/widget_muted</item>
+    </style>
+    <style name="WText.Label">
+        <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/widget_text2</item>
+    </style>
+    <style name="WText.Button">
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="WIcon">
+        <item name="android:layout_width">18dp</item>
+        <item name="android:layout_height">18dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+</resources>

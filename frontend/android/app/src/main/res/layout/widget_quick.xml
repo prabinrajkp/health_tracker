@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A home-screen widget layout. Colours and text are set in code: see docs/widgets_plan.md -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/w_card_base" android:foreground="@drawable/w_ripple_card"
+    android:clipToOutline="true">
+<include layout="@layout/w_card_bg" />
+<LinearLayout android:id="@+id/w_body" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:paddingStart="4dp" android:paddingEnd="4dp" android:paddingTop="6dp" android:paddingBottom="6dp">
+<LinearLayout android:id="@+id/q_meal" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+    android:orientation="vertical" android:gravity="center" android:foreground="@drawable/w_ripple_round">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<ImageView style="@style/WIcon" android:id="@+id/q_meal_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_meal" android:tint="@color/widget_text" />
+<TextView style="@style/WText.Heading" android:id="@+id/q_meal_label" android:text="Meal" android:textSize="13sp" android:layout_marginStart="6dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="5dp">
+<ImageView style="@style/WIcon" android:id="@+id/q_meal_tick" android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/w_ic_check" android:tint="@color/widget_success" android:visibility="gone" android:layout_marginEnd="3dp" />
+<TextView style="@style/WText.Caption" android:id="@+id/q_meal_status" android:text="1 of 3" android:textColor="@color/widget_muted" />
+</LinearLayout>
+</LinearLayout>
+<LinearLayout android:id="@+id/q_move" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+    android:orientation="vertical" android:gravity="center" android:foreground="@drawable/w_ripple_round">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<ImageView style="@style/WIcon" android:id="@+id/q_move_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_steps" android:tint="@color/widget_text" />
+<TextView style="@style/WText.Heading" android:id="@+id/q_move_label" android:text="Move" android:textSize="13sp" android:layout_marginStart="6dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="5dp">
+<ImageView style="@style/WIcon" android:id="@+id/q_move_tick" android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/w_ic_check" android:tint="@color/widget_success" android:visibility="visible" android:layout_marginEnd="3dp" />
+<TextView style="@style/WText.Caption" android:id="@+id/q_move_status" android:text="4.2k" android:textColor="@color/widget_success" />
+</LinearLayout>
+</LinearLayout>
+<LinearLayout android:id="@+id/q_sleep" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+    android:orientation="vertical" android:gravity="center" android:foreground="@drawable/w_ripple_round">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<ImageView style="@style/WIcon" android:id="@+id/q_sleep_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_sleep" android:tint="@color/widget_text" />
+<TextView style="@style/WText.Heading" android:id="@+id/q_sleep_label" android:text="Sleep" android:textSize="13sp" android:layout_marginStart="6dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="5dp">
+<ImageView style="@style/WIcon" android:id="@+id/q_sleep_tick" android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/w_ic_check" android:tint="@color/widget_success" android:visibility="visible" android:layout_marginEnd="3dp" />
+<TextView style="@style/WText.Caption" android:id="@+id/q_sleep_status" android:text="Logged" android:textColor="@color/widget_success" />
+</LinearLayout>
+</LinearLayout>
+<LinearLayout android:id="@+id/q_weight" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+    android:orientation="vertical" android:gravity="center" android:foreground="@drawable/w_ripple_round">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<ImageView style="@style/WIcon" android:id="@+id/q_weight_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_weight" android:tint="@color/widget_text" />
+<TextView style="@style/WText.Heading" android:id="@+id/q_weight_label" android:text="Weight" android:textSize="13sp" android:layout_marginStart="6dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="5dp">
+<ImageView style="@style/WIcon" android:id="@+id/q_weight_tick" android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/w_ic_check" android:tint="@color/widget_success" android:visibility="gone" android:layout_marginEnd="3dp" />
+<TextView style="@style/WText.Caption" android:id="@+id/q_weight_status" android:text="Not yet" android:textColor="@color/widget_muted" />
+</LinearLayout>
+</LinearLayout>
+</LinearLayout>
+</FrameLayout>

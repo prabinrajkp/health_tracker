@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A bar's filled part, starting at 60% for the picker preview. The widget sets the real level -->
+<scale xmlns:android="http://schemas.android.com/apk/res/android" android:drawable="@drawable/w_pill" android:level="6000"
+    android:scaleWidth="100%" android:scaleGravity="left|fill_vertical" />

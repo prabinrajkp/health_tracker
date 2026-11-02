@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A home-screen widget layout. Colours and text are set in code: see docs/widgets_plan.md -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/w_card_base" android:foreground="@drawable/w_ripple_card"
+    android:clipToOutline="true">
+<include layout="@layout/w_card_bg" />
+<LinearLayout android:id="@+id/w_body" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center"
+    android:paddingStart="4dp" android:paddingEnd="4dp" android:paddingTop="6dp" android:paddingBottom="6dp">
+<FrameLayout android:layout_width="30dp" android:layout_height="42dp">
+<ImageView android:id="@+id/d_glass_body" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/w_glass_body" android:scaleType="fitCenter" android:tint="@color/widget_tile" android:importantForAccessibility="no" />
+<ImageView android:id="@+id/d_glass_water" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/w_glass_water_preview" android:scaleType="fitCenter" android:tint="@color/widget_water" android:importantForAccessibility="no" />
+<ImageView android:id="@+id/d_glass_edge" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/w_glass_edge" android:scaleType="fitCenter" android:tint="@color/widget_edge" android:importantForAccessibility="no" />
+<ImageView android:id="@+id/d_glass_tick" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/w_glass_tick" android:scaleType="fitCenter" android:visibility="gone" android:importantForAccessibility="no" />
+</FrameLayout>
+<TextView style="@style/WText.Heading" android:id="@+id/d_total" android:text="1.2 L" android:textSize="13sp" android:layout_marginTop="4dp" />
+</LinearLayout>
+</FrameLayout>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A home-screen widget layout. Colours and text are set in code: see docs/widgets_plan.md -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/w_card_base" android:foreground="@drawable/w_ripple_card"
+    android:clipToOutline="true">
+<include layout="@layout/w_card_bg" />
+<LinearLayout android:id="@+id/w_body" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="horizontal" android:gravity="center_vertical"
+    android:paddingStart="14dp" android:paddingEnd="14dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:id="@+id/t_scorebox" android:gravity="bottom">
+<TextView style="@style/WText.Hero" android:id="@+id/t_score" android:text="72" />
+<TextView style="@style/WText.Caption" android:id="@+id/t_outof" android:text="/ 100" android:layout_marginStart="4dp" android:layout_marginBottom="3dp" />
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:id="@+id/t_msg_box" android:gravity="center_vertical" android:visibility="gone">
+<ImageView style="@style/WIcon" android:id="@+id/t_msg_icon" android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/w_ic_sick" android:tint="@color/widget_text2" android:layout_marginEnd="10dp" />
+<LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1">
+<TextView style="@style/WText.Heading" android:id="@+id/t_msg_title" android:text="Sick day" />
+<TextView style="@style/WText.Secondary" android:id="@+id/t_msg_body" android:text="Rest up. Nothing to log today." android:layout_marginTop="2dp" />
+</LinearLayout>
+</LinearLayout>
+<FrameLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
+<RelativeLayout android:id="@+id/t_chip_frame" android:layout_width="wrap_content" android:layout_height="wrap_content">
+<ImageView android:id="@+id/t_chip_bg" android:layout_width="0dp" android:layout_height="0dp"
+    android:layout_alignStart="@+id/t_chip" android:layout_alignEnd="@+id/t_chip"
+    android:layout_alignTop="@+id/t_chip" android:layout_alignBottom="@+id/t_chip"
+    android:src="@drawable/w_pill" android:scaleType="fitXY" android:tint="@color/widget_brand_tint" android:importantForAccessibility="no" />
+<TextView android:id="@+id/t_chip" style="@style/WText.Heading" android:textSize="13sp" android:textColor="@color/widget_brand"
+    android:paddingStart="10dp" android:paddingEnd="10dp" android:paddingTop="4dp" android:paddingBottom="4dp" android:text="B · Great" />
+</RelativeLayout>
+</LinearLayout>
+</FrameLayout>

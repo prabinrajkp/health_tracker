@@ -28,20 +28,29 @@ export function getSleepTimerStart() {
   } catch { return null }
 }
 
-export function startSleepTimer() {
-  const now = Date.now()
-  localStorage.setItem(TIMER_KEY, String(now))
-  toast.success('Sleep timer started. Open the app when you wake up.')
-  return now
+// Home-screen widgets show the timer, so they redraw whenever it changes
+const changed = () => { try { window.dispatchEvent(new Event(TIMER_EVENT)) } catch {} }
+export const TIMER_EVENT = 'hq-sleep-timer'
+
+// `at` and `quiet` are for a start tapped on the widget and handed over later.
+// That never moves a timer already running.
+export function startSleepTimer(at = Date.now(), { quiet = false } = {}) {
+  const running = getSleepTimerStart()
+  if (quiet && running) return running
+  localStorage.setItem(TIMER_KEY, String(at))
+  if (!quiet) toast.success('Sleep timer started. Open the app when you wake up.')
+  changed()
+  return at
 }
 
 // Stops the timer and saves the night under the wake-up date. Screen-on time
 // during the night is deducted when Usage Access is granted. Returns the saved
 // record, or null when nothing was saved (under an hour, or the save failed).
-export async function stopSleepTimer() {
-  const startedAt = getSleepTimerStart()
+// A stop tapped on the widget passes its own times, so the night is saved as
+// it happened however late the app is opened.
+export async function stopSleepTimer({ endAt = Date.now(), startedAt = getSleepTimerStart() } = {}) {
   if (!startedAt) return null
-  const now = Date.now()
+  const now = endAt
 
   let screenOnHours = 0
   if (Capacitor.isNativePlatform()) {
@@ -57,9 +66,10 @@ export async function stopSleepTimer() {
 
   const sleepHours = Math.round(((now - startedAt) / 3600000) * 10) / 10
   const effective  = Math.max(0, Math.round((sleepHours - screenOnHours) * 10) / 10)
-  const logDate    = format(new Date(), 'yyyy-MM-dd')
+  const logDate    = format(new Date(now), 'yyyy-MM-dd')
 
   localStorage.removeItem(TIMER_KEY)
+  changed()
 
   if (sleepHours < 1) {
     toast(`Timer cleared — only ${fmtHours(sleepHours)} elapsed, nothing saved.`)

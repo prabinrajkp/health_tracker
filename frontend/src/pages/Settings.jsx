@@ -6,7 +6,7 @@ import {
   Save, RotateCcw, Minus, Plus, Trash2, Sparkles, Sun, Moon, Download, Upload, Bell,
   ChevronRight, User, Scale, Sliders, Utensils, Dumbbell, Clock, Timer,
   AlertTriangle, ArrowLeft, Smartphone, GlassWater, Archive, ArchiveRestore, BarChart2, Footprints, BookOpen, RefreshCw, Pencil, Check, X,
-  Copy, ChevronDown, Lock, HeartPulse, Flame, KeyRound, Eye, EyeOff,
+  Copy, ChevronDown, Lock, HeartPulse, Flame, KeyRound, Eye, EyeOff, LayoutGrid,
 } from 'lucide-react'
 import { TutorialSlides } from './Onboarding'
 import * as XLSX from 'xlsx'
@@ -21,6 +21,7 @@ import { getFoodUsage, reviveFood, getEnergyDays } from '../services/localStore'
 import { NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/reminders'
 import { planNudges } from '../services/nudgePlanner'
 import NudgeSettings, { NudgeDeveloperStats } from '../components/NudgeSettings'
+import WidgetSettings from '../components/WidgetSettings'
 import { version as APP_VERSION } from '../../package.json'
 import useStore from '../store/useStore'
 import db, { DEFAULT_WEIGHTS } from '../services/db'
@@ -732,6 +733,7 @@ export default function Settings() {
     ] },
     { title: 'Reminders & data', items: [
       { key: 'reminders', Icon: Bell,     label: 'Reminders',        desc: `${modeLabel} · bed ${bedTime}` },
+      { key: 'widgets',   Icon: LayoutGrid, label: 'Widgets',        desc: 'See and log from your home screen' },
       { key: 'export',    Icon: Download, label: 'Export & backup',  desc: 'Excel · JSON backup · restore' },
       { key: 'tutorial',  Icon: BookOpen, label: 'How scoring works', desc: 'A three-step tour' },
     ] },
@@ -1529,6 +1531,15 @@ export default function Settings() {
           <NudgeSettings hasKey={hasLlmKey(aiConfig)} onOpenAi={() => setActiveSection('ai_provider')} />
         </div>
         <SaveBtn />
+      </div>
+    )
+
+    if (activeSection === 'widgets') return (
+      <div className="flex flex-col h-full">
+        <DetailHeader title="Widgets" onBack={back} />
+        <div className="overflow-y-auto flex-1 px-4 py-4">
+          <WidgetSettings />
+        </div>
       </div>
     )
 

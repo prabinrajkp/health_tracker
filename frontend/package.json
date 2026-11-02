@@ -1,7 +1,7 @@
 {
   "name": "health-tracker",
   "private": true,
-  "version": "4.37.0",
+  "version": "4.38.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,8 @@
     "cap:add": "npx cap add android",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
-    "test": "vitest run"
+    "test": "vitest run",
+    "widgets:res": "node scripts/gen_widget_colors.mjs && node scripts/gen_widget_icons.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",

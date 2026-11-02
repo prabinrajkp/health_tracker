@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented here.
 
+## [v4.38] — 2026-11-02
+
+Home-screen widgets, rebuilt from the app's own theme. See `docs/widgets_plan.md`.
+
+### Added
+- **Eight widgets, each with one job** — four to see: Today (score, grade and the next step), This week (a dot per day, the average and one thing to fix), Calories (food against target, worded for your body goal) and Goals (level, streak and today's goals). Four to log: Drinks, Sleep timer, Quick log and Weight
+- **Log without opening the app** — one tap adds a glass of water and the glass fills at once. The sleep timer starts and stops on the home screen with a live clock. Weight steps from your last weight in 0.1 kg. Each tap is kept on the phone and written to your logs, with its own time, the next time the app opens. Scores update then
+- **Quick log** — Meal, Move, Sleep and Weight on the home screen, each opening its screen. Meal opens Add Meal on the meal that fits the time of day
+- **Settings → Widgets** — a preview of each in your theme, with an Add button that places it on the home screen
+- **Sizes** — each widget changes layout as it is resized, from one row to a larger card
+
+### Changed
+- **The old widget is replaced** — the purple RPG widget with the radar chart becomes the new Today widget in place, with no need to add it again
+- **Matches the app** — the same colours, generated from the app's theme, in light and dark. Widgets follow the app's Light, Dark or System setting, even when it differs from the phone's. The same icons, no emoji, and nothing under 12sp
+- **A widget timer cancels that night's bedtime reminder**, and stopping it cancels the morning "timer still running" reminder
+
+### Fixed
+- **Yesterday's score no longer looks like today's** — the old widget never read the date. Now every widget shows today as not started after midnight, and a sick day as a sick day
+- **Widgets update straight away** — anything logged in the app redraws them when the app settles, not 3 seconds after the next time it is opened
+- **The download page said Android 7+** — the app needs Android 8 or later
+
+---
+
 ## [v4.37] — 2026-11-01
 
 Smarter notifications and optional AI-written nudges. See `docs/ai_nudges_plan.md`.

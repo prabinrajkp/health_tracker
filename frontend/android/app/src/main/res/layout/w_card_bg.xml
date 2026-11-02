@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The card behind every widget, tinted in code: a solid surface, with a 1dp border in light mode -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@+id/w_bg_fill" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="@drawable/w_card" android:scaleType="fitXY" android:tint="@color/widget_card"
+        android:importantForAccessibility="no" />
+    <ImageView android:id="@+id/w_bg_edge" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="@drawable/w_card_edge_auto" android:scaleType="fitXY"
+        android:importantForAccessibility="no" />
+</merge>

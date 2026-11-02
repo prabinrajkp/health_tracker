@@ -2,8 +2,6 @@ package com.healthquest.tracker;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -11,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(UsageStatsPlugin.class);
         registerPlugin(NudgeBackgroundPlugin.class);
+        registerPlugin(WidgetsPlugin.class);
         super.onCreate(savedInstanceState);
         rememberNudgeTap(getIntent());
     }
@@ -21,7 +20,8 @@ public class MainActivity extends BridgeActivity {
         rememberNudgeTap(intent);
     }
 
-    // A tap on a notification the background worker posted. The app reads it on resume.
+    // A tap on a notification the background worker posted, or on a widget. The app reads
+    // it on resume and opens that screen.
     private void rememberNudgeTap(Intent intent) {
         String route = intent == null ? null : intent.getStringExtra(NudgeAlarmReceiver.EXTRA_ROUTE);
         if (route == null) return;
@@ -30,13 +30,5 @@ public class MainActivity extends BridgeActivity {
             .putString(NudgeWorker.KEY_TAP_KEY, intent.getStringExtra(NudgeAlarmReceiver.EXTRA_KEY))
             .apply();
         intent.removeExtra(NudgeAlarmReceiver.EXTRA_ROUTE);
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        // After 3 s the JS side has had time to write widget_data.json — refresh widget.
-        new Handler(Looper.getMainLooper()).postDelayed(
-            () -> HealthQuestWidget.updateAll(this), 3000);
     }
 }

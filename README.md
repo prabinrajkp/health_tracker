@@ -114,10 +114,19 @@ Four tabs, each with one job. Everything saves as you change it — there is no 
 - **Learns simply:** a kind ignored 3 times in a row rests for 7 days, two "not helpful" ratings turn it off, and mostly ignored nudges drop to every other day
 - **AI wording (optional):** the AI only rewords facts the rules chose. Every number is checked against those facts, and anything that fails keeps the rule-written text. Groq is tried first, then OpenRouter on hosts that do not collect data
 
+### Home-screen widgets
+Eight widgets, each with one job, in the app's own colours and following its Light, Dark or System theme:
+- **To see:** Today (score, grade and the next step, which moves on with the clock), This week (a dot per day and one thing to fix), Calories (food against target, worded for your body goal), Goals (level, streak and today's goals)
+- **To log:** Drinks (one tap adds a glass, and the glass fills at once), Sleep timer (start and stop on the home screen, with a live clock), Quick log (Meal, Move, Sleep and Weight, each opening its screen), Weight (step from your last weight in 0.1 kg and save)
+- Taps on a widget are kept on the phone and written to your logs the next time the app opens, each with its own time. Scores update then. Starting the timer on a widget cancels that night's bedtime reminder
+- Yesterday's score is never shown as today's: after midnight each widget shows today as not started yet
+- Add them from **Settings → Widgets**, or from the home screen's widget list
+
 ### Settings
 - **You:** name, body & goal (Lose, Keep or Gain, pace, Build muscle, height, age, activity, target weight, hide calorie numbers, optional active calories from Health Connect), water goal and glass size, theme
 - **Scoring:** one screen for category maximums, workout points and step targets, sleep, fasting and penalties, with Reset to defaults
 - **Food & AI:** custom foods with points, ideal portions and nutrition; optional AI key. Foods not logged for more than 7 days move to an archive to keep the list short. They can be restored, still appear in Add Meal search, and come back by themselves when logged. Each food can be marked as a drink with its mL per portion
+- **Widgets:** a preview of each, with an Add button that places it on the home screen
 - **Reminders & data:** Quiet / Standard / Coach notification level, reminder times, optional AI-written nudges with a view of exactly what is sent, recent nudges with why each was sent and helpful or not buttons, Excel export, JSON backup and restore, tutorial
 
 ---
@@ -150,14 +159,14 @@ The script will:
 
 **Option A — USB (fastest):**
 ```bash
-adb install health-quest-v4.37-debug.apk
+adb install health-quest-v4.38-debug.apk
 ```
 
 **Option B — WiFi (same network):**
 ```bash
 python3 -m http.server 9999 --directory .
 ```
-Then open `http://<your-pc-ip>:9999/health-quest-v4.37-debug.apk` on your phone and tap to install.
+Then open `http://<your-pc-ip>:9999/health-quest-v4.38-debug.apk` on your phone and tap to install.
 
 > Settings → Apps → Install unknown apps → enable for your browser
 
@@ -186,10 +195,13 @@ health_tracker/
 │   │   │   ├── localStore.js      # All CRUD operations + score computation
 │   │   │   ├── scoring.js         # Pure scoring functions (no side effects)
 │   │   │   ├── nextAction.js      # Picks Today's one next action
+│   │   │   ├── widgetData.js      # Everything the home-screen widgets show
+│   │   │   ├── widgetInbox.js     # Writes taps made on a widget when the app opens
 │   │   │   └── reminders.js       # Fixed reminders and the notification level
 │   │   └── store/
 │   │       └── useStore.js        # Zustand global state
-│   └── android/                   # Capacitor Android project
+│   ├── scripts/                   # Widget colours and icons, generated from the app's theme
+│   └── android/                   # Capacitor Android project, with the widgets in Java
 ├── backend/                       # FastAPI (optional, for desktop browser dev)
 ├── build_apk.sh                   # One-command APK builder
 └── docs/                          # Planning docs, app critique and revamp plan

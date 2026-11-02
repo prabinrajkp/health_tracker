@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The water in the picker preview: the glass a little over half full. The widget swaps in w_glass_water -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp" android:height="50dp" android:viewportWidth="36" android:viewportHeight="50">
+    <clip-path android:pathData="M0 22 H36 V50 H0 Z" />
+    <path android:pathData="M5 4 H31 L28 44 Q28 46 26 46 H10 Q8 46 8 44 Z" android:fillColor="#FFFFFFFF" />
+</vector>

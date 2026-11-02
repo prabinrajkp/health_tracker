@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A home-screen widget layout. Colours and text are set in code: see docs/widgets_plan.md -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/w_card_base" android:foreground="@drawable/w_ripple_card"
+    android:clipToOutline="true">
+<include layout="@layout/w_card_bg" />
+<LinearLayout android:id="@+id/w_body" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingStart="14dp" android:paddingEnd="14dp" android:paddingTop="14dp" android:paddingBottom="14dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<TextView style="@style/WText.Heading" android:id="@+id/g_level" android:text="Level 7" android:textSize="16sp" />
+<FrameLayout android:layout_width="0dp" android:layout_height="8dp" android:layout_weight="1" android:layout_marginStart="12dp" android:layout_marginEnd="12dp">
+<ImageView android:id="@+id/g_xp_track" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:src="@drawable/w_pill" android:scaleType="fitXY" android:tint="@color/widget_tile" android:importantForAccessibility="no" />
+<ImageView android:id="@+id/g_xp_fill" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:src="@drawable/w_bar_fill_25" android:scaleType="fitXY" android:tint="@color/widget_brand" android:importantForAccessibility="no" />
+</FrameLayout>
+<LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:id="@+id/g_streak_box" android:gravity="center_vertical">
+<ImageView style="@style/WIcon" android:id="@+id/g_streak_icon" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/w_ic_streak" android:tint="@color/widget_warning" />
+<TextView style="@style/WText.Secondary" android:id="@+id/g_streak" android:text="12 days" android:layout_marginStart="6dp" />
+</LinearLayout>
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:id="@+id/g_rows" android:layout_marginTop="4dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:id="@+id/g_row0" android:gravity="center_vertical" android:layout_marginTop="8dp">
+<ImageView style="@style/WIcon" android:id="@+id/g_row0_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_circle" android:tint="@color/widget_muted" />
+<TextView style="@style/WText.Body" android:id="@+id/g_row0_label" android:text="Walk 8,000 steps" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="10dp" />
+<TextView style="@style/WText.Caption" android:id="@+id/g_row0_xp" android:text="+10 XP" android:layout_marginStart="8dp" android:textColor="@color/widget_muted" />
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:id="@+id/g_row1" android:gravity="center_vertical" android:layout_marginTop="8dp">
+<ImageView style="@style/WIcon" android:id="@+id/g_row1_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_circle" android:tint="@color/widget_muted" />
+<TextView style="@style/WText.Body" android:id="@+id/g_row1_label" android:text="Log Weight" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="10dp" />
+<TextView style="@style/WText.Caption" android:id="@+id/g_row1_xp" android:text="+5 XP" android:layout_marginStart="8dp" android:textColor="@color/widget_muted" />
+</LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:id="@+id/g_row2" android:gravity="center_vertical" android:layout_marginTop="8dp">
+<ImageView style="@style/WIcon" android:id="@+id/g_row2_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/w_ic_check" android:tint="@color/widget_success" />
+<TextView style="@style/WText.Body" android:id="@+id/g_row2_label" android:text="Log Breakfast" android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="10dp" />
+<TextView style="@style/WText.Caption" android:id="@+id/g_row2_xp" android:text="+5 XP" android:layout_marginStart="8dp" android:textColor="@color/widget_success" />
+</LinearLayout>
+</LinearLayout>
+<TextView style="@style/WText.Secondary" android:id="@+id/g_msg" android:text="Open the app to see today's goals" android:maxLines="2" android:layout_marginTop="10dp" android:visibility="gone" />
+</LinearLayout>
+</FrameLayout>

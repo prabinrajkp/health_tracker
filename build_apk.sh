@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 FRONTEND="$ROOT/frontend"
 ANDROID_DIR="$FRONTEND/android"
 SDK_HOME="$HOME/android-sdk"
-APK_OUT="$ROOT/health-quest-v4.37-debug.apk"
+APK_OUT="$ROOT/health-quest-v4.38-debug.apk"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 info()  { echo -e "${GREEN}▶ $*${NC}"; }
@@ -91,6 +91,10 @@ cd "$FRONTEND"
 npm install --legacy-peer-deps
 
 # ── 5. React build (no VITE_API_URL needed — app uses local storage) ───────
+step "Widget colours and icons"
+# Generated from the app's own theme, so the widgets never fall behind it
+npm run widgets:res
+
 step "React build"
 npm run build
 info "React app built."

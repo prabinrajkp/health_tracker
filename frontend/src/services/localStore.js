@@ -293,17 +293,20 @@ export async function getAllWaterDays() {
 
 // Adds one drink. The day's goal is stamped on the record each time so the
 // day is later judged against the goal that applied when it was logged.
-export async function addWaterEntry(date, { ml, kind = 'water' }) {
+// A drink tapped on the widget brings its own id and time, so handing it over
+// twice still adds it once.
+export async function addWaterEntry(date, { ml, kind = 'water', id = null, time = null }) {
   const amount = Math.round(Number(ml))
   if (!Number.isFinite(amount) || amount <= 0 || amount > 5000) throw new Error('Invalid amount')
   const goal  = await currentWaterGoal(date)
   const now   = new Date()
   const entry = {
-    id: `${now.getTime()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: id || `${now.getTime()}-${Math.random().toString(36).slice(2, 6)}`,
     ml: amount, kind,
-    time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+    time: time || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   }
   const existing = await db.water_logs.get({ date })
+  if (id && (existing?.entries || []).some(e => e.id === id)) return existing
   if (existing) {
     await db.water_logs.update(existing.id, {
       entries: [...(existing.entries || []), entry], goal_ml: goal.targetMl, updated_at: now.toISOString(),

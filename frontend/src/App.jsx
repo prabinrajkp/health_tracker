@@ -20,6 +20,8 @@ import { planNudges, recordTap, consumeNativeTap, takeNotices, refreshModelList 
 import { seedFoodDefaults } from './services/foodDefaults'
 import { syncStepsBackground, syncActiveCalories } from './services/stepSync'
 import { runBadgeEngine } from './services/badgeEngine'
+import { watchWidgetData, publishWidgets, scheduleWidgetPublish } from './services/widgetData'
+import { applyWidgetInbox } from './services/widgetInbox'
 
 const STEP_SYNC_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes
 const RESUME_PLAN_GAP_MS    = 60 * 1000      // switching apps and back should not replan every time
@@ -70,9 +72,15 @@ export default function App() {
       })
       .catch(() => setOnboardingDone(true)) // On db error, never block existing users
 
+    // Taps made on a home-screen widget while the app was closed are written first,
+    // so the plan below sees a sleep timer started there. Then the widgets redraw.
+    watchWidgetData()
+    const inboxDone = foodsReady.then(() => applyWidgetInbox()).catch(() => [])
+    inboxDone.then(() => publishWidgets()).catch(() => {})
+
     // Plan the coming notifications from current data, then say anything owed once
     refreshModelList().catch(() => {})
-    planNudges().then(() => takeNotices()).then(notices => notices.forEach(n => toast(n, { duration: 6000 }))).catch(() => {})
+    inboxDone.then(() => planNudges()).then(() => takeNotices()).then(notices => notices.forEach(n => toast(n, { duration: 6000 }))).catch(() => {})
 
     // Tapping a notification opens the screen the rule chose for it
     const followTap = async (key, route) => {
@@ -82,7 +90,9 @@ export default function App() {
     let lastPlanAt = Date.now()
     const replanOnReturn = async () => {
       const tap = await consumeNativeTap().catch(() => null)
+      await applyWidgetInbox().catch(() => [])
       if (tap?.route) followTap(tap.key, tap.route)
+      scheduleWidgetPublish()   // the next step moves on with the clock
       syncStepsBackground().catch(() => {})
       if (Date.now() - lastPlanAt < RESUME_PLAN_GAP_MS) return
       lastPlanAt = Date.now()
