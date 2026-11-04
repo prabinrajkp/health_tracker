@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ChevronDown, Check } from 'lucide-react'
 import { getBadgeStates, CATEGORY_META } from '../services/badgeEngine'
 import { SUPER_BADGES } from '../services/superBadges'
 import BadgeModal from '../components/BadgeModal'
 import BadgeTile from '../components/BadgeTile'
+import { useGoBack } from '../hooks/useNavigation'
 
 const PREVIEW = 6   // one row per category until it is opened
 
 // Every badge, grouped by category. Each category shows one row — earned first,
 // then the closest to earning — and opens to show the rest.
 export default function Badges() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const [badges, setBadges] = useState(null)
   const [open, setOpen]     = useState({})
   const [modalBadge, setModalBadge] = useState(null)
@@ -34,7 +34,7 @@ export default function Badges() {
   return (
     <div className="min-h-screen bg-surface-base pb-nav animate-fade-in">
       <div className="page-header">
-        <button onClick={() => navigate(-1)} aria-label="Back" className="icon-btn"><ArrowLeft size={18} /></button>
+        <button onClick={goBack} aria-label="Back" className="icon-btn"><ArrowLeft size={18} /></button>
         <div className="flex-1">
           <h1 className="t-title">Badges</h1>
           <p className="text-sm text-text-muted">{unlockedIds.size} of {badges.length} earned</p>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Utensils } from 'lucide-react'
+import { useOpen } from '../hooks/useNavigation'
 import BottomSheet from './BottomSheet'
 import { DRINK_KINDS, DRINK_KIND_LABELS, formatLitres } from '../services/hydration'
 import { MEAL_META } from '../constants/mealMeta'
@@ -12,14 +12,14 @@ import { MEAL_META } from '../constants/mealMeta'
 // `water` is the caller's useWater() instance, so the sheet and whatever
 // opened it always show the same numbers.
 export default function DrinksSheet({ open, onClose, water }) {
-  const navigate = useNavigate()
+  const openScreen = useOpen()
   const { entries, fromMeals, totals, goal, targetMl, glassMl, add, remove } = water
   const [kind, setKind] = useState('water')
   const hasGoal = targetMl > 0
   const pct     = hasGoal ? Math.min((totals.totalMl / targetMl) * 100, 100) : 0
   const tapped  = [...entries].reverse()
 
-  const go = (path) => { onClose(); navigate(path) }
+  const go = (path) => { onClose(); openScreen(path) }
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Drinks">

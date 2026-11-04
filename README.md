@@ -76,6 +76,8 @@ Above 10,000 steps, points increase linearly to 28 at 18,000 steps. The step tar
 
 Four tabs, each with one job. Everything saves as you change it — there is no Save button in logging.
 
+The Android back button closes whatever is on top first (a sheet, a pop-up, a step in Add Meal), then goes back one level, then to Today, and leaves the app from Today. Switching tabs never adds to the history.
+
 ### Today
 - Score, grade (S/A/B/C/D/F) and the four category bars: Diet · Fasting · Workout · Sleep
 - One **Next** card: the most useful thing left to do today. Tapping it opens the place to do it
@@ -159,14 +161,14 @@ The script will:
 
 **Option A — USB (fastest):**
 ```bash
-adb install health-quest-v4.38-debug.apk
+adb install health-quest-v4.39-debug.apk
 ```
 
 **Option B — WiFi (same network):**
 ```bash
 python3 -m http.server 9999 --directory .
 ```
-Then open `http://<your-pc-ip>:9999/health-quest-v4.38-debug.apk` on your phone and tap to install.
+Then open `http://<your-pc-ip>:9999/health-quest-v4.39-debug.apk` on your phone and tap to install.
 
 > Settings → Apps → Install unknown apps → enable for your browser
 

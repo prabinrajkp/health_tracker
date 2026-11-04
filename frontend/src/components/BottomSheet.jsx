@@ -1,10 +1,13 @@
 import { X } from 'lucide-react'
+import { useBackClose } from '../hooks/useNavigation'
 
 // Shared bottom-sheet primitive — extracted from the recipe already used
 // (independently, copy-pasted) in Activity.jsx's log sheet and Settings.jsx's
 // AI overlay: dimmed backdrop, rounded-top panel, translate-y transition,
 // always mounted so open/close animates instead of popping.
+// The Android back button closes it, as it does any sheet.
 export default function BottomSheet({ open, onClose, title, headerRight, children, zIndex = 60 }) {
+  useBackClose(open, onClose)
   return (
     <div
       className={`fixed inset-0 transition-opacity duration-300 ${open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}

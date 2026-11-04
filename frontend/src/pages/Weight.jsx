@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { format, subDays, parseISO } from 'date-fns'
 import toast from 'react-hot-toast'
 import { Scale, Minus, Plus, TrendingDown, TrendingUp, Target, ArrowLeft, Info } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from 'recharts'
@@ -10,6 +9,7 @@ import { getWeightEntry, getWeightEntries, saveWeightEntry, getConfig, saveConfi
 import { planOn, weightDirection, targetProgress, weightTone, weightPaceNote } from '../services/bodyGoal'
 import useStore from '../store/useStore'
 import { col } from '../services/theme'
+import { useGoBack } from '../hooks/useNavigation'
 
 const RANGES = [
   { id: 30,  label: '30d' },
@@ -42,7 +42,7 @@ function StatTile({ label, value, unit, tone, Icon }) {
 }
 
 export default function Weight() {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const { fetchTodayScore } = useStore()
   const [now, setNow] = useState(() => new Date())
   const today     = format(now, 'yyyy-MM-dd')
@@ -164,7 +164,7 @@ export default function Weight() {
   return (
     <div className="min-h-screen bg-surface-base pb-nav animate-fade-in">
       <div className="page-header">
-        <button onClick={() => navigate(-1)} aria-label="Back" className="icon-btn"><ArrowLeft size={18} /></button>
+        <button onClick={goBack} aria-label="Back" className="icon-btn"><ArrowLeft size={18} /></button>
         <div className="flex-1">
           <h1 className="t-title">Weight</h1>
           <p className="text-sm text-text-muted">{stats ? `Latest ${stats.latest} kg` : 'No entries yet'}</p>

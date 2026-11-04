@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Routes, Route, Navigate, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import { LocalNotifications } from '@capacitor/local-notifications'
@@ -22,6 +22,7 @@ import { syncStepsBackground, syncActiveCalories } from './services/stepSync'
 import { runBadgeEngine } from './services/badgeEngine'
 import { watchWidgetData, publishWidgets, scheduleWidgetPublish } from './services/widgetData'
 import { applyWidgetInbox } from './services/widgetInbox'
+import { recordMove, backAction, closeTopOverlay, getTrail, outsideAction, run } from './services/navigation'
 
 const STEP_SYNC_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes
 const RESUME_PLAN_GAP_MS    = 60 * 1000      // switching apps and back should not replan every time
@@ -37,6 +38,13 @@ export default function App() {
   const [onboardingDone, setOnboardingDone] = useState(null)
   const [unlockQueue, setUnlockQueue] = useState([])
   const navigate = useNavigate()
+  const location = useLocation()
+  const navigationType = useNavigationType()
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+
+  // The app's own record of the pages in the history, for the back button
+  useEffect(() => { recordMove(location, navigationType) }, [location.key])
 
   useEffect(() => {
     migrateSleepDatesV8().catch(console.error)   // undo v7 mis-convention; runs first
@@ -82,10 +90,11 @@ export default function App() {
     refreshModelList().catch(() => {})
     inboxDone.then(() => planNudges()).then(() => takeNotices()).then(notices => notices.forEach(n => toast(n, { duration: 6000 }))).catch(() => {})
 
-    // Tapping a notification opens the screen the rule chose for it
+    // Tapping a notification or widget opens the screen the rule chose for it, with
+    // only Today behind it
     const followTap = async (key, route) => {
       await recordTap(key).catch(() => {})
-      if (route) navigate(route)
+      if (route) run(navigateRef.current, outsideAction(route))
     }
     let lastPlanAt = Date.now()
     const replanOnReturn = async () => {
@@ -104,6 +113,14 @@ export default function App() {
         followTap(notification?.extra?.key, notification?.extra?.route)
       }))
       handles.push(CapApp.addListener('appStateChange', ({ isActive }) => { if (isActive) replanOnReturn() }))
+      // Back closes what is on top, then goes up one level, then to Today, then leaves.
+      // Leaving minimises, like Home, so coming back is instant.
+      handles.push(CapApp.addListener('backButton', () => {
+        if (closeTopOverlay()) return
+        const action = backAction(getTrail())
+        if (action.type === 'leave') CapApp.minimizeApp().catch(() => {})
+        else run(navigateRef.current, action)
+      }))
       consumeNativeTap().then(tap => { if (tap?.route) followTap(tap.key, tap.route) }).catch(() => {})
     }
 

@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented here.
 
+## [v4.39] — 2026-11-04
+
+A back button that makes sense. See `docs/navigation_critique.md`.
+
+### Added
+- **Back closes what is on top** — the Android back button closes an open sheet or pop-up first (Drinks, Add Meal, Today in detail, badge details, the AI sheets in Settings, a day's detail on Progress) and leaves the page under it as it was
+- **Add Meal steps back** — back from a food's portions returns to the list of foods, and with foods already picked it asks "Discard this meal?" instead of throwing them away
+- **Tabs remember their view** — Progress comes back on Month or Trends, and Log on Move or Sleep, where you left them
+
+### Changed
+- **Back goes to Today, then out** — switching tabs no longer adds to the history, so back from any tab goes to Today, and back on Today leaves the app like Home. Before, back replayed every tab visited
+- **Settings sections are steps** — back from a section such as Theme returns to the Settings menu, and the arrow agrees with the back button
+- **Notification and widget taps start clean** — the screen they open goes back to Today, not to whatever was open before
+- **Tapping the open tab** scrolls it back to the top
+
+### Fixed
+- **Back could not leave the app** — once back had walked through every page, it did nothing at all
+- **Settings and Profile went round in circles** — the arrow on Settings opened Profile again as a new page, so each visit added two pages to walk back through
+- **Back arrows that did nothing** — Weight and Badges opened from a notification or widget had nothing to go back to. They now go to their parent screen
+- **Links to a view inside a tab** — a notification for Log → Sleep now shows Sleep even when Log was already open on Food
+
+---
+
 ## [v4.38] — 2026-11-02
 
 Home-screen widgets, rebuilt from the app's own theme. See `docs/widgets_plan.md`.

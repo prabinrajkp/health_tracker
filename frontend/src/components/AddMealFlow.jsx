@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { Search, Plus, Minus, X, Sparkles, Loader2, Star, Clock, Check, ChevronDown, Pencil, RotateCcw } from 'lucide-react'
 import BottomSheet from './BottomSheet'
+import { useBackClose } from '../hooks/useNavigation'
 import { MEAL_TYPES, MEAL_META, defaultCategoryForTime } from '../constants/mealMeta'
 import { getDiet, saveDiet, getConfig } from '../api/client'
 import {
@@ -337,6 +338,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
   const [suggestions, setSuggestions] = useState([])
   const [duplicateInfo, setDuplicateInfo] = useState(null)
   const [confirmation, setConfirmation] = useState(null)
+  const [askDiscard, setAskDiscard] = useState(false)
   const searchInputRef = useRef(null)
 
   // Focus the search input only once the sheet has actually opened onto the
@@ -363,7 +365,7 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
     setStep('browse')
     setCategory(presetCategory || defaultCategoryForTime())
     setCatMenuOpen(false)
-    setQuery(''); setItems([]); setDuplicateInfo(null); setConfirmation(null)
+    setQuery(''); setItems([]); setDuplicateInfo(null); setConfirmation(null); setAskDiscard(false)
     getFoods().then(setFoods)
     getFoodUsage().then(setFoodUsage).catch(() => {})
     getConfig().then(rows => {
@@ -511,6 +513,18 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
 
   const done = () => { onClose(); }
 
+  // Back steps through the flow instead of throwing the meal away: the category menu,
+  // then the previous step, then a question before discarding foods already picked.
+  // With nothing picked, the sheet's own back closes it.
+  const stepBack = () => {
+    if (askDiscard) setAskDiscard(false)
+    else if (catMenuOpen) setCatMenuOpen(false)
+    else if (step === 'duplicate') setStep('builder')
+    else if (step === 'builder') setStep('browse')
+    else if (items.length) setAskDiscard(true)
+  }
+  useBackClose(open && (askDiscard || catMenuOpen || step === 'duplicate' || step === 'builder' || (step === 'browse' && items.length > 0)), stepBack)
+
   const title = step === 'confirmation' ? null : `Add to ${MEAL_META[category].label.toLowerCase()}`
 
   return (
@@ -519,6 +533,18 @@ export default function AddMealFlow({ open, presetCategory, onClose, onLogged })
         <CategoryPicker category={category} open={catMenuOpen} onToggle={() => setCatMenuOpen(o => !o)} onSelect={changeCategory} />
       ) : null}
     >
+      {askDiscard && (
+        <div className="mx-4 mt-4 card space-y-3" role="alertdialog" aria-label="Discard this meal?">
+          <p className="text-base font-semibold text-text-primary">Discard this meal?</p>
+          <p className="text-sm text-text-secondary">
+            The {items.length} food{items.length === 1 ? '' : 's'} you picked will not be logged.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="btn-danger flex-1">Discard</button>
+            <button onClick={() => setAskDiscard(false)} className="btn-ghost flex-1">Keep</button>
+          </div>
+        </div>
+      )}
       {step === 'browse' && (
         <BrowseStep hideCalories={hideCalories}
           category={category} foods={foods} query={query} setQuery={setQuery} results={results}

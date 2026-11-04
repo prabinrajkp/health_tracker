@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, subDays, parseISO, addWeeks } from 'date-fns'
 import { ChevronLeft, ChevronRight, ChevronDown, X, Share2, TrendingUp, TrendingDown, Minus as MinusIcon, CheckCircle2, XCircle, Trophy, Dumbbell } from 'lucide-react'
 import { toPng } from 'html-to-image'
@@ -21,6 +20,7 @@ import { longestRun, toSickSet } from '../services/sickDays'
 import { planOn, fastingCounts } from '../services/bodyGoal'
 import { NetWeek, NetMonth } from '../components/NetSummary'
 import IfThenCard from '../components/IfThenCard'
+import { useSubTab, useBackClose } from '../hooks/useNavigation'
 
 // Deterministic, history-driven meal analytics (see recommendationEngine.js) —
 // top foods/templates, diversity, and repetition over the last 30 days.
@@ -102,11 +102,7 @@ const TABS = [['week', 'Week'], ['month', 'Month'], ['trends', 'Trends']]
 
 export default function Progress() {
   // ── Tab state ────────────────────────────────────────────────────────────
-  const [searchParams] = useSearchParams()
-  const [historyTab, setHistoryTab] = useState(() => {
-    const t = searchParams.get('tab')
-    return TABS.some(([key]) => key === t) ? t : 'week'
-  })
+  const [historyTab, setHistoryTab] = useSubTab('progress', TABS.map(([key]) => key), 'week')
   const [whyOpen, setWhyOpen]           = useState(false)
   const [insightsOpen, setInsightsOpen] = useState(false)
   const [lifetime, setLifetime]         = useState(null)
@@ -188,6 +184,8 @@ export default function Progress() {
   const [loading, setLoading] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
   const [dayDetail, setDayDetail] = useState(null)
+  // A day's detail sits on top of the calendar: back closes it
+  useBackClose(!!selectedDate, () => { setSelectedDate(null); setDayDetail(null) })
   const [detailLoading, setDetailLoading] = useState(false)
   const [chartMode, setChartMode] = useState('line')
   const [selectedLine, setSelectedLine] = useState('total')

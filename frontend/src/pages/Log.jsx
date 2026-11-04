@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
-import { useSearchParams } from 'react-router-dom'
 import { Utensils, Footprints, Moon, Check } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
@@ -10,6 +9,7 @@ import { planNudges } from '../services/nudgePlanner'
 import FoodSection from './log/FoodSection'
 import MoveSection from './log/MoveSection'
 import SleepSection from './log/SleepSection'
+import { useSubTab } from '../hooks/useNavigation'
 
 const TABS = [
   { id: 'food',  label: 'Food',  Icon: Utensils },
@@ -21,11 +21,7 @@ const TAB_ALIAS = { diet: 'food', workout: 'move' }
 
 export default function Log() {
   const { fetchTodayScore } = useStore()
-  const [searchParams] = useSearchParams()
-  const requested = searchParams.get('tab')
-  const initial = TAB_ALIAS[requested] || (TABS.some(t => t.id === requested) ? requested : 'food')
-
-  const [tab, setTab]     = useState(initial)
+  const [tab, setTab]     = useSubTab('log', TABS.map(t => t.id), 'food', TAB_ALIAS)
   const [saved, setSaved] = useState(false)
   const [sickToday, setSickToday] = useState(false)
   const savedTimer  = useRef(null)

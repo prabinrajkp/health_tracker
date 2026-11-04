@@ -2,9 +2,11 @@ import { useEffect } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { Haptics, ImpactStyle } from '@capacitor/haptics'
 import { TIER_META } from '../services/badgeEngine'
+import { useBackClose } from '../hooks/useNavigation'
 
 export default function BadgeUnlockOverlay({ badge, remaining, onDismiss }) {
   const t = TIER_META[badge.tier] || TIER_META.common
+  useBackClose(true, onDismiss)
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {

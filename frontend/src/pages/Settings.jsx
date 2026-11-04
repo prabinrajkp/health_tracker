@@ -22,6 +22,7 @@ import { NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/remin
 import { planNudges } from '../services/nudgePlanner'
 import NudgeSettings, { NudgeDeveloperStats } from '../components/NudgeSettings'
 import WidgetSettings from '../components/WidgetSettings'
+import { useGoBack, useBackClose } from '../hooks/useNavigation'
 import { version as APP_VERSION } from '../../package.json'
 import useStore from '../store/useStore'
 import db, { DEFAULT_WEIGHTS } from '../services/db'
@@ -119,7 +120,7 @@ export default function Settings() {
   const { fetchConfig, fetchTodayScore, theme, setTheme } = useStore()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const sectionFromUrl = searchParams.get('section')
+  const goBack = useGoBack()
   const [weights, setWeights]         = useState(DEFAULT_WEIGHTS)
   const [playerName, setPlayerName]   = useState('')
   const [targetWeight, setTargetWeight] = useState('')
@@ -170,7 +171,10 @@ export default function Settings() {
   const [waterGoalMode, setWaterGoalMode]     = useState('auto')   // 'auto' | 'custom' | 'off'
   const [waterGoalCustom, setWaterGoalCustom] = useState('')
   const [waterGlassMl, setWaterGlassMl]       = useState(String(DEFAULT_GLASS_ML))
-  const [activeSection, setActiveSection] = useState(() => resolveSection(searchParams.get('section')) || null)
+  // The open section lives in the address, so back returns to the Settings menu and a
+  // link to a section works even when Settings is already open
+  const activeSection = resolveSection(searchParams.get('section')) || null
+  const setActiveSection = (key) => navigate(`/settings?section=${key}`)
   const versionTaps = useRef(0)
 
   // Developer tools
@@ -466,6 +470,12 @@ export default function Settings() {
   const resetAI = () => {
     setAiMode(null); setAiResult(null); setAiPasteText(''); setAiShowHowTo(false); setAiCopied(false)
   }
+  // Back closes the AI sheets first
+  useBackClose(!!aiMode, resetAI)
+  useBackClose(!!bulkMode, () => setBulkMode(null))
+
+  // Leaving a section, by the arrow or by back, drops any half-done food edit
+  useEffect(() => { setEditingId(null); setEditDraft(null) }, [activeSection])
 
   // Only a real change adds a history entry, so saving other settings leaves it alone
   const saveGoalIfChanged = async () => {
@@ -746,15 +756,7 @@ export default function Settings() {
 
   // ── Detail screens ────────────────────────────────────────────────────────
   const renderDetail = () => {
-    const back = () => {
-      setEditingId(null)
-      setEditDraft(null)
-      if (sectionFromUrl) {
-        navigate(-1)
-      } else {
-        setActiveSection(null)
-      }
-    }
+    const back = goBack
     const SaveBtn = () => (
       <div className="px-4 pt-3 pb-24 shrink-0">
         <button onClick={handleSave} disabled={saving} className="btn-primary w-full py-4">
@@ -1854,7 +1856,7 @@ export default function Settings() {
         <>
           {/* Header */}
           <div className="page-header">
-            <button onClick={() => navigate('/profile')} aria-label="Back to Profile" className="icon-btn">
+            <button onClick={goBack} aria-label="Back to Profile" className="icon-btn">
               <ArrowLeft size={18} />
             </button>
             <h1 className="t-title flex-1">Settings</h1>

@@ -22,6 +22,7 @@ import { planNudges } from '../services/nudgePlanner'
 import { gradeFor, weightsFromConfig, categoryMaxes, CATEGORY_COLORS } from '../services/scoreMeta'
 import { getSleepTimerStart, startSleepTimer, stopSleepTimer, hhmm, formatElapsed } from '../services/sleepTimer'
 import { APPLIED_EVENT } from '../services/widgetInbox'
+import { useOpenTab } from '../hooks/useNavigation'
 
 const PERFECT_KEY  = 'hq-perfect-day'
 const UNWELL_KEY   = 'hq-still-unwell-dismissed'   // the date "Still unwell?" was answered
@@ -176,6 +177,7 @@ const suggestedGoal = (config) => {
 export default function Today() {
   const { todayScore, streak, refreshAll, config } = useStore()
   const navigate = useNavigate()
+  const openTab  = useOpenTab()   // Log is a tab: going there never adds to the history
   const [searchParams, setSearchParams] = useSearchParams()
   const today     = format(new Date(), 'yyyy-MM-dd')
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd')
@@ -325,7 +327,7 @@ export default function Today() {
 
   const runAction = (target) => {
     if (target.type === 'meal') openAddMeal(target.category)
-    else navigate(`/log?tab=${target.tab}`)
+    else openTab(`/log?tab=${target.tab}`)
   }
   const handleMealLogged = async () => {
     await refreshAll()
@@ -487,9 +489,9 @@ export default function Today() {
               onClick={() => openAddMeal()} />
             <LogButton Icon={Footprints} label="Move"
               status={steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : steps > 0 ? String(steps) : 'Not yet'} done={moveDone}
-              onClick={() => navigate('/log?tab=move')} />
+              onClick={() => openTab('/log?tab=move')} />
             <LogButton Icon={Moon} label="Sleep" status={sleepDone ? 'Logged' : 'Not yet'} done={sleepDone}
-              onClick={() => navigate('/log?tab=sleep')} />
+              onClick={() => openTab('/log?tab=sleep')} />
             <LogButton Icon={Scale} label="Weight" status={weightDone ? `${logs.weight.weight_kg} kg` : 'Not yet'} done={weightDone}
               onClick={() => navigate('/weight')} />
           </div>

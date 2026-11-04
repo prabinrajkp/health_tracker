@@ -1,8 +1,10 @@
 import { format } from 'date-fns'
 import { X, Check } from 'lucide-react'
 import { TIER_META, CATEGORY_META } from '../services/badgeEngine'
+import { useBackClose } from '../hooks/useNavigation'
 
 export default function BadgeModal({ badge, onClose }) {
+  useBackClose(!!badge, onClose)
   if (!badge) return null
   const t   = TIER_META[badge.tier] || TIER_META.common
   const cat = CATEGORY_META[badge.category] || {}
