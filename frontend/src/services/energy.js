@@ -2,6 +2,7 @@
 // is an estimate: it is shown as information and never touches the score.
 // See docs/body_goal_net_energy_plan.md §3.
 import { calcNutritionTotals } from './scoring'
+import { itemsKcal } from './workoutItems'
 
 // METs from the 2024 Adult Compendium of Physical Activities (code in brackets).
 export const EXERCISE_METS = {
@@ -36,7 +37,9 @@ const hasSteps = (workout) => (workout?.steps || 0) > 0
 
 // A session's burn, net of the resting energy the base already covers. Walking is
 // counted through steps, so it only adds here when the day has no steps at all.
-export function exerciseKcal(workout, kg) {
+// A day logged as a list adds up its items instead; see services/workoutItems.js.
+export function exerciseKcal(workout, kg, heightCm = 170) {
+  if (Array.isArray(workout?.workout_items)) return itemsKcal(workout.workout_items, { kg, heightCm, steps: workout.steps }).total
   if (!workout?.exercise_done || !workout.exercise_duration_minutes || !kg) return 0
   const type = workout.exercise_type || 'Other'
   if (type === 'Walking' && hasSteps(workout)) return 0
@@ -74,7 +77,7 @@ export function estimateBurn({ dietetics, workout, fractionOfDay = 1, useDevice 
   }
   const resting  = bmr * BASE_MULTIPLIER * fractionOfDay
   const steps    = stepKcal(workout.steps, heightCm, weightKg)
-  const exercise = exerciseKcal(workout, weightKg) + walkKcal(workout, weightKg)
+  const exercise = exerciseKcal(workout, weightKg, heightCm) + walkKcal(workout, weightKg)
   return { source: 'logs', resting, steps, exercise, adjust, total: resting + steps + exercise + adjust }
 }
 

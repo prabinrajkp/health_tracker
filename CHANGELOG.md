@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented here.
 
+## [v4.40] — 2026-11-18
+
+Log any workout in your own words. See `docs/workout_logging_plan.md`.
+
+### Added
+- **Type your workout** — on Log → Move, write it as you would to a friend: "gym 50 min: bench 3x10 60kg, squats 3x8 80kg, 20 min cycling". Sets, reps, weight, minutes, distance and effort are read from the text, and each exercise becomes its own row you can edit
+- **Any exercise, several a day** — 65 activities, from bench press and squats to running, swimming, cricket, football, yoga and martial arts, instead of six fixed types. A morning run and an evening gym session are both counted
+- **Calories you can trust** — each exercise's calories come from its activity level (METs), its minutes and your weight, so the same workout always gives the same figure. The weight on the bar doesn't change it, because time and effort are what burn energy
+- **AI for names it doesn't know** — with an AI key, a name the app doesn't recognise is matched to the closest exercise, once, and remembered. The AI never sets a calorie number, and only the name is sent. Without a key, you pick the closest from the list
+- **Lifting progress** — each lift shows your last sessions and best set, and says when you set a new best
+- **Repeat and routines** — repeat your last workout in one tap, or save one as a routine, such as "Push day"
+- **Settings → Your exercises** — the names the app learned and your routines, each one tap to forget
+
+### Changed
+- **Runs and walks are not counted twice** — the part of a run or walk your step counter already counted is taken off, so the session adds only what the steps missed
+- **One tap still works** — Gym, Walking, Running, Cycling, Badminton, Yoga, Swimming and Other add a session straight away, with the minutes and effort editable
+- **Exports** — the Excel workout sheet lists each day's exercises, and the AI health summary names them
+
+### Fixed
+- **A logged run was counted twice** — once through your steps and again as a session
+
+---
+
 ## [v4.39] — 2026-11-04
 
 A back button that makes sense. See `docs/navigation_critique.md`.

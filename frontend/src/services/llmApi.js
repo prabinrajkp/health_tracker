@@ -5,6 +5,8 @@
  * in Settings and reused from there — never hardcoded here.
  */
 
+import { describeItem } from './workoutItems'
+
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const GROQ_URL       = 'https://api.groq.com/openai/v1/chat/completions'
 
@@ -338,7 +340,7 @@ ${sleep?.wake_time ? `  Wake time: ${sleep.wake_time}` : '  Wake time: Not recor
 ${sleep?.sleep_hours > 0 ? `  Total sleep: ${sleep.sleep_hours} hours` : '  Duration: Not recorded'}${screenH > 0 ? `\n  Screen time before bed: ${screenH} hours (effective sleep: ${effectiveSleep} hours)` : ''}${sleep?.quality ? `\n  Quality: ${qualityLabel[sleep.quality] || sleep.quality}/5` : ''}${sleep?.notes ? `\n  Notes: ${sleep.notes}` : ''}
 
 WORKOUT:
-${workout?.exercise_type ? `  Exercise: ${workout.exercise_type}${workout.exercise_duration_minutes ? ` — ${workout.exercise_duration_minutes} min` : ''}` : '  No workout logged'}${workout?.notes ? `\n  Notes: ${workout.notes}` : ''}${goalBlock(plan, net)}`,
+${workout?.workout_items?.length ? `  Exercise: ${workout.workout_items.map(i => `${i.name}${describeItem(i) ? ` (${describeItem(i)})` : ''}`).join(', ')}` : workout?.exercise_type ? `  Exercise: ${workout.exercise_type}${workout.exercise_duration_minutes ? ` — ${workout.exercise_duration_minutes} min` : ''}` : '  No workout logged'}${workout?.notes ? `\n  Notes: ${workout.notes}` : ''}${goalBlock(plan, net)}`,
   ]
   return lines.join('')
 }
@@ -442,4 +444,48 @@ export async function bulkTagDrinksWithAI(labels, config, onProgress) {
   }
   if (results.size === 0) throw new Error("Couldn't parse the AI response — try again")
   return results
+}
+
+// ── Exercise names ────────────────────────────────────────────────────────────
+// The AI only says which library entry a name means. It is never asked for calories,
+// METs or minutes: the app works those out, so they are the same every time. Only the
+// names are sent, never weight or anything else about the user.
+export function exerciseMappingPrompt(names, library) {
+  const options = library.map(e => `${e.id}: ${e.name} (${e.kind})`).join('\n')
+  return `You match exercise names written by gym-goers and athletes to a fixed list.
+
+Respond with ONLY a valid JSON array (no markdown, no extra text), one object per name, same order:
+[{"text":"...","library":"<an id from the list, or null>","effort":"normal"|"hard"}]
+
+Keep "text" exactly as given. Use null when nothing in the list fits. effort is "hard" only
+when the name itself says so (sprints, competitive, heavy), otherwise "normal".
+Do not add calories, minutes or any other field.
+
+List:
+${options}
+
+Names:
+${names.map(n => `- ${n}`).join('\n')}`
+}
+
+/**
+ * The library ids the AI picked, checked: an id not in the library is dropped, so a
+ * made-up answer can never become a logged exercise. Returns { [name]: { library, effort } }.
+ */
+export function parseExerciseMapping(text, names, validIds) {
+  const rows = extractJson(text, '[', ']')
+  if (!Array.isArray(rows)) return {}
+  const out = {}
+  rows.forEach((row, i) => {
+    const name = names.includes(row?.text) ? row.text : names[i]
+    if (!name || !validIds.has(row?.library)) return
+    out[name] = { library: row.library, effort: row.effort === 'hard' ? 'hard' : 'normal' }
+  })
+  return out
+}
+
+export async function mapExercisesWithAI(names, library, config) {
+  if (!names.length) return {}
+  const text = await chatCompletion(exerciseMappingPrompt(names, library), config)
+  return parseExerciseMapping(text, names, new Set(library.map(e => e.id)))
 }

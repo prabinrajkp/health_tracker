@@ -92,7 +92,7 @@ The Android back button closes whatever is on top first (a sheet, a pop-up, a st
 - **Food:** each meal lists its foods with portions and the meal time; **+ Add** opens Add Meal on that meal (search, Repeat Yesterday, frequent and recent meals, named meals, optional AI lookup). One fasting line and the calories and macro targets sit below
 - **Drinks** (one row on Food, opening a sheet): one tap adds a glass of water; the sheet adds bigger amounts or another drink and lists the day's entries. Drinks logged in a meal (coffee, tea, juice, milk) are counted automatically, because foods can be tagged as drinks with a mL per portion. The total counts toward an estimated daily goal from body weight (30 mL per kg), which can be set by hand or switched off, and is never part of the score
 - **Net calories** (on the Calories card): food eaten minus an estimate of everything burned, against the net your goal asks for. It opens to show resting burn, steps and exercise. It is information only and never changes the score or the food target
-- **Move:** steps synced from Health Connect or the phone sensor, or typed in (a typed count is kept for the day until you tap Sync); switches for post-dinner walk and exercise, with a Normal or Hard choice for sessions
+- **Move:** steps synced from Health Connect or the phone sensor, or typed in (a typed count is kept for the day until you tap Sync); a post-dinner walk switch; and exercise as a list. Type a whole workout in your own words ("gym 50 min: bench 3x10 60kg, squats 3x8 80kg, 20 min cycling"), add a common one with one tap, repeat an earlier workout or a saved routine. Calories come from each exercise's activity level (METs), the minutes and your weight. An optional AI key only matches names the app doesn't know, once. Lifts show earlier sessions and your best set
 - **Sleep:** one timer button with automatic screen-time deduction; manual times, presets, quality and notes under Edit details
 
 ### Progress
@@ -161,14 +161,14 @@ The script will:
 
 **Option A — USB (fastest):**
 ```bash
-adb install health-quest-v4.39-debug.apk
+adb install health-quest-v4.40-debug.apk
 ```
 
 **Option B — WiFi (same network):**
 ```bash
 python3 -m http.server 9999 --directory .
 ```
-Then open `http://<your-pc-ip>:9999/health-quest-v4.39-debug.apk` on your phone and tap to install.
+Then open `http://<your-pc-ip>:9999/health-quest-v4.40-debug.apk` on your phone and tap to install.
 
 > Settings → Apps → Install unknown apps → enable for your browser
 

@@ -3,8 +3,9 @@ import toast from 'react-hot-toast'
 import { RefreshCw, Pencil } from 'lucide-react'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { HealthConnect } from 'capacitor-health-connect'
-import { getWorkout, saveWorkout, getConfig, getLatestWeight } from '../../api/client'
-import { exerciseKcal, fmtKcal, INTENSITIES } from '../../services/energy'
+import { getWorkout, saveWorkout, getConfig, getLatestWeight, saveConfig, getRecentWorkouts } from '../../api/client'
+import { itemsOf, summarise } from '../../services/workoutItems'
+import ExerciseLog from '../../components/ExerciseLog'
 import { calcWorkoutScore } from '../../services/scoring'
 import { weightsFromConfig, categoryMaxes, stepTargets, CATEGORY_COLORS } from '../../services/scoreMeta'
 import { isStepsManualToday, setStepsManualToday } from '../../services/stepSync'
@@ -12,11 +13,8 @@ import { useAutoSave, SectionScore, Toggle, PillSelector, NoteField, todayStr, T
 
 const UsageStats = registerPlugin('UsageStats')
 
-const EXERCISE_TYPES     = ['Badminton', 'Stairs', 'Walking', 'Gym', 'Cycling', 'Other']
 const WALK_DURATIONS     = [5, 10, 15, 20, 30]
-const EXERCISE_DURATIONS = [20, 30, 45, 60, 90]
 const EMPTY_WORKOUT = { steps: 0, post_dinner_walk: false, post_dinner_walk_minutes: 0, exercise_done: false, exercise_type: '', exercise_duration_minutes: 0, exercise_intensity: 'normal', notes: '' }
-const INTENSITY_LABEL = { normal: 'Normal', hard: 'Hard' }
 
 const hhmm = (ts) => {
   const d = new Date(ts)
@@ -64,6 +62,8 @@ export default function MoveSection({ afterSave }) {
   const [syncing, setSyncing]   = useState(false)
   const [weightKg, setWeightKg] = useState(null)
   const [hideCalories, setHideCalories] = useState(false)
+  const [configMap, setConfigMap] = useState({})
+  const [earlier, setEarlier]     = useState([])
 
   const { save } = useAutoSave(async (next) => {
     await saveWorkout({ ...next, date: today })
@@ -91,7 +91,9 @@ export default function MoveSection({ afterSave }) {
     getConfig().then(rows => {
       setWeights(weightsFromConfig(rows))
       setHideCalories(rows.some(r => r.key === 'hide_calories' && r.value === 'true'))
+      setConfigMap(Object.fromEntries(rows.map(r => [r.key, r.value])))
     }).catch(() => {})
+    getRecentWorkouts().then(setEarlier).catch(() => {})
     getLatestWeight().then(w => setWeightKg(w?.weight_kg || null)).catch(() => {})
     getWorkout(today).then(async (existing) => {
       if (existing) commit({ ...EMPTY_WORKOUT, ...existing, date: today }, 0, false)
@@ -167,7 +169,18 @@ export default function MoveSection({ afterSave }) {
     : `${(t.full - steps).toLocaleString()} to go for full points`
   const sourceLabel = { health_connect: 'Health Connect', sensor: 'Phone sensor', manual: 'Entered by you' }[source]
   const canSync = hcStatus === 'Available'
-  const sessionKcal = exerciseKcal(form, weightKg)
+  // The day's exercise is a list; the old single-session fields follow it on every save
+  const items = itemsOf(form)
+  const setItems = (next) => update({ workout_items: next, ...summarise(next) })
+  const saveJson = (key, value) => {
+    setConfigMap(c => ({ ...c, [key]: JSON.stringify(value) }))
+    saveConfig({ key, value: JSON.stringify(value) }).catch(() => {})
+  }
+  const learn = (found) => {
+    let known = {}
+    try { known = JSON.parse(configMap.exercise_aliases || '{}') } catch {}
+    saveJson('exercise_aliases', { ...known, ...found })
+  }
 
   return (
     <div className="space-y-6">
@@ -233,7 +246,7 @@ export default function MoveSection({ afterSave }) {
         )}
       </section>
 
-      {/* ── Walk and exercise: one group, two rows ── */}
+      {/* ── Post-dinner walk ── */}
       <section className="group-list">
         <div>
           <Toggle label="Post-dinner walk" sublabel="10 minutes or more for full points" points={w.post_dinner_walk}
@@ -246,28 +259,14 @@ export default function MoveSection({ afterSave }) {
             </div>
           )}
         </div>
-        <div>
-          <Toggle label="Exercise session" sublabel="45 minutes or more for full points" points={w.exercise_session}
-            checked={!!form.exercise_done}
-            onChange={on => update({ exercise_done: on, exercise_duration_minutes: on ? (form.exercise_duration_minutes || 30) : 0 })} />
-          {form.exercise_done && (
-            <div className="pb-4 space-y-3">
-              <PillSelector options={EXERCISE_TYPES} value={form.exercise_type} onChange={type => update({ exercise_type: type })} />
-              <PillSelector options={EXERCISE_DURATIONS} value={form.exercise_duration_minutes}
-                onChange={v => update({ exercise_duration_minutes: v })} formatter={v => `${v} min`} />
-              {!hideCalories && (
-                <>
-                  <PillSelector options={INTENSITIES} value={form.exercise_intensity || 'normal'}
-                    onChange={v => update({ exercise_intensity: v })} formatter={v => INTENSITY_LABEL[v]} />
-                  <p className="text-sm text-text-secondary tabular-nums">
-                    {sessionKcal > 0 ? `About ${fmtKcal(sessionKcal).slice(1)} kcal` : form.exercise_type === 'Walking' && steps > 0 ? 'Counted through your steps' : ''}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-        </div>
       </section>
+
+      <ExerciseLog items={items} onChange={setItems} onLearn={learn}
+        onRoutines={(list) => saveJson('workout_routines', list)}
+        context={{
+          kg: weightKg, heightCm: Number(configMap.height_cm) || 170, steps, hideCalories, config: configMap, earlier,
+          points: w.exercise_session, done: !!form.exercise_done,
+        }} />
 
       <NoteField value={form.notes} placeholder="How was today's workout?"
         onChange={notes => update({ notes }, TEXT_SAVE_MS)} />

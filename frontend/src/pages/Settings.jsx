@@ -22,6 +22,8 @@ import { NOTIFICATION_MODES, DEFAULT_NOTIFICATION_MODE } from '../services/remin
 import { planNudges } from '../services/nudgePlanner'
 import NudgeSettings, { NudgeDeveloperStats } from '../components/NudgeSettings'
 import WidgetSettings from '../components/WidgetSettings'
+import ExerciseSettings from '../components/ExerciseSettings'
+import { describeItem } from '../services/workoutItems'
 import { useGoBack, useBackClose } from '../hooks/useNavigation'
 import { version as APP_VERSION } from '../../package.json'
 import useStore from '../store/useStore'
@@ -578,6 +580,7 @@ export default function Settings() {
         Date: r.date, Steps: r.steps || 0, 'Post-Dinner Walk': r.post_dinner_walk ? 'Yes' : 'No',
         'Walk Minutes': r.post_dinner_walk_minutes || 0, 'Exercise Done': r.exercise_done ? 'Yes' : 'No',
         'Exercise Type': r.exercise_type || '', 'Exercise Duration (min)': r.exercise_duration_minutes || 0,
+        Exercises: (r.workout_items || []).map(i => [i.name, describeItem(i)].filter(Boolean).join(' ')).join(', '),
       }))), 'Workout')
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sleepLogs.map(r => ({
         Date: r.date, 'Sleep Time': r.sleep_time || '', 'Wake Time': r.wake_time || '',
@@ -740,6 +743,7 @@ export default function Settings() {
     { title: 'Food & AI', items: [
       { key: 'foods',       Icon: Sparkles, label: 'Custom foods', desc: `${activeFoods.length} food${activeFoods.length !== 1 ? 's' : ''}${archivedFoods.length ? ` · ${archivedFoods.length} archived` : ''}` },
       { key: 'ai_provider', Icon: KeyRound, label: 'AI assistant', desc: hasLlmKey(aiConfig) ? 'Connected' : 'Not set up' },
+      { key: 'exercises',   Icon: Dumbbell, label: 'Your exercises', desc: 'Learned names and saved routines' },
     ] },
     { title: 'Reminders & data', items: [
       { key: 'reminders', Icon: Bell,     label: 'Reminders',        desc: `${modeLabel} · bed ${bedTime}` },
@@ -1533,6 +1537,15 @@ export default function Settings() {
           <NudgeSettings hasKey={hasLlmKey(aiConfig)} onOpenAi={() => setActiveSection('ai_provider')} />
         </div>
         <SaveBtn />
+      </div>
+    )
+
+    if (activeSection === 'exercises') return (
+      <div className="flex flex-col h-full">
+        <DetailHeader title="Your exercises" onBack={back} />
+        <div className="overflow-y-auto flex-1 px-4 py-4">
+          <ExerciseSettings />
+        </div>
       </div>
     )
 

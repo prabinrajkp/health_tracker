@@ -480,6 +480,13 @@ export async function getMaintenanceCheck() {
 }
 
 // What the user has eaten lately, for suggesting foods they already like.
+// Earlier workouts, newest first, for repeating a session and for lifting progress
+export async function getRecentWorkouts(days = 120) {
+  const since = format(subDays(new Date(), days), 'yyyy-MM-dd')
+  const rows = await db.workout_logs.where('date').between(since, today(), true, false).toArray()
+  return rows.sort((a, b) => b.date.localeCompare(a.date))
+}
+
 export async function getRecentDietLogs(days = 30) {
   const start = format(subDays(new Date(), days), 'yyyy-MM-dd')
   return db.diet_logs.where('date').between(start, today(), true, true).toArray()

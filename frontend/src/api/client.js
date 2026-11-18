@@ -84,6 +84,7 @@ export const getEnergyDays      = (s, e)  => local.getEnergyDays(s, e)
 export const getDayEnergy       = (date)  => local.getDayEnergy(date)
 export const getMaintenanceCheck = ()     => local.getMaintenanceCheck()
 export const getRecentDietLogs  = (days)  => local.getRecentDietLogs(days)
+export const getRecentWorkouts  = (days)  => local.getRecentWorkouts(days)
 
 export const isSickDay      = (date)  => local.isSickDay(date)
 export const markSickDays   = (dates) => local.markSickDays(dates)
